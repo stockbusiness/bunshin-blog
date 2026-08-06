@@ -1,0 +1,854 @@
+// BUNSHIN BLOG Phase 0 — Prisma schema
+// 対応仕様：docs/SPEC.md v2.1 第5章
+// 補足：docs/DATA_MODEL.md（jsonb構造・アプリ層制約・追加テーブルの根拠）
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// Enums
+// ============================================================
+
+enum Role {
+  ADMIN
+  MONITOR
+}
+
+enum UserStatus {
+  INVITED
+  ACTIVE
+  PAUSED
+  WITHDRAWN
+}
+
+enum OnboardingStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum BlogPurpose {
+  AFFILIATE
+  DISPLAY_AD
+  MIXED
+}
+
+enum BlogStatus {
+  SETUP
+  ACTIVE
+  PAUSED
+  CLOSED
+}
+
+enum ConnectionStatus {
+  UNTESTED
+  CONNECTED
+  FAILED
+  REVOKED
+}
+
+enum CompetitionLevel {
+  HIGH
+  MEDIUM
+  LOW
+  UNKNOWN
+}
+
+enum YmylRisk {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum GenreStatus {
+  CANDIDATE
+  APPROVED
+  REJECTED
+}
+
+enum FactType {
+  EXPERIENCE
+  OPINION
+  PROFILE
+  FAILURE
+  PRODUCT_REVIEW
+}
+
+enum FactSource {
+  USER_INPUT
+  ADMIN_INTERVIEW
+  EXISTING_CONTENT
+  AI_INFERENCE
+}
+
+enum FactVerification {
+  VERIFIED
+  UNVERIFIED
+  REJECTED
+}
+
+enum ConversionType {
+  FREE_SIGNUP
+  REQUEST
+  TRIAL
+  PURCHASE
+  OTHER
+}
+
+enum UserExperience {
+  USED
+  NOT_USED
+  UNKNOWN
+}
+
+enum OfferStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ENDED
+  NEEDS_REVIEW
+}
+
+enum BannerSlot {
+  TOP
+  AFTER_FIRST_HEADING
+  MIDDLE
+  BOTTOM
+  SIDEBAR
+}
+
+enum BannerStatus {
+  ACTIVE
+  PAUSED
+  ENDED
+}
+
+enum StrategyType {
+  STANDARD
+  HIGH_VOLUME
+  HIGH_QUALITY
+  REVENUE_FOCUSED
+  CUSTOM
+}
+
+enum PlanType {
+  INITIAL
+  MONTHLY
+  AD_HOC
+}
+
+enum PlanStatus {
+  DRAFT
+  APPROVED
+  ACTIVE
+  ARCHIVED
+}
+
+enum ContentType {
+  INFORMATIONAL
+  EXPERIENCE
+  FAQ
+  COMPARISON
+  AFFILIATE
+}
+
+enum Objective {
+  TRAFFIC
+  TRUST
+  REVENUE
+  INTERNAL_LINK
+}
+
+enum ContentItemStatus {
+  PLANNED
+  GENERATING
+  READY_FOR_REVIEW
+  APPROVED
+  POSTED
+  PUBLISHED
+  REJECTED
+}
+
+enum FactCheckStatus {
+  NOT_CHECKED
+  PASSED
+  WARNING
+  FAILED
+}
+
+enum ApprovalStatus {
+  PENDING
+  VIEWED
+  APPROVED
+  REVISION_REQUESTED
+  SKIPPED
+  EXPIRED
+}
+
+enum ProposalType {
+  NEW_ARTICLE
+  REWRITE
+  TITLE
+  CTA
+  INTERNAL_LINK
+  BANNER
+}
+
+enum RevisionRequestType {
+  SHORTER
+  SOFTER
+  CHANGE_TITLE
+  CHANGE_PRODUCT
+  FACT_ERROR
+  FREE_TEXT
+}
+
+enum WpPostStatus {
+  DRAFT
+  PENDING
+  PUBLISH
+  TRASH
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum PlanningStepStatus {
+  PASSED
+  WARNED
+  BLOCKED
+  OVERRIDDEN
+}
+
+// ============================================================
+// ユーザー
+// ============================================================
+
+model User {
+  id               String     @id @default(uuid()) @db.Uuid
+  role             Role       @default(MONITOR)
+  displayName      String     @map("display_name")
+  email            String?    @unique
+  lineUserId       String?    @unique @map("line_user_id")
+  status           UserStatus @default(INVITED)
+  timezone         String     @default("Asia/Tokyo")
+  termsAcceptedAt  DateTime?  @map("terms_accepted_at") @db.Timestamptz(6)
+  dataUseConsentAt DateTime?  @map("data_use_consent_at") @db.Timestamptz(6)
+  createdAt        DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  monitorProfile MonitorProfile?
+  userPersona    UserPersona?
+  blogs          Blog[]
+  personaFacts   PersonaFact[]
+  approvals      Approval[]
+  aiUsageLogs    AiUsageLog[]
+  auditLogs      AuditLog[]      @relation("AuditActor")
+
+  @@index([status])
+  @@map("users")
+}
+
+model MonitorProfile {
+  id                       String           @id @default(uuid()) @db.Uuid
+  userId                   String           @unique @map("user_id") @db.Uuid
+  affiliateExperienceYears Int?             @map("affiliate_experience_years")
+  monthlyGoalYen           Int?             @map("monthly_goal_yen")
+  primaryAspNames          String[]         @map("primary_asp_names")
+  notificationDays         Int[]            @map("notification_days")
+  notificationTime         DateTime         @map("notification_time") @db.Time(6)
+  maxDailyProposals        Int              @default(1) @map("max_daily_proposals")
+  onboardingStatus         OnboardingStatus @default(NOT_STARTED) @map("onboarding_status")
+  createdAt                DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("monitor_profiles")
+}
+
+// ============================================================
+// ブログ
+// ============================================================
+
+model Blog {
+  id                String      @id @default(uuid()) @db.Uuid
+  userId            String      @map("user_id") @db.Uuid
+  name              String
+  slug              String
+  genreId           String?     @map("genre_id") @db.Uuid
+  penName           String?     @map("pen_name")
+  targetReader      String
+  purpose           BlogPurpose @default(AFFILIATE)
+  status            BlogStatus  @default(SETUP)
+  slotNumber        Int         @map("slot_number")
+  launchDate        DateTime?   @map("launch_date") @db.Date
+  articleRatio      Json        @map("article_ratio")
+  experimentGroupId String?     @map("experiment_group_id") @db.Uuid
+  createdAt         DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user            User                     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  genre           Genre?                   @relation(fields: [genreId], references: [id], onDelete: SetNull)
+  experimentGroup ExperimentGroup?         @relation(fields: [experimentGroupId], references: [id], onDelete: SetNull)
+  wordpress       WordpressConnection?
+  personaSettings BlogPersonaSetting?
+  searchConsole   SearchConsoleConnection?
+  offers          AffiliateOffer[]
+  banners         Banner[]
+  personaFacts    PersonaFact[]
+  contentPlans    ContentPlan[]
+  contentItems    ContentItem[]
+  wordpressPosts  WordpressPost[]
+  approvals       Approval[]
+  metricsDaily    MetricDaily[]
+  planningRuns    PlanningRun[]
+  aiUsageLogs     AiUsageLog[]
+
+  @@unique([userId, slotNumber])
+  @@index([userId, status])
+  @@map("blogs")
+}
+
+model WordpressConnection {
+  id                   String           @id @default(uuid()) @db.Uuid
+  blogId               String           @unique @map("blog_id") @db.Uuid
+  siteUrl              String           @map("site_url")
+  wpUsernameEncrypted  String           @map("wp_username_encrypted")
+  appPasswordEncrypted String           @map("app_password_encrypted")
+  apiBaseUrl           String           @map("api_base_url")
+  connectionStatus     ConnectionStatus @default(UNTESTED) @map("connection_status")
+  canCreatePosts       Boolean          @default(false) @map("can_create_posts")
+  canEditPosts         Boolean          @default(false) @map("can_edit_posts")
+  canUploadMedia       Boolean          @default(false) @map("can_upload_media")
+  lastTestedAt         DateTime?        @map("last_tested_at") @db.Timestamptz(6)
+  lastSyncedAt         DateTime?        @map("last_synced_at") @db.Timestamptz(6)
+  lastErrorCode        String?          @map("last_error_code")
+  lastErrorMessage     String?          @map("last_error_message")
+  createdAt            DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  blog Blog @relation(fields: [blogId], references: [id], onDelete: Cascade)
+
+  @@map("wordpress_connections")
+}
+
+model Genre {
+  id               String           @id @default(uuid()) @db.Uuid
+  name             String
+  category         String
+  competitionLevel CompetitionLevel @default(UNKNOWN) @map("competition_level")
+  ymylRisk         YmylRisk         @map("ymyl_risk")
+  notes            String?
+  status           GenreStatus      @default(CANDIDATE)
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  blogs Blog[]
+
+  @@unique([name])
+  @@map("genres")
+}
+
+// ============================================================
+// 分身
+// ============================================================
+
+model UserPersona {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @unique @map("user_id") @db.Uuid
+  baseProfile   Json     @map("base_profile")
+  tone          Json
+  values        Json
+  ngExpressions String[] @map("ng_expressions")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_personas")
+}
+
+model BlogPersonaSetting {
+  id                 String   @id @default(uuid()) @db.Uuid
+  blogId             String   @unique @map("blog_id") @db.Uuid
+  penName            String   @map("pen_name")
+  toneOverride       Json     @map("tone_override")
+  targetReader       Json     @map("target_reader")
+  allowedExperiences String[] @map("allowed_experiences") @db.Uuid
+  ngTopics           String[] @map("ng_topics")
+  writingRules       Json     @map("writing_rules")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  blog Blog @relation(fields: [blogId], references: [id], onDelete: Cascade)
+
+  @@map("blog_persona_settings")
+}
+
+model PersonaFact {
+  id                String           @id @default(uuid()) @db.Uuid
+  userId            String           @map("user_id") @db.Uuid
+  blogId            String?          @map("blog_id") @db.Uuid
+  factType          FactType         @map("fact_type")
+  content           String
+  source            FactSource
+  verification      FactVerification @default(UNVERIFIED)
+  usableFirstPerson Boolean          @default(false) @map("usable_first_person")
+  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  blog Blog? @relation(fields: [blogId], references: [id], onDelete: SetNull)
+
+  @@index([userId, verification])
+  @@index([blogId])
+  @@map("persona_facts")
+}
+
+// ============================================================
+// 案件・バナー
+// ============================================================
+
+model AffiliateOffer {
+  id              String         @id @default(uuid()) @db.Uuid
+  blogId          String         @map("blog_id") @db.Uuid
+  name            String
+  aspName         String         @map("asp_name")
+  advertiserName  String?        @map("advertiser_name")
+  landingPageUrl  String         @map("landing_page_url")
+  affiliateUrl    String         @map("affiliate_url")
+  rewardYen       Int?           @map("reward_yen")
+  conversionType  ConversionType @map("conversion_type")
+  facts           Json
+  userExperience  UserExperience @default(UNKNOWN) @map("user_experience")
+  userRating      Int?           @map("user_rating")
+  denyConditions  String[]       @map("deny_conditions")
+  lpFormFields    Int?           @map("lp_form_fields")
+  lpMobileReady   Boolean?       @map("lp_mobile_ready")
+  lpEvaluatedAt   DateTime?      @map("lp_evaluated_at") @db.Timestamptz(6)
+  selectionScore  Int?           @map("selection_score")
+  scoreBreakdown  Json?          @map("score_breakdown")
+  status          OfferStatus    @default(DRAFT)
+  startsAt        DateTime?      @map("starts_at") @db.Date
+  endsAt          DateTime?      @map("ends_at") @db.Date
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  blog           Blog            @relation(fields: [blogId], references: [id], onDelete: Cascade)
+  banners        Banner[]
+  contentItems   ContentItem[]
+  affiliateLinks AffiliateLink[]
+
+  @@index([blogId, status])
+  @@map("affiliate_offers")
+}
+
+model Banner {
+  id               String       @id @default(uuid()) @db.Uuid
+  blogId           String       @map("blog_id") @db.Uuid
+  name             String
+  imageUrl         String       @map("image_url")
+  destinationUrl   String       @map("destination_url")
+  affiliateOfferId String?      @map("affiliate_offer_id") @db.Uuid
+  slot             BannerSlot
+  targetCategories String[]     @map("target_categories")
+  status           BannerStatus @default(ACTIVE)
+  startsAt         DateTime?    @map("starts_at") @db.Timestamptz(6)
+  endsAt           DateTime?    @map("ends_at") @db.Timestamptz(6)
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  blog           Blog            @relation(fields: [blogId], references: [id], onDelete: Cascade)
+  affiliateOffer AffiliateOffer? @relation(fields: [affiliateOfferId], references: [id], onDelete: SetNull)
+
+  @@index([blogId, status])
+  @@map("banners")
+}
+
+// ============================================================
+// 実験
+// ============================================================
+
+model ExperimentGroup {
+  id           String       @id @default(uuid()) @db.Uuid
+  name         String
+  description  String
+  strategyType StrategyType @map("strategy_type")
+  settings     Json
+  startDate    DateTime     @map("start_date") @db.Date
+  endDate      DateTime?    @map("end_date") @db.Date
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  blogs Blog[]
+
+  @@map("experiment_groups")
+}
+
+// ============================================================
+// 構成表・記事
+// ============================================================
+
+model ContentPlan {
+  id               String     @id @default(uuid()) @db.Uuid
+  blogId           String     @map("blog_id") @db.Uuid
+  planType         PlanType   @map("plan_type")
+  version          Int        @default(1)
+  status           PlanStatus @default(DRAFT)
+  strategySnapshot Json       @map("strategy_snapshot")
+  generatedByJobId String?    @map("generated_by_job_id") @db.Uuid
+  createdAt        DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  blog         Blog          @relation(fields: [blogId], references: [id], onDelete: Cascade)
+  contentItems ContentItem[]
+  planningRuns PlanningRun[]
+
+  @@unique([blogId, planType, version])
+  @@map("content_plans")
+}
+
+/// 構成表の1行。制約はアプリ層で検証する（DATA_MODEL.md「アプリ層制約」参照）
+model ContentItem {
+  id                  String            @id @default(uuid()) @db.Uuid
+  contentPlanId       String            @map("content_plan_id") @db.Uuid
+  blogId              String            @map("blog_id") @db.Uuid
+  sequenceNo          Int               @map("sequence_no")
+  contentType         ContentType       @map("content_type")
+  title               String
+  primaryKeyword      String?           @map("primary_keyword")
+  searchIntent        String            @map("search_intent")
+  objective           Objective
+  affiliateOfferId    String?           @map("affiliate_offer_id") @db.Uuid
+  targetRevenueItemId String?           @map("target_revenue_item_id") @db.Uuid
+  inboundLinkItemIds  String[]          @map("inbound_link_item_ids") @db.Uuid
+  outboundLinkItemIds String[]          @map("outbound_link_item_ids") @db.Uuid
+  publishPriority     Int               @map("publish_priority")
+  plannedPublishWeek  Int?              @map("planned_publish_week")
+  plannedPublishDate  DateTime?         @map("planned_publish_date") @db.Date
+  status              ContentItemStatus @default(PLANNED)
+  createdAt           DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  contentPlan     ContentPlan      @relation(fields: [contentPlanId], references: [id], onDelete: Cascade)
+  blog            Blog             @relation(fields: [blogId], references: [id], onDelete: Cascade)
+  affiliateOffer  AffiliateOffer?  @relation(fields: [affiliateOfferId], references: [id], onDelete: SetNull)
+  targetRevenue   ContentItem?     @relation("RevenueTarget", fields: [targetRevenueItemId], references: [id], onDelete: SetNull)
+  inboundItems    ContentItem[]    @relation("RevenueTarget")
+  articleVersions ArticleVersion[]
+  approvals       Approval[]
+  wordpressPost   WordpressPost?
+  metricsDaily    MetricDaily[]
+  affiliateLinks  AffiliateLink[]
+  aiUsageLogs     AiUsageLog[]
+
+  @@unique([contentPlanId, sequenceNo])
+  @@index([blogId, contentType])
+  @@index([blogId, primaryKeyword])
+  @@map("content_items")
+}
+
+model ArticleVersion {
+  id                 String          @id @default(uuid()) @db.Uuid
+  contentItemId      String          @map("content_item_id") @db.Uuid
+  versionNo          Int             @map("version_no")
+  title              String
+  excerpt            String
+  answerCapsule      String          @map("answer_capsule")
+  bodyHtml           String          @map("body_html")
+  faqJson            Json            @map("faq_json")
+  structuredDataJson Json            @map("structured_data_json")
+  factCheckStatus    FactCheckStatus @default(NOT_CHECKED) @map("fact_check_status")
+  riskFlags          Json            @map("risk_flags")
+  usedFactIds        String[]        @map("used_fact_ids") @db.Uuid
+  unverifiedClaims   Json            @map("unverified_claims")
+  modelProvider      String          @map("model_provider")
+  modelName          String          @map("model_name")
+  promptVersion      String          @map("prompt_version")
+  inputTokens        Int             @map("input_tokens")
+  outputTokens       Int             @map("output_tokens")
+  estimatedCostUsd   Decimal         @map("estimated_cost_usd") @db.Decimal(10, 6)
+  contentHash        String          @map("content_hash")
+  createdAt          DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  contentItem ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  approvals   Approval[]
+
+  @@unique([contentItemId, versionNo])
+  @@index([factCheckStatus])
+  @@map("article_versions")
+}
+
+// ============================================================
+// 承認
+// ============================================================
+
+model Approval {
+  id               String         @id @default(uuid()) @db.Uuid
+  userId           String         @map("user_id") @db.Uuid
+  blogId           String         @map("blog_id") @db.Uuid
+  contentItemId    String         @map("content_item_id") @db.Uuid
+  articleVersionId String         @map("article_version_id") @db.Uuid
+  status           ApprovalStatus @default(PENDING)
+  proposalType     ProposalType   @map("proposal_type")
+  priorityScore    Int            @map("priority_score")
+  proposalReason   String         @map("proposal_reason")
+  sentAt           DateTime?      @map("sent_at") @db.Timestamptz(6)
+  viewedAt         DateTime?      @map("viewed_at") @db.Timestamptz(6)
+  respondedAt      DateTime?      @map("responded_at") @db.Timestamptz(6)
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  blog             Blog              @relation(fields: [blogId], references: [id], onDelete: Cascade)
+  contentItem      ContentItem       @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  articleVersion   ArticleVersion    @relation(fields: [articleVersionId], references: [id], onDelete: Cascade)
+  revisionRequests RevisionRequest[]
+
+  @@index([userId, status])
+  @@index([blogId, status])
+  @@map("approvals")
+}
+
+model RevisionRequest {
+  id          String              @id @default(uuid()) @db.Uuid
+  approvalId  String              @map("approval_id") @db.Uuid
+  requestType RevisionRequestType @map("request_type")
+  comment     String?
+  createdAt   DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  approval Approval @relation(fields: [approvalId], references: [id], onDelete: Cascade)
+
+  @@index([approvalId])
+  @@map("revision_requests")
+}
+
+// ============================================================
+// WordPress投稿
+// ============================================================
+
+model WordpressPost {
+  id              String       @id @default(uuid()) @db.Uuid
+  blogId          String       @map("blog_id") @db.Uuid
+  contentItemId   String       @unique @map("content_item_id") @db.Uuid
+  wpPostId        Int          @map("wp_post_id")
+  wpPostUrl       String?      @map("wp_post_url")
+  wpEditUrl       String?      @map("wp_edit_url")
+  wpStatus        WpPostStatus @default(DRAFT) @map("wp_status")
+  lastContentHash String       @map("last_content_hash")
+  postedAt        DateTime     @map("posted_at") @db.Timestamptz(6)
+  publishedAt     DateTime?    @map("published_at") @db.Timestamptz(6)
+  lastSyncedAt    DateTime?    @map("last_synced_at") @db.Timestamptz(6)
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  blog        Blog        @relation(fields: [blogId], references: [id], onDelete: Cascade)
+  contentItem ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+
+  @@unique([blogId, wpPostId])
+  @@map("wordpress_posts")
+}
+
+// ============================================================
+// 計測
+// ============================================================
+
+model MetricDaily {
+  id                String   @id @default(uuid()) @db.Uuid
+  blogId            String   @map("blog_id") @db.Uuid
+  contentItemId     String?  @map("content_item_id") @db.Uuid
+  metricDate        DateTime @map("metric_date") @db.Date
+  impressions       Int      @default(0)
+  searchClicks      Int      @default(0) @map("search_clicks")
+  averagePosition   Decimal? @map("average_position") @db.Decimal(6, 2)
+  pageViews         Int?     @map("page_views")
+  affiliateClicks   Int      @default(0) @map("affiliate_clicks")
+  aiReferrals       Int      @default(0) @map("ai_referrals")
+  bannerImpressions Int      @default(0) @map("banner_impressions")
+  bannerClicks      Int      @default(0) @map("banner_clicks")
+  conversions       Int      @default(0)
+  revenueYen        Int      @default(0) @map("revenue_yen")
+  indexed           Boolean?
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  blog        Blog         @relation(fields: [blogId], references: [id], onDelete: Cascade)
+  contentItem ContentItem? @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+
+  @@unique([blogId, contentItemId, metricDate])
+  @@index([metricDate])
+  @@map("metrics_daily")
+}
+
+// ============================================================
+// AI費用・ジョブ・監査
+// ============================================================
+
+model AiUsageLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  blogId        String?  @map("blog_id") @db.Uuid
+  contentItemId String?  @map("content_item_id") @db.Uuid
+  jobId         String?  @map("job_id") @db.Uuid
+  provider      String
+  model         String
+  operation     String
+  inputTokens   Int      @map("input_tokens")
+  outputTokens  Int      @map("output_tokens")
+  webSearchCalls Int     @default(0) @map("web_search_calls")
+  costUsd       Decimal  @map("cost_usd") @db.Decimal(10, 6)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  blog        Blog?        @relation(fields: [blogId], references: [id], onDelete: SetNull)
+  contentItem ContentItem? @relation(fields: [contentItemId], references: [id], onDelete: SetNull)
+  job         Job?         @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([blogId, createdAt])
+  @@map("ai_usage_logs")
+}
+
+model Job {
+  id             String    @id @default(uuid()) @db.Uuid
+  jobType        String    @map("job_type")
+  userId         String?   @map("user_id") @db.Uuid
+  blogId         String?   @map("blog_id") @db.Uuid
+  targetId       String?   @map("target_id") @db.Uuid
+  status         JobStatus @default(QUEUED)
+  attemptCount   Int       @default(0) @map("attempt_count")
+  idempotencyKey String    @unique @map("idempotency_key")
+  inputJson      Json      @map("input_json")
+  outputJson     Json?     @map("output_json")
+  errorCode      String?   @map("error_code")
+  errorMessage   String?   @map("error_message")
+  startedAt      DateTime? @map("started_at") @db.Timestamptz(6)
+  completedAt    DateTime? @map("completed_at") @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  aiUsageLogs AiUsageLog[]
+
+  @@index([status, jobType])
+  @@index([blogId])
+  @@map("jobs")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  actorUserId String?  @map("actor_user_id") @db.Uuid
+  action      String
+  entityType  String   @map("entity_type")
+  entityId    String?  @map("entity_id") @db.Uuid
+  metadata    Json
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  actor User? @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ============================================================
+// 追加テーブル（SPEC 5章に記載なし・DATA_MODEL.mdに根拠を記載）
+// ============================================================
+
+/// 構成表生成の実行記録。STEP 1〜4の判定結果と再生成回数を保持する
+model PlanningRun {
+  id             String             @id @default(uuid()) @db.Uuid
+  blogId         String             @map("blog_id") @db.Uuid
+  contentPlanId  String?            @map("content_plan_id") @db.Uuid
+  step1Status    PlanningStepStatus @map("step1_status")
+  step1Reasons   Json               @map("step1_reasons")
+  rejectionCount Int                @default(0) @map("rejection_count")
+  overriddenAt   DateTime?          @map("overridden_at") @db.Timestamptz(6)
+  selectedOffers Json               @map("selected_offers")
+  retryCount     Int                @default(0) @map("retry_count")
+  constraintResult Json             @map("constraint_result")
+  succeeded      Boolean            @default(false)
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  blog        Blog         @relation(fields: [blogId], references: [id], onDelete: Cascade)
+  contentPlan ContentPlan? @relation(fields: [contentPlanId], references: [id], onDelete: SetNull)
+
+  @@index([blogId, createdAt])
+  @@map("planning_runs")
+}
+
+/// プロンプトのバージョン管理（SPEC 6.2 /admin/prompts の永続化先）
+model PromptVersion {
+  id        String   @id @default(uuid()) @db.Uuid
+  key       String
+  version   String
+  body      String
+  isActive  Boolean  @default(false) @map("is_active")
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([key, version])
+  @@index([key, isActive])
+  @@map("prompt_versions")
+}
+
+/// アフィリエイトリンクの自前リダイレクタ（TASKS D-8）
+model AffiliateLink {
+  id               String   @id @default(uuid()) @db.Uuid
+  code             String   @unique
+  affiliateOfferId String   @map("affiliate_offer_id") @db.Uuid
+  contentItemId    String?  @map("content_item_id") @db.Uuid
+  destinationUrl   String   @map("destination_url")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  affiliateOffer AffiliateOffer @relation(fields: [affiliateOfferId], references: [id], onDelete: Cascade)
+  contentItem    ContentItem?   @relation(fields: [contentItemId], references: [id], onDelete: SetNull)
+  clicks         LinkClick[]
+
+  @@index([affiliateOfferId])
+  @@map("affiliate_links")
+}
+
+/// クリック生イベント。日次で metrics_daily へ集計する
+model LinkClick {
+  id              String   @id @default(uuid()) @db.Uuid
+  affiliateLinkId String   @map("affiliate_link_id") @db.Uuid
+  referrerHost    String?  @map("referrer_host")
+  isAiReferral    Boolean  @default(false) @map("is_ai_referral")
+  userAgentHash   String?  @map("user_agent_hash")
+  clickedAt       DateTime @default(now()) @map("clicked_at") @db.Timestamptz(6)
+
+  affiliateLink AffiliateLink @relation(fields: [affiliateLinkId], references: [id], onDelete: Cascade)
+
+  @@index([affiliateLinkId, clickedAt])
+  @@map("link_clicks")
+}
+
+/// Search Console の OAuth トークン（TASKS G-1）
+model SearchConsoleConnection {
+  id                    String           @id @default(uuid()) @db.Uuid
+  blogId                String           @unique @map("blog_id") @db.Uuid
+  propertyUrl           String           @map("property_url")
+  refreshTokenEncrypted String           @map("refresh_token_encrypted")
+  connectionStatus      ConnectionStatus @default(UNTESTED) @map("connection_status")
+  lastSyncedAt          DateTime?        @map("last_synced_at") @db.Timestamptz(6)
+  lastErrorCode         String?          @map("last_error_code")
+  createdAt             DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  blog Blog @relation(fields: [blogId], references: [id], onDelete: Cascade)
+
+  @@map("search_console_connections")
+}
