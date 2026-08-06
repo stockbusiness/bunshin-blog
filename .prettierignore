@@ -1,0 +1,14 @@
+node_modules
+.next
+out
+build
+coverage
+package-lock.json
+next-env.d.ts
+
+# ドキュメントは手書き仕様のため整形対象にしない
+*.md
+docs/
+
+# Prisma スキーマは A-2 の設計成果物
+prisma/

@@ -28,3 +28,26 @@
 - 状況：モニター募集条件そのもの
 - 影響範囲：H-1、H-2、募集要項
 - 状態：**未解決。モニター募集前に決定が必要**
+
+### Q-003 ソースディレクトリに `src/` を付けるか
+
+- 発生タスク：A-1
+- 状況：`SPEC.md` 4.2 のツリーは `src/` 配下に `modules/` `app/` `lib/` `tests/` を置いている。一方 `TASKS.md` の「主な変更先」欄は `lib/env.ts` `modules/auth/` `app/liff/` `tests/integration/` と `src/` を省いた表記になっている
+- 選択肢：(a) `src/app` `src/modules` `src/lib` `src/tests`（SPEC 4.2 の表記どおり）／(b) リポジトリ直下に `app/` `modules/` `lib/` `tests/`
+- 影響範囲：以降の全タスクのファイルパス、`tsconfig.json` の `@/*` エイリアス
+- 状態：**解決（2026-08-06）。(a) を採用。`src/` 配下が正であり、SPEC 4.2 を唯一の正とする。ディレクトリ移動は不要**
+
+決定内容：
+
+- ソースコードは全て `src/` 配下に置く。`@/*` → `./src/*`
+- `TASKS.md` の「主な変更先」欄が `src/` を省いているのは記載ミス。以下のとおり読み替える
+
+  | TASKS.md の表記 | 実際のパス |
+  |---|---|
+  | `lib/env.ts` | `src/lib/env.ts` |
+  | `modules/auth/` | `src/modules/auth/` |
+  | `app/liff/` | `src/app/liff/` |
+  | `tests/` | `src/tests/` |
+
+- **例外：`prisma/` はリポジトリ直下のまま。`src/` 配下へ移動しない**
+- `TASKS.md` 本体の表記修正は A-1 のPRに含めず、別PR（`docs/fix-tasks-paths`）で行う

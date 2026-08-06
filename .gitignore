@@ -1,8 +1,15 @@
 node_modules/
 .next/
+out/
+build/
+coverage/
 .env
 .env.*
 !.env.example
 *.log
 .DS_Store
 /prisma/migrations/dev.db*
+
+# TypeScript / Next.js
+*.tsbuildinfo
+next-env.d.ts
