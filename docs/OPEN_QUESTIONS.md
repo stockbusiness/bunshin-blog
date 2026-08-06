@@ -28,3 +28,11 @@
 - 状況：モニター募集条件そのもの
 - 影響範囲：H-1、H-2、募集要項
 - 状態：**未解決。モニター募集前に決定が必要**
+
+### Q-003 ソースディレクトリに `src/` を付けるか
+
+- 発生タスク：A-1
+- 状況：`SPEC.md` 4.2 のツリーは `src/` 配下に `modules/` `app/` `lib/` `tests/` を置いている。一方 `TASKS.md` の「主な変更先」欄は `lib/env.ts` `modules/auth/` `app/liff/` `tests/integration/` と `src/` を省いた表記になっている
+- 選択肢：(a) `src/app` `src/modules` `src/lib` `src/tests`（SPEC 4.2 の表記どおり）／(b) リポジトリ直下に `app/` `modules/` `lib/` `tests/`
+- 影響範囲：以降の全タスクのファイルパス、`tsconfig.json` の `@/*` エイリアス
+- 状態：**暫定決定（2026-08-06）。SPEC を唯一の正とし (a) を採用。`@/*` → `./src/*`。(b) が正なら A-2 以降が増える前に移動が必要なため、早期の確認を希望**
