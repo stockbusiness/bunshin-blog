@@ -12,6 +12,7 @@
 - 完了時に `docs/IMPLEMENTATION_STATUS.md` の該当行を更新する
 - 判断できない事項は実装せず `docs/OPEN_QUESTIONS.md` へ記録する
 - `依存`欄のタスクが完了していない状態で着手しない
+- ソースコードは `SPEC.md` 4.2 のとおり `src/` 配下に置く（`src/app` `src/modules` `src/lib` `src/tests`）。**`prisma/` `.github/` `docs/` はリポジトリ直下のまま**（OPEN_QUESTIONS Q-003）
 
 ### 着手前に確定が必要な事項
 
@@ -28,8 +29,8 @@
 |---|---|---|---|---|
 | A-1 | Next.js + TypeScript 基盤作成 | — | build / typecheck が成功 | ルート一式 |
 | A-2 | `schema.prisma` 全テーブル定義 | A-1 | SPEC 5章の全テーブルが定義され、migrate が成功 | `prisma/` |
-| A-3 | 環境変数バリデーション | A-1 | 未設定時に起動が失敗し、欠落名が表示される | `lib/env.ts` |
-| A-4 | 共通ロガー・エラーレスポンス | A-1 | 秘密情報がログに出ないことをテストで確認 | `lib/logger.ts` `lib/errors.ts` |
+| A-3 | 環境変数バリデーション | A-1 | 未設定時に起動が失敗し、欠落名が表示される | `src/lib/env.ts` |
+| A-4 | 共通ロガー・エラーレスポンス | A-1 | 秘密情報がログに出ないことをテストで確認 | `src/lib/logger.ts` `src/lib/errors.ts` |
 | A-5 | テスト基盤とCI | A-1 | lint / typecheck / test / build がCIで成功 | `.github/` `vitest.config.ts` |
 | A-6 | ドキュメント初期化 | A-1 | README / ARCHITECTURE / STATUS / HISTORY / OPEN_QUESTIONS が存在 | `docs/` |
 
@@ -41,13 +42,13 @@
 
 | ID | タスク | 依存 | 完了条件 | 主な変更先 |
 |---|---|---|---|---|
-| B-1 | LIFF認証（IDトークン検証） | A-2 | 改竄トークンを拒否。クライアント送信のuser_idを信用しない | `modules/auth/` |
-| B-2 | ユーザー登録・規約同意・データ利用同意 | B-1 | 同意なしで他APIが403 | `modules/users/` |
-| B-3 | ブログCRUD | B-2 | 自分のブログのみ取得・更新できる | `modules/blogs/` |
-| B-4 | 3ブログ上限とslot制御 | B-3 | 4件目の登録が拒否される。slot重複が拒否される | `modules/blogs/` |
-| B-5 | ブログ設定画面（LIFF） | B-4 | スマートフォンで全項目を編集できる | `app/liff/blogs/` |
-| B-6 | 管理者認証（Supabase Auth） | A-3 | MONITORが `/admin` へアクセスできない | `modules/auth/` |
-| B-7 | 管理者ユーザー一覧 | B-6 | モニター一覧とオンボーディング状況が表示される | `app/admin/users/` |
+| B-1 | LIFF認証（IDトークン検証） | A-2 | 改竄トークンを拒否。クライアント送信のuser_idを信用しない | `src/modules/auth/` |
+| B-2 | ユーザー登録・規約同意・データ利用同意 | B-1 | 同意なしで他APIが403 | `src/modules/users/` |
+| B-3 | ブログCRUD | B-2 | 自分のブログのみ取得・更新できる | `src/modules/blogs/` |
+| B-4 | 3ブログ上限とslot制御 | B-3 | 4件目の登録が拒否される。slot重複が拒否される | `src/modules/blogs/` |
+| B-5 | ブログ設定画面（LIFF） | B-4 | スマートフォンで全項目を編集できる | `src/app/liff/blogs/` |
+| B-6 | 管理者認証（Supabase Auth） | A-3 | MONITORが `/admin` へアクセスできない | `src/modules/auth/` |
+| B-7 | 管理者ユーザー一覧 | B-6 | モニター一覧とオンボーディング状況が表示される | `src/app/admin/users/` |
 
 **所有権検証は B-3 で共通ヘルパーとして実装し、以降の全モジュールで使い回す。** 各所で `WHERE id = :id AND user_id = :sessionUserId` を書かせない。
 
@@ -57,12 +58,12 @@
 
 | ID | タスク | 依存 | 完了条件 | 主な変更先 |
 |---|---|---|---|---|
-| C-1 | 接続情報の暗号化保存 | A-3, B-4 | 復号値がAPIレスポンス・ログに出ない | `modules/wordpress/` |
-| C-2 | 接続テスト（7項目） | C-1 | 権限不足を個別のエラーコードで返す | `modules/wordpress/` |
-| C-3 | 下書き投稿 | C-2 | `status: draft` 以外で投稿されない | `modules/wordpress/` |
-| C-4 | 冪等性（idempotency_key） | C-3 | 同一ジョブ再実行で二重投稿されない | `modules/jobs/` |
-| C-5 | 投稿更新とWP同期 | C-4 | content hash が同一なら更新しない。公開状態を取り込む | `modules/wordpress/` |
-| C-6 | テナント越境の統合テスト | C-5 | 2ユーザー×2ブログで越境投稿が発生しない | `tests/integration/` |
+| C-1 | 接続情報の暗号化保存 | A-3, B-4 | 復号値がAPIレスポンス・ログに出ない | `src/modules/wordpress/` |
+| C-2 | 接続テスト（7項目） | C-1 | 権限不足を個別のエラーコードで返す | `src/modules/wordpress/` |
+| C-3 | 下書き投稿 | C-2 | `status: draft` 以外で投稿されない | `src/modules/wordpress/` |
+| C-4 | 冪等性（idempotency_key） | C-3 | 同一ジョブ再実行で二重投稿されない | `src/modules/jobs/` |
+| C-5 | 投稿更新とWP同期 | C-4 | content hash が同一なら更新しない。公開状態を取り込む | `src/modules/wordpress/` |
+| C-6 | テナント越境の統合テスト | C-5 | 2ユーザー×2ブログで越境投稿が発生しない | `src/tests/integration/` |
 
 **C-6は必ず単独タスクにする。** 他タスクのついでに書かせると省略される。
 
@@ -72,14 +73,14 @@
 
 | ID | タスク | 依存 | 完了条件 | 主な変更先 |
 |---|---|---|---|---|
-| D-1 | 案件CRUD | B-4 | ブログ別に分離。他ブログの案件が見えない | `modules/affiliate/` |
-| D-2 | LP自動評価 | D-1, A-4 | SSRF対策を満たし、フォーム項目数・ページ長・viewportを判定 | `modules/affiliate/` |
-| D-3 | バナーCRUD | B-4 | 表示位置・対象カテゴリ・有効期間が保存される | `modules/banners/` |
-| D-4 | `user_personas` | B-2 | ユーザー共通人格を編集できる | `modules/personas/` |
-| D-5 | `blog_persona_settings` | D-4, B-4 | ブログ別の上書き設定が保存される | `modules/personas/` |
-| D-6 | `persona_facts` | D-4 | `AI_INFERENCE` かつ `UNVERIFIED` が一人称利用不可のフラグを持つ | `modules/personas/` |
-| D-7 | LINE返信からのfacts保存 | D-6 | 返信が `persona_facts` または `revision_requests` に保存される | `modules/line/` |
-| D-8 | アフィリエイトリダイレクタとクリック計測 | D-1 | 記事内リンクが自前URL経由になり、クリックが記録される | `app/go/` `modules/analytics/` |
+| D-1 | 案件CRUD | B-4 | ブログ別に分離。他ブログの案件が見えない | `src/modules/affiliate/` |
+| D-2 | LP自動評価 | D-1, A-4 | SSRF対策を満たし、フォーム項目数・ページ長・viewportを判定 | `src/modules/affiliate/` |
+| D-3 | バナーCRUD | B-4 | 表示位置・対象カテゴリ・有効期間が保存される | `src/modules/banners/` |
+| D-4 | `user_personas` | B-2 | ユーザー共通人格を編集できる | `src/modules/personas/` |
+| D-5 | `blog_persona_settings` | D-4, B-4 | ブログ別の上書き設定が保存される | `src/modules/personas/` |
+| D-6 | `persona_facts` | D-4 | `AI_INFERENCE` かつ `UNVERIFIED` が一人称利用不可のフラグを持つ | `src/modules/personas/` |
+| D-7 | LINE返信からのfacts保存 | D-6 | 返信が `persona_facts` または `revision_requests` に保存される | `src/modules/line/` |
+| D-8 | アフィリエイトリダイレクタとクリック計測 | D-1 | 記事内リンクが自前URL経由になり、クリックが記録される | `src/app/go/` `src/modules/analytics/` |
 
 **D-8をPhase Gから前倒ししている。** 記事生成（E-8）でリンクを本文に埋め込むため、リダイレクタが後発だと公開済み記事のリンクを全て貼り替えることになる。
 
@@ -89,21 +90,21 @@
 
 | ID | タスク | 依存 | 完了条件 | 主な変更先 |
 |---|---|---|---|---|
-| E-1 | ジョブ基盤（キュー・再試行・状態管理） | A-2 | 長時間処理がリクエスト内で走らない | `modules/jobs/` |
-| E-2 | プロンプト管理とバージョニング | A-2 | プロンプトの有効化・ロールバックができる | `modules/content-generation/` |
-| E-3 | AIプロバイダー抽象化とモデルルーティング | A-3, E-2 | モデル名が環境変数・設定テーブル経由で切替可能 | `lib/ai/` |
-| E-4 | STEP 1 ジャンル審査 | E-1 | 停止条件を満たすジャンルが通過しない。差し戻し2回で選択肢が出る | `modules/content-planning/` |
-| E-5 | STEP 2 案件スコアリング | D-2, E-4 | 足切り・100点満点スコア・上位3件採用がコードで判定される | `modules/content-planning/` |
-| E-6 | STEP 3 収益記事の設計 | E-5 | 記事数が「案件数×2＋1」で算出される | `modules/content-planning/` |
-| E-7 | STEP 4 集客記事とリンク設計 | E-6 | リンク先に `AFFILIATE` 以外を指定できない | `modules/content-planning/` |
-| E-8 | 制約チェックと再生成ループ | E-7 | SPEC 9.2.6の全項目を判定。3回で収束しなければジョブ FAILED | `modules/content-planning/` |
-| E-9 | 公開順序の付与 | E-8 | 収益記事が先行し、集客記事が週4本を超えない | `modules/content-planning/` |
-| E-10 | 記事生成（本文・内部リンク・CTA） | E-3, E-9 | 構成表を参照して生成。単体生成モードを作らない | `modules/content-generation/` |
-| E-11 | アンサーカプセル・FAQ・JSON-LD | E-10 | H1直後に80〜120字の結論。JSON-LDが構文的に妥当 | `modules/content-generation/` |
-| E-12 | 事実チェック | E-10, D-6 | facts外の数値・条件を検出。FAILEDは承認依頼へ送らない | `modules/content-generation/` |
-| E-13 | 禁止表現・リスクフラグ・PR表記 | E-10 | PR表記欠落と断定表現を検出 | `modules/content-generation/` |
-| E-14 | AI費用ログ | E-3 | ユーザー別・ブログ別・記事別・モデル別に記録される | `modules/ai-costs/` |
-| E-15 | 予算通知（80/100/150%） | E-14 | 超過しても生成が停止しない。ADMINへ通知される | `modules/ai-costs/` |
+| E-1 | ジョブ基盤（キュー・再試行・状態管理） | A-2 | 長時間処理がリクエスト内で走らない | `src/modules/jobs/` |
+| E-2 | プロンプト管理とバージョニング | A-2 | プロンプトの有効化・ロールバックができる | `src/modules/content-generation/` |
+| E-3 | AIプロバイダー抽象化とモデルルーティング | A-3, E-2 | モデル名が環境変数・設定テーブル経由で切替可能 | `src/lib/ai/` |
+| E-4 | STEP 1 ジャンル審査 | E-1 | 停止条件を満たすジャンルが通過しない。差し戻し2回で選択肢が出る | `src/modules/content-planning/` |
+| E-5 | STEP 2 案件スコアリング | D-2, E-4 | 足切り・100点満点スコア・上位3件採用がコードで判定される | `src/modules/content-planning/` |
+| E-6 | STEP 3 収益記事の設計 | E-5 | 記事数が「案件数×2＋1」で算出される | `src/modules/content-planning/` |
+| E-7 | STEP 4 集客記事とリンク設計 | E-6 | リンク先に `AFFILIATE` 以外を指定できない | `src/modules/content-planning/` |
+| E-8 | 制約チェックと再生成ループ | E-7 | SPEC 9.2.6の全項目を判定。3回で収束しなければジョブ FAILED | `src/modules/content-planning/` |
+| E-9 | 公開順序の付与 | E-8 | 収益記事が先行し、集客記事が週4本を超えない | `src/modules/content-planning/` |
+| E-10 | 記事生成（本文・内部リンク・CTA） | E-3, E-9 | 構成表を参照して生成。単体生成モードを作らない | `src/modules/content-generation/` |
+| E-11 | アンサーカプセル・FAQ・JSON-LD | E-10 | H1直後に80〜120字の結論。JSON-LDが構文的に妥当 | `src/modules/content-generation/` |
+| E-12 | 事実チェック | E-10, D-6 | facts外の数値・条件を検出。FAILEDは承認依頼へ送らない | `src/modules/content-generation/` |
+| E-13 | 禁止表現・リスクフラグ・PR表記 | E-10 | PR表記欠落と断定表現を検出 | `src/modules/content-generation/` |
+| E-14 | AI費用ログ | E-3 | ユーザー別・ブログ別・記事別・モデル別に記録される | `src/modules/ai-costs/` |
+| E-15 | 予算通知（80/100/150%） | E-14 | 超過しても生成が停止しない。ADMINへ通知される | `src/modules/ai-costs/` |
 
 ### AIとコードの境界（E-4〜E-9で厳守）
 
@@ -121,13 +122,13 @@
 
 | ID | タスク | 依存 | 完了条件 | 主な変更先 |
 |---|---|---|---|---|
-| F-1 | 提案の優先順位算出（3ブログ横断） | E-10 | 優先度と提案理由が保存される | `modules/approvals/` |
-| F-2 | LINE通知送信 | F-1 | 同一提案を連続通知しない | `modules/line/` |
-| F-3 | 通知数制御（既定1日1件・最大2件） | F-2 | 3ブログ合計で制限される。緊急通知は別枠 | `modules/line/` |
-| F-4 | LIFF承認一覧 | F-1 | 他ユーザーの承認を開けない | `app/liff/approvals/` |
-| F-5 | LIFF承認詳細（記事全文・リスク表示） | F-4, E-12 | 未確認事実とリスク警告が表示される | `app/liff/approvals/` |
-| F-6 | 承認・修正依頼・見送りAPI | F-5 | トランザクションと冪等性を持つ | `modules/approvals/` |
-| F-7 | 承認からWordPress投稿ジョブ連携 | F-6, C-4 | 承認→下書き投稿がE2Eで成功 | `modules/jobs/` |
+| F-1 | 提案の優先順位算出（3ブログ横断） | E-10 | 優先度と提案理由が保存される | `src/modules/approvals/` |
+| F-2 | LINE通知送信 | F-1 | 同一提案を連続通知しない | `src/modules/line/` |
+| F-3 | 通知数制御（既定1日1件・最大2件） | F-2 | 3ブログ合計で制限される。緊急通知は別枠 | `src/modules/line/` |
+| F-4 | LIFF承認一覧 | F-1 | 他ユーザーの承認を開けない | `src/app/liff/approvals/` |
+| F-5 | LIFF承認詳細（記事全文・リスク表示） | F-4, E-12 | 未確認事実とリスク警告が表示される | `src/app/liff/approvals/` |
+| F-6 | 承認・修正依頼・見送りAPI | F-5 | トランザクションと冪等性を持つ | `src/modules/approvals/` |
+| F-7 | 承認からWordPress投稿ジョブ連携 | F-6, C-4 | 承認→下書き投稿がE2Eで成功 | `src/modules/jobs/` |
 
 ---
 
@@ -135,13 +136,13 @@
 
 | ID | タスク | 依存 | 完了条件 | 主な変更先 |
 |---|---|---|---|---|
-| G-1 | Search Console OAuth連携 | B-4 | ブログ単位で連携でき、トークンが暗号化される | `modules/analytics/` |
-| G-2 | Search Analytics 取得ジョブ | G-1, E-1 | 日次で表示回数・クリック・順位を保存。API上限を考慮 | `modules/analytics/` |
-| G-3 | インデックス状況取得（別ジョブ） | G-2 | URL Inspection の結果が保存される | `modules/analytics/` |
-| G-4 | AI検索流入の判別 | D-8 | 対象ドメインが設定ファイルで追加できる | `modules/analytics/` |
-| G-5 | 手動収益入力（週次） | B-4 | 成果件数と報酬額のみ入力。0件を1操作で記録できる | `app/liff/results/` |
-| G-6 | `metrics_daily` 集計 | G-2, G-5 | SPEC 10.2の記録条件が全て保存される | `modules/analytics/` |
-| G-7 | 管理ダッシュボード | G-6 | ジャンル別・戦略別・ブログ別の集計がSQLで取得できる | `app/admin/` |
+| G-1 | Search Console OAuth連携 | B-4 | ブログ単位で連携でき、トークンが暗号化される | `src/modules/analytics/` |
+| G-2 | Search Analytics 取得ジョブ | G-1, E-1 | 日次で表示回数・クリック・順位を保存。API上限を考慮 | `src/modules/analytics/` |
+| G-3 | インデックス状況取得（別ジョブ） | G-2 | URL Inspection の結果が保存される | `src/modules/analytics/` |
+| G-4 | AI検索流入の判別 | D-8 | 対象ドメインが設定ファイルで追加できる | `src/modules/analytics/` |
+| G-5 | 手動収益入力（週次） | B-4 | 成果件数と報酬額のみ入力。0件を1操作で記録できる | `src/app/liff/results/` |
+| G-6 | `metrics_daily` 集計 | G-2, G-5 | SPEC 10.2の記録条件が全て保存される | `src/modules/analytics/` |
+| G-7 | 管理ダッシュボード | G-6 | ジャンル別・戦略別・ブログ別の集計がSQLで取得できる | `src/app/admin/` |
 
 **実験グループの管理UIとAPIは作らない。** `experiment_groups` への登録はSQLまたはシードで行う（SPEC 10.3）。
 
@@ -151,10 +152,10 @@
 
 | ID | タスク | 依存 | 完了条件 | 主な変更先 |
 |---|---|---|---|---|
-| H-1 | 招待フロー | B-7 | 招待〜ACTIVE化が管理画面で完結 | `modules/users/` |
-| H-2 | オンボーディング（LIFF 10ステップ） | H-1, C-2, D-1 | 中断・再開ができる | `app/liff/onboarding/` |
-| H-3 | エラー通知とサポート依頼 | F-2 | 接続切れ・リンク切れ・案件終了が緊急通知される | `modules/line/` |
-| H-4 | 退会・停止処理 | B-2 | 物理削除せずCLOSED。データエクスポートができる | `modules/users/` |
+| H-1 | 招待フロー | B-7 | 招待〜ACTIVE化が管理画面で完結 | `src/modules/users/` |
+| H-2 | オンボーディング（LIFF 10ステップ） | H-1, C-2, D-1 | 中断・再開ができる | `src/app/liff/onboarding/` |
+| H-3 | エラー通知とサポート依頼 | F-2 | 接続切れ・リンク切れ・案件終了が緊急通知される | `src/modules/line/` |
+| H-4 | 退会・停止処理 | B-2 | 物理削除せずCLOSED。データエクスポートができる | `src/modules/users/` |
 | H-5 | バックアップ | A-2 | 日次バックアップと復旧手順が文書化されている | `docs/` |
 | H-6 | 操作マニュアルとデータ利用同意文 | H-2 | モニターが自力でオンボーディングを完了できる | `docs/` |
 
