@@ -62,7 +62,7 @@
 | C-2 | 接続テスト（7項目） | C-1 | 権限不足を個別のエラーコードで返す | `src/modules/wordpress/` |
 | C-3 | 下書き投稿 | C-2 | `status: draft` 以外で投稿されない | `src/modules/wordpress/` |
 | C-4 | 冪等性（idempotency_key） | C-3 | 同一ジョブ再実行で二重投稿されない | `src/modules/jobs/` |
-| C-5 | 投稿更新とWP同期 | C-4 | content hash が同一なら更新しない。公開状態を取り込む | `src/modules/wordpress/` |
+| C-5 | 投稿更新とWP同期 | C-4 | content hash が同一なら更新しない。公開状態を取り込む。`user_edited_at` の追加と、未編集判定の実装（DATA_MODEL 11章） | `src/modules/wordpress/` `prisma/` |
 | C-6 | テナント越境の統合テスト | C-5 | 2ユーザー×2ブログで越境投稿が発生しない | `src/tests/integration/` |
 
 **C-6は必ず単独タスクにする。** 他タスクのついでに書かせると省略される。
