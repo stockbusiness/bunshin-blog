@@ -1,0 +1,216 @@
+/**
+ * 日時ヘルパー（TASKS A-7）。
+ *
+ * `docs/DATA_MODEL.md` 10章に従う。
+ * - 保存は `timestamptz`（内部的にUTC）
+ * - 業務上の基準時刻は JST（Asia/Tokyo）
+ * - 週の開始は月曜
+ *
+ * **各モジュールで独自に日付計算を書かない。** 日付境界・週境界の判定は
+ * 必ずここを経由する。`new Date()` からの手計算や、モジュールごとの
+ * オフセット加算を禁止する。
+ *
+ * JSTは夏時間を持たないため、固定オフセット（UTC+9）で計算する。
+ * 対象期間に切り替えは無く、`Intl` に依存しない分だけ結果が決定的になる。
+ */
+
+export const JST_TIME_ZONE = 'Asia/Tokyo';
+
+/** JSTのUTCからのオフセット（分） */
+export const JST_OFFSET_MINUTES = 9 * 60;
+
+const MS_PER_MINUTE = 60_000;
+const MS_PER_DAY = 24 * 60 * MS_PER_MINUTE;
+const JST_OFFSET_MS = JST_OFFSET_MINUTES * MS_PER_MINUTE;
+
+/**
+ * JSTの暦日を表す `YYYY-MM-DD`。
+ *
+ * `metrics_daily.metric_date` など `date` 型の列に対応する
+ * （DATA_MODEL 10章「日付型のカラムはJSTの暦日として扱う」）。
+ */
+export type JstDate = string;
+
+/** JSTの壁時計時刻を表す `HH:MM` または `HH:MM:SS` */
+export type JstTime = string;
+
+/** 日付境界の区間。`start` 以上 `endExclusive` 未満 */
+export interface InstantRange {
+  start: Date;
+  endExclusive: Date;
+}
+
+const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
+const TIME_PATTERN = /^(\d{2}):(\d{2})(?::(\d{2}))?$/;
+
+function pad(value: number, length = 2): string {
+  return String(value).padStart(length, '0');
+}
+
+/** `YYYY-MM-DD` として妥当か。存在しない日付（2026-02-30 など）は false */
+export function isJstDate(value: string): boolean {
+  const matched = DATE_PATTERN.exec(value);
+  if (matched === null) {
+    return false;
+  }
+
+  const year = Number(matched[1]);
+  const month = Number(matched[2]);
+  const day = Number(matched[3]);
+  const utc = new Date(Date.UTC(year, month - 1, day));
+
+  // 繰り上がった場合は存在しない日付
+  return (
+    utc.getUTCFullYear() === year &&
+    utc.getUTCMonth() === month - 1 &&
+    utc.getUTCDate() === day
+  );
+}
+
+function assertJstDate(value: string): void {
+  if (!isJstDate(value)) {
+    throw new Error(`JSTの日付として不正です: ${value}（YYYY-MM-DD 形式）`);
+  }
+}
+
+function assertValidInstant(instant: Date): void {
+  if (Number.isNaN(instant.getTime())) {
+    throw new Error('Invalid Date が渡されました');
+  }
+}
+
+/**
+ * UTCの瞬間を、その時点のJSTの暦日に変換する。
+ *
+ * 外部APIがUTC基準のタイムスタンプを返す場合も、これを通してから
+ * `date` 列に保存する（DATA_MODEL 10章）。
+ */
+export function toJstDate(instant: Date): JstDate {
+  assertValidInstant(instant);
+
+  const shifted = new Date(instant.getTime() + JST_OFFSET_MS);
+
+  return [
+    pad(shifted.getUTCFullYear(), 4),
+    pad(shifted.getUTCMonth() + 1),
+    pad(shifted.getUTCDate()),
+  ].join('-');
+}
+
+/** JSTの暦日の 00:00 を表すUTCの瞬間を返す */
+export function startOfJstDay(date: JstDate): Date {
+  assertJstDate(date);
+
+  const matched = DATE_PATTERN.exec(date) as RegExpExecArray;
+  const utcMidnight = Date.UTC(
+    Number(matched[1]),
+    Number(matched[2]) - 1,
+    Number(matched[3]),
+  );
+
+  return new Date(utcMidnight - JST_OFFSET_MS);
+}
+
+/** JSTの1日の区間を返す。日次集計の抽出条件に使う */
+export function jstDayRange(date: JstDate): InstantRange {
+  const start = startOfJstDay(date);
+
+  return {
+    start,
+    endExclusive: new Date(start.getTime() + MS_PER_DAY),
+  };
+}
+
+/**
+ * JSTの暦日と壁時計時刻から、UTCの瞬間を求める。
+ *
+ * `monitor_profiles.notification_time` はJSTの壁時計時刻で保存されるため、
+ * 送信時刻を求めるときにこれを使う（DATA_MODEL 10章）。
+ */
+export function atJstTime(date: JstDate, time: JstTime): Date {
+  const matched = TIME_PATTERN.exec(time);
+  if (matched === null) {
+    throw new Error(`JSTの時刻として不正です: ${time}（HH:MM 形式）`);
+  }
+
+  const hours = Number(matched[1]);
+  const minutes = Number(matched[2]);
+  const seconds = matched[3] === undefined ? 0 : Number(matched[3]);
+
+  if (hours > 23 || minutes > 59 || seconds > 59) {
+    throw new Error(`JSTの時刻として不正です: ${time}`);
+  }
+
+  const startMs = startOfJstDay(date).getTime();
+
+  return new Date(startMs + ((hours * 60 + minutes) * 60 + seconds) * 1_000);
+}
+
+/** JSTの暦日に日数を加算する。負の値で減算 */
+export function addJstDays(date: JstDate, days: number): JstDate {
+  if (!Number.isInteger(days)) {
+    throw new Error(`日数は整数である必要があります: ${days}`);
+  }
+
+  const shifted = startOfJstDay(date).getTime() + days * MS_PER_DAY;
+
+  return toJstDate(new Date(shifted));
+}
+
+/**
+ * その日が属する週の月曜のJST暦日を返す。
+ *
+ * **週の開始は月曜**（DATA_MODEL 10章）。`planned_publish_week` の週番号も、
+ * 週4本の上限判定の集計区間も、これで揃える。
+ */
+export function startOfJstWeek(date: JstDate): JstDate {
+  assertJstDate(date);
+
+  // getUTCDay: 0=日曜, 1=月曜, ... 6=土曜
+  const dayOfWeek = new Date(
+    startOfJstDay(date).getTime() + JST_OFFSET_MS,
+  ).getUTCDay();
+
+  // 月曜を0とした経過日数
+  const daysSinceMonday = (dayOfWeek + 6) % 7;
+
+  return addJstDays(date, -daysSinceMonday);
+}
+
+/** その日が属する週（月曜〜日曜）の区間を返す */
+export function jstWeekRange(date: JstDate): InstantRange {
+  const start = startOfJstDay(startOfJstWeek(date));
+
+  return {
+    start,
+    endExclusive: new Date(start.getTime() + 7 * MS_PER_DAY),
+  };
+}
+
+/**
+ * 2つの日付が何週離れているかを返す（月曜始まり）。
+ *
+ * 同じ週なら0。`to` が後の週なら正、前の週なら負。
+ */
+export function jstWeeksBetween(from: JstDate, to: JstDate): number {
+  const fromMonday = startOfJstDay(startOfJstWeek(from)).getTime();
+  const toMonday = startOfJstDay(startOfJstWeek(to)).getTime();
+
+  return Math.round((toMonday - fromMonday) / (7 * MS_PER_DAY));
+}
+
+/**
+ * 基準日を1週目としたときの週番号を返す（1始まり）。
+ *
+ * `content_items.planned_publish_week` に対応する。
+ * SPEC 9.2.7 は「1〜2週目：収益記事」「3週目以降：集客記事を週4本」と
+ * 定めており、この番号はブログの公開開始日を基準とした相対週である。
+ */
+export function jstWeekNumber(baseDate: JstDate, target: JstDate): number {
+  return jstWeeksBetween(baseDate, target) + 1;
+}
+
+/** いま現在のJST暦日 */
+export function todayInJst(now: Date = new Date()): JstDate {
+  return toJstDate(now);
+}
