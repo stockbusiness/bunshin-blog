@@ -166,3 +166,10 @@ jobs:
             exit 1
           fi
           echo "slot_number=4 は拒否された"
+
+      - name: 統合テスト
+        run: |
+          # 前のステップで入れた検証用データを消してから走らせる
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c \
+            "truncate table blogs, users restart identity cascade"
+          npm run test:integration

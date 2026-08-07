@@ -10,6 +10,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/tests/**/*.test.ts', 'src/**/*.test.ts'],
+    // 統合テストは実DBを要するため、別設定（vitest.integration.config.ts）で動かす
+    exclude: ['src/tests/integration/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text-summary', 'lcov'],
