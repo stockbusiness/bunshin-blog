@@ -254,10 +254,28 @@ model User {
   personaFacts   PersonaFact[]
   approvals      Approval[]
   aiUsageLogs    AiUsageLog[]
-  auditLogs      AuditLog[]      @relation("AuditActor")
+  auditLogs      AuditLog[]        @relation("AuditActor")
+  loginTokens    AdminLoginToken[]
 
   @@index([status])
   @@map("users")
+}
+
+/// 管理者のログイン用ワンタイムトークン（B-10、OPEN_QUESTIONS Q-012）。
+/// **トークンそのものは保存しない。** ハッシュだけを持つ。
+model AdminLoginToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([expiresAt])
+  @@map("admin_login_tokens")
 }
 
 model MonitorProfile {
@@ -422,29 +440,29 @@ model PersonaFact {
 // ============================================================
 
 model AffiliateOffer {
-  id              String         @id @default(uuid()) @db.Uuid
-  blogId          String         @map("blog_id") @db.Uuid
-  name            String
-  aspName         String         @map("asp_name")
-  advertiserName  String?        @map("advertiser_name")
-  landingPageUrl  String         @map("landing_page_url")
-  affiliateUrl    String         @map("affiliate_url")
-  rewardYen       Int?           @map("reward_yen")
-  conversionType  ConversionType @map("conversion_type")
-  facts           Json
-  userExperience  UserExperience @default(UNKNOWN) @map("user_experience")
-  userRating      Int?           @map("user_rating")
-  denyConditions  String[]       @map("deny_conditions")
-  lpFormFields    Int?           @map("lp_form_fields")
-  lpMobileReady   Boolean?       @map("lp_mobile_ready")
-  lpEvaluatedAt   DateTime?      @map("lp_evaluated_at") @db.Timestamptz(6)
-  selectionScore  Int?           @map("selection_score")
-  scoreBreakdown  Json?          @map("score_breakdown")
-  status          OfferStatus    @default(DRAFT)
-  startsAt        DateTime?      @map("starts_at") @db.Date
-  endsAt          DateTime?      @map("ends_at") @db.Date
-  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id             String         @id @default(uuid()) @db.Uuid
+  blogId         String         @map("blog_id") @db.Uuid
+  name           String
+  aspName        String         @map("asp_name")
+  advertiserName String?        @map("advertiser_name")
+  landingPageUrl String         @map("landing_page_url")
+  affiliateUrl   String         @map("affiliate_url")
+  rewardYen      Int?           @map("reward_yen")
+  conversionType ConversionType @map("conversion_type")
+  facts          Json
+  userExperience UserExperience @default(UNKNOWN) @map("user_experience")
+  userRating     Int?           @map("user_rating")
+  denyConditions String[]       @map("deny_conditions")
+  lpFormFields   Int?           @map("lp_form_fields")
+  lpMobileReady  Boolean?       @map("lp_mobile_ready")
+  lpEvaluatedAt  DateTime?      @map("lp_evaluated_at") @db.Timestamptz(6)
+  selectionScore Int?           @map("selection_score")
+  scoreBreakdown Json?          @map("score_breakdown")
+  status         OfferStatus    @default(DRAFT)
+  startsAt       DateTime?      @map("starts_at") @db.Date
+  endsAt         DateTime?      @map("ends_at") @db.Date
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   blog           Blog            @relation(fields: [blogId], references: [id], onDelete: Cascade)
   banners        Banner[]
@@ -697,19 +715,19 @@ model MetricDaily {
 // ============================================================
 
 model AiUsageLog {
-  id            String   @id @default(uuid()) @db.Uuid
-  userId        String   @map("user_id") @db.Uuid
-  blogId        String?  @map("blog_id") @db.Uuid
-  contentItemId String?  @map("content_item_id") @db.Uuid
-  jobId         String?  @map("job_id") @db.Uuid
-  provider      String
-  model         String
-  operation     String
-  inputTokens   Int      @map("input_tokens")
-  outputTokens  Int      @map("output_tokens")
-  webSearchCalls Int     @default(0) @map("web_search_calls")
-  costUsd       Decimal  @map("cost_usd") @db.Decimal(10, 6)
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  blogId         String?  @map("blog_id") @db.Uuid
+  contentItemId  String?  @map("content_item_id") @db.Uuid
+  jobId          String?  @map("job_id") @db.Uuid
+  provider       String
+  model          String
+  operation      String
+  inputTokens    Int      @map("input_tokens")
+  outputTokens   Int      @map("output_tokens")
+  webSearchCalls Int      @default(0) @map("web_search_calls")
+  costUsd        Decimal  @map("cost_usd") @db.Decimal(10, 6)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   blog        Blog?        @relation(fields: [blogId], references: [id], onDelete: SetNull)
@@ -768,18 +786,18 @@ model AuditLog {
 
 /// 構成表生成の実行記録。STEP 1〜4の判定結果と再生成回数を保持する
 model PlanningRun {
-  id             String             @id @default(uuid()) @db.Uuid
-  blogId         String             @map("blog_id") @db.Uuid
-  contentPlanId  String?            @map("content_plan_id") @db.Uuid
-  step1Status    PlanningStepStatus @map("step1_status")
-  step1Reasons   Json               @map("step1_reasons")
-  rejectionCount Int                @default(0) @map("rejection_count")
-  overriddenAt   DateTime?          @map("overridden_at") @db.Timestamptz(6)
-  selectedOffers Json               @map("selected_offers")
-  retryCount     Int                @default(0) @map("retry_count")
-  constraintResult Json             @map("constraint_result")
-  succeeded      Boolean            @default(false)
-  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  id               String             @id @default(uuid()) @db.Uuid
+  blogId           String             @map("blog_id") @db.Uuid
+  contentPlanId    String?            @map("content_plan_id") @db.Uuid
+  step1Status      PlanningStepStatus @map("step1_status")
+  step1Reasons     Json               @map("step1_reasons")
+  rejectionCount   Int                @default(0) @map("rejection_count")
+  overriddenAt     DateTime?          @map("overridden_at") @db.Timestamptz(6)
+  selectedOffers   Json               @map("selected_offers")
+  retryCount       Int                @default(0) @map("retry_count")
+  constraintResult Json               @map("constraint_result")
+  succeeded        Boolean            @default(false)
+  createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
 
   blog        Blog         @relation(fields: [blogId], references: [id], onDelete: Cascade)
   contentPlan ContentPlan? @relation(fields: [contentPlanId], references: [id], onDelete: SetNull)

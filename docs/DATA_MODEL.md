@@ -138,6 +138,11 @@ Prismaのスキーマでは表現できない。**`modules/content-planning/cons
 ```sql
 ALTER TABLE blogs ADD CONSTRAINT blogs_slot_range CHECK (slot_number BETWEEN 1 AND 3);
 ALTER TABLE content_items ADD CONSTRAINT content_items_outbound_max CHECK (array_length(outbound_link_item_ids, 1) IS NULL OR array_length(outbound_link_item_ids, 1) <= 2);
+
+-- B-10。期限切れのトークンを発行しても「なぜかログインできない」としか
+-- 分からず、原因の切り分けが難しい
+ALTER TABLE admin_login_tokens ADD CONSTRAINT admin_login_tokens_expiry_after_creation CHECK (expires_at > created_at);
+ALTER TABLE admin_login_tokens ADD CONSTRAINT admin_login_tokens_used_after_creation CHECK (used_at IS NULL OR used_at >= created_at);
 ```
 
 `blogs` の3件上限（`UNIQUE(user_id, slot_number)` ＋ 上記CHECK）で、4件目は構造的に登録できない。
@@ -181,6 +186,21 @@ TASKS D-8の自前リダイレクタ。SPEC 20.1でリダイレクト方式をPh
 
 TASKS G-1。ブログ単位のOAuthトークンを暗号化保存する。SPEC 11.3に「ブログ単位でOAuth連携」とあるが保存先が未定義。
 
+### `admin_login_tokens`
+
+TASKS B-10。管理者のワンタイムログインリンク（OPEN_QUESTIONS Q-012）。
+
+**必要な理由：** SPEC 3.2 は管理者の認証を「Supabase Auth／メール＋ワンタイムリンク／ADMINロール制御のいずれか」としており、Q-012 で2つ目を選んだ。**リンクを1回だけ使えるようにするには、使用済みかどうかを保存する場所が要る。** 署名だけの自己完結トークンでは、期限内に何度でも使えてしまい、メールの転送や端末の紛失でそのまま入られる。
+
+| 列 | 用途 |
+|---|---|
+| `token_hash` | **トークンのSHA-256。原文は保存しない。** DBが漏れてもリンクが使えないようにする |
+| `expires_at` | 有効期限（15分程度） |
+| `used_at` | 使用時刻。`NULL` のものだけが使える |
+| `user_id` | `role = 'ADMIN'` の行にのみ発行する（判定はアプリ層・B-11） |
+
+所有モジュールは `auth`。発行と検証は B-11 で実装する。
+
 ---
 
 ## 7. 暗号化対象
@@ -209,12 +229,13 @@ A-5 で CI に組み込み、A-8 でマイグレーション運用に切り替�
 |---|---|
 | `prisma validate` | ✅ 通過 |
 | 初期マイグレーションのコミット（A-8） | ✅ `prisma/migrations/`。26テーブル・30 enum |
+| 追加マイグレーション（B-10） | ✅ `admin_login_tokens`。**27テーブル**になった |
 | 実PostgreSQLへの適用（`prisma migrate deploy`） | ✅ CIのサービスコンテナで実行 |
 | スキーマとマイグレーションの乖離検出 | ✅ CIで実行 |
 
 CI は `db push` ではなく **`migrate deploy`** で適用し、適用後のDBと `schema.prisma` を `migrate diff --exit-code` で比較する。スキーマだけ変えてマイグレーションを足し忘れると失敗する。
 
-4章でDB側にも入れると定めたCHECK制約2件（`blogs_slot_range` / `content_items_outbound_max`）は Prisma のスキーマで表現できないため、初期マイグレーションに手で追記している。CIで存在と実効性を確認している。
+4章でDB側にも入れると定めたCHECK制約は Prisma のスキーマで表現できないため、マイグレーションに手で追記している。**現在4件**（`blogs_slot_range` / `content_items_outbound_max` / `admin_login_tokens_expiry_after_creation` / `admin_login_tokens_used_after_creation`）。CIで件数を確認し、実効性は統合テストで確かめている。
 
 `prisma validate` は Prisma 6 系でのみ通る。Prisma 7 は `datasource` の `url` を廃止したため、本スキーマは通らない（OPEN_QUESTIONS Q-004）。
 

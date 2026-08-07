@@ -52,7 +52,7 @@ const blog = await requireBlogForUser({ blogId, userId });
 | `ai-costs` | `ai_usage_logs` |
 | `jobs` | `jobs` |
 | `audit` | `audit_logs` |
-| `auth` | なし（`users` は `users` モジュール経由で参照する） |
+| `auth` | `admin_login_tokens`（B-10）。`users` は `users` モジュール経由で参照する |
 | `line` | なし（外部APIとの入出力のみ） |
 
 テーブル名は `docs/DATA_MODEL.md` と `prisma/schema.prisma` に従う（A-2 時点の26テーブル全てに所有モジュールを割り当てている）。所有の割り当てを変える場合は、本ファイルを同じPRで更新する。
