@@ -18,6 +18,8 @@ export const AUTH_ERROR_CODES = {
   consentRequired: 'AUTH_CONSENT_REQUIRED',
   /** 停止・退会などで利用できない状態 */
   userNotActive: 'AUTH_USER_NOT_ACTIVE',
+  /** 認証は済んでいるが ADMIN ではない（B-6） */
+  adminRequired: 'AUTH_ADMIN_REQUIRED',
 } as const;
 
 export type AuthErrorCode =

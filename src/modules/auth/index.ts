@@ -35,6 +35,7 @@ export {
 export {
   requireUser,
   requireConsentedUser,
+  requireAdmin,
   readSessionCookie,
   type GuardOptions,
 } from './guard';
