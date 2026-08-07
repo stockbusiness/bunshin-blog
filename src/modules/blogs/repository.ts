@@ -1,7 +1,17 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { AppError } from '@/lib/errors';
-import { BLOG_ERROR_CODES, ownedBy, requireFound } from './ownership';
+import { ownedBy, requireFound } from './ownership';
+import {
+  MAX_BLOGS_PER_USER,
+  availableSlots,
+  isBlogSlotNumber,
+  resolveSlotNumber,
+  slotTakenError,
+  type BlogSlotNumber,
+  type BlogSlotOccupancy,
+  type BlogSlotUsage,
+} from './slots';
 import type { AppBlog, CreateBlogInput, UpdateBlogInput } from './types';
 
 /**
@@ -94,16 +104,50 @@ export async function requireBlogForUser(params: {
   return requireFound(await findBlogForUser(params));
 }
 
+/**
+ * スロットの使用状況（B-4）。
+ *
+ * **`CLOSED` を含める。** 閉じたブログもスロットを保持し続ける（Q-008）。
+ * 一覧（`listBlogsForUser`）が既定で `CLOSED` を外すのとは方針が異なる。
+ */
+export async function getSlotUsageForUser(
+  userId: string,
+): Promise<BlogSlotUsage> {
+  const records = await prisma.blog.findMany({
+    where: { userId },
+    select: { id: true, slotNumber: true, status: true },
+    orderBy: LIST_ORDER,
+  });
+
+  const used: BlogSlotOccupancy[] = records
+    // CHECK 制約で 1〜3 に限られるが、範囲外の行があっても空き計算を壊さない
+    .filter((record) => isBlogSlotNumber(record.slotNumber))
+    .map((record) => ({
+      slotNumber: record.slotNumber as BlogSlotNumber,
+      blogId: record.id,
+      status: record.status as AppBlog['status'],
+    }));
+
+  const available = availableSlots(used);
+
+  return {
+    limit: MAX_BLOGS_PER_USER,
+    used,
+    available,
+    remaining: available.length,
+  };
+}
+
 /** Prisma の制約違反を、意味のあるエラーへ変換する */
-function toConflictError(error: unknown): AppError | null {
+function toConflictError(
+  error: unknown,
+  slotNumber: BlogSlotNumber,
+): AppError | null {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
-    // P2002: unique 制約（UNIQUE(user_id, slot_number)）
+    // P2002: unique 制約（UNIQUE(user_id, slot_number)）。
+    // アプリ側の判定を通った後にここへ来るのは、同時に2件作られた場合
     if (error.code === 'P2002') {
-      return new AppError(
-        BLOG_ERROR_CODES.conflict,
-        409,
-        'そのスロットは既に使われています',
-      );
+      return slotTakenError({ slotNumber, closed: false });
     }
     // P2010 / P2000 系: CHECK 制約（blogs_slot_range）など
     if (error.code === 'P2010' || error.code === 'P2000') {
@@ -127,14 +171,22 @@ function toConflictError(error: unknown): AppError | null {
  *
  * `userId` はセッションから渡すこと。**入力に `userId` を含めない。**
  *
- * 3件上限の判定は B-4 で追加する。現時点では
- * `UNIQUE(user_id, slot_number)` と `CHECK(slot_number BETWEEN 1 AND 3)` により
- * 構造的に4件目が入らない（DATA_MODEL 4章）。
+ * 上限3件・スロット重複・`CLOSED` の再利用は `resolveSlotNumber` が判定する
+ * （B-4）。`UNIQUE(user_id, slot_number)` と
+ * `CHECK(slot_number BETWEEN 1 AND 3)` は同時実行に対する最後の砦として残す。
+ *
+ * `input.slotNumber` を省略すると空いている最小の番号を割り当てる。
  */
 export async function createBlogForUser(
   userId: string,
   input: CreateBlogInput,
 ): Promise<AppBlog> {
+  const usage = await getSlotUsageForUser(userId);
+  const slotNumber = resolveSlotNumber({
+    used: usage.used,
+    requested: input.slotNumber,
+  });
+
   try {
     const record = await prisma.blog.create({
       data: {
@@ -142,7 +194,7 @@ export async function createBlogForUser(
         name: input.name,
         slug: input.slug,
         targetReader: input.targetReader,
-        slotNumber: input.slotNumber,
+        slotNumber,
         penName: input.penName ?? null,
         ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
         // 記事構成の既定値。SPEC 9.3 の初期30記事・週4本
@@ -152,7 +204,7 @@ export async function createBlogForUser(
 
     return toAppBlog(record);
   } catch (error) {
-    const mapped = toConflictError(error);
+    const mapped = toConflictError(error, slotNumber);
     if (mapped !== null) {
       throw mapped;
     }

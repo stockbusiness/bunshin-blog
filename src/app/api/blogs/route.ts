@@ -1,7 +1,11 @@
 import { z } from 'zod';
 import { AppError, toErrorHttpResponse } from '@/lib/errors';
 import { requireConsentedUser } from '@/modules/auth';
-import { createBlogForUser, listBlogsForUser } from '@/modules/blogs';
+import {
+  createBlogForUser,
+  getSlotUsageForUser,
+  listBlogsForUser,
+} from '@/modules/blogs';
 
 /**
  * `GET /api/blogs` / `POST /api/blogs`（SPEC 13.2、TASKS B-3）
@@ -22,7 +26,8 @@ const createSchema = z.object({
       message: '英小文字・数字・ハイフンのみ',
     }),
   targetReader: z.string().min(1).max(500),
-  slotNumber: z.number().int().min(1).max(3),
+  // 省略可。省略すると空いている最小のスロットが割り当てられる（B-4）
+  slotNumber: z.number().int().min(1).max(3).optional(),
   penName: z.string().max(100).optional(),
   purpose: z.enum(['AFFILIATE', 'DISPLAY_AD', 'MIXED']).optional(),
 });
@@ -30,9 +35,21 @@ const createSchema = z.object({
 export async function GET(request: Request): Promise<Response> {
   try {
     const user = await requireConsentedUser(request.headers.get('cookie'));
-    const blogs = await listBlogsForUser(user.id);
+    const [blogs, slots] = await Promise.all([
+      listBlogsForUser(user.id),
+      getSlotUsageForUser(user.id),
+    ]);
 
-    return Response.json({ blogs });
+    // 残枠を一緒に返す。一覧は CLOSED を含まないため、
+    // クライアントは `blogs.length` から空きを計算できない（Q-008）
+    return Response.json({
+      blogs,
+      slots: {
+        limit: slots.limit,
+        available: slots.available,
+        remaining: slots.remaining,
+      },
+    });
   } catch (error) {
     return toErrorHttpResponse(error);
   }
