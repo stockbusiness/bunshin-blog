@@ -25,6 +25,14 @@ export {
 } from './ownership';
 
 export {
+  countBlogsByUserForAdmin,
+  toBlogCounts,
+  EMPTY_BLOG_COUNT,
+  type AdminBlogCount,
+  type BlogStatusCountRow,
+} from './admin-counts';
+
+export {
   BLOG_SLOT_NUMBERS,
   BLOG_SLOT_ERROR_CODES,
   MAX_BLOGS_PER_USER,
