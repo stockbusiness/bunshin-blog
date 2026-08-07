@@ -40,4 +40,33 @@ export {
   type GuardOptions,
 } from './guard';
 
+export {
+  requestAdminLoginLink,
+  consumeAdminLoginLink,
+  type RequestLoginLinkDeps,
+  type RequestLoginLinkResult,
+  type RequestLinkOutcome,
+  type ConsumeLoginLinkDeps,
+  type ConsumeLoginLinkResult,
+} from './admin-login/service';
+
+export {
+  createLoginToken,
+  hashLoginToken,
+  loginTokenExpiry,
+  rateWindowStart,
+  buildLoginUrl,
+  buildLoginMail,
+  loginTokenHashEquals,
+  LOGIN_TOKEN_TTL_MINUTES,
+  LOGIN_TOKEN_RATE_LIMIT,
+  LOGIN_TOKEN_RATE_WINDOW_MINUTES,
+} from './admin-login/token';
+
+export type {
+  AdminLoginTokenDb,
+  AdminLoginTokenRecord,
+  AdminLoginDeps,
+} from './admin-login/repository';
+
 export { AUTH_ERROR_CODES, type AuthErrorCode } from './errors';

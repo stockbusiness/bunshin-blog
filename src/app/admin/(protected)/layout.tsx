@@ -1,10 +1,11 @@
+import Link from 'next/link';
 import { headers } from 'next/headers';
 import type { Metadata } from 'next';
 import { AppError } from '@/lib/errors';
 import { requireAdmin } from '@/modules/auth';
 
 /**
- * `/admin` 配下の共通レイアウト（TASKS B-6、SPEC 6.2）。
+ * 認証が要る管理画面の共通レイアウト（TASKS B-6、SPEC 6.2）。
  *
  * **判定はサーバー側で行う。** クライアントで隠すだけでは、画面の中身も
  * データも取得できてしまう。ここで弾けば配下の画面は ADMIN 前提で書ける。
@@ -12,6 +13,10 @@ import { requireAdmin } from '@/modules/auth';
  * `middleware.ts` を使わないのは、セッションの検証が `node:crypto` の
  * `timingSafeEqual` に依存しており（B-2）、Middleware の既定の実行環境で
  * 動かないため。
+ *
+ * **`/admin/login` はこのレイアウトの外に置く**（B-11）。ログイン前の
+ * 画面をここに入れると、ログインするためにログインが要ることになる。
+ * そのためルートグループ `(protected)` で分けている。
  */
 
 export const metadata: Metadata = {
@@ -56,6 +61,9 @@ function AdminDenied({ error }: { error: unknown }) {
     <main className="flex min-h-dvh flex-col items-center justify-center p-6 text-center">
       <p className="text-base font-bold">管理画面</p>
       <p className="mt-3 text-sm leading-relaxed">{message}</p>
+      <Link href="/admin/login" className="mt-6 text-sm underline">
+        ログインする
+      </Link>
     </main>
   );
 }

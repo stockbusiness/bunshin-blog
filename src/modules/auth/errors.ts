@@ -20,6 +20,8 @@ export const AUTH_ERROR_CODES = {
   userNotActive: 'AUTH_USER_NOT_ACTIVE',
   /** 認証は済んでいるが ADMIN ではない（B-6） */
   adminRequired: 'AUTH_ADMIN_REQUIRED',
+  /** ログインリンクが無効（未登録・期限切れ・使用済み。区別しない・B-11） */
+  invalidLoginLink: 'AUTH_INVALID_LOGIN_LINK',
 } as const;
 
 export type AuthErrorCode =

@@ -95,7 +95,7 @@ import { verifyIdToken } from '@/modules/auth';
 
 | 区分 | ファイル |
 |---|---|
-| サーバー専用 | `db.ts`（Prisma）、`env.ts`（`process.env` の全件検証）、`src/modules/**` |
+| サーバー専用 | `db.ts`（Prisma）、`env.ts`（`process.env` の全件検証）、`mailer/`（APIキーを読む）、`src/modules/**` |
 | ブラウザでも動く | `liff/`、`datetime.ts`、`errors.ts` の型 |
 
 **理由。** `db.ts` は Prisma を、`env.ts` はサーバー専用の環境変数を読む。クライアントコンポーネントから辿れる位置に置くとビルドが壊れるか、最悪の場合サーバー側の設定値がバンドルへ混入する（SPEC 14.2）。
