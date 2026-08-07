@@ -84,7 +84,7 @@ B-3 で作る所有権検証は **Phase B〜H の全モジュールが使う土�
 | B-3 | ブログCRUD | B-2 | 自分のブログのみ取得・更新できる | `src/modules/blogs/` |
 | B-4 | 3ブログ上限とslot制御 | B-3 | 4件目の登録が拒否される。slot重複が拒否される。`CLOSED` のスロットを再利用できない（OPEN_QUESTIONS Q-008） | `src/modules/blogs/` |
 | B-5 | ブログ設定画面（LIFF） | B-4, B-8 | ブログ名・ペンネーム・想定読者・収益方針・投稿頻度をスマートフォンで編集できる。ジャンルと算出値は表示のみ（OPEN_QUESTIONS Q-009〜Q-011） | `src/app/liff/blogs/` |
-| B-6 | 管理者認証（Supabase Auth） | A-3 | MONITORが `/admin` へアクセスできない | `src/modules/auth/` |
+| B-6 | 管理者の認可（ADMINロール制御） | B-2 | MONITORが `/admin` へアクセスできない。ログイン手段は OPEN_QUESTIONS Q-012 | `src/modules/auth/`, `src/app/admin/` |
 | B-7 | 管理者ユーザー一覧 | B-6 | モニター一覧とオンボーディング状況が表示される | `src/app/admin/users/` |
 | B-8 | LIFFクライアント基盤 | B-1 | 設定漏れ・初期化失敗・認証失敗のときに画面へ案内が出る。初期化後にセッションCookieが確立する | `src/app/liff/`, `src/lib/liff/` |
 | B-9 | LIFF画面のテスト基盤 | B-5 | 画面のコンポーネントテストが `npm run test` で走る。B-5 の一覧と設定画面について、描画・入力・保存・失敗表示が検証される | `vitest.config.ts`, `src/tests/app/` |
@@ -92,6 +92,14 @@ B-3 で作る所有権検証は **Phase B〜H の全モジュールが使う土�
 **所有権検証は B-3 で共通ヘルパーとして実装し、以降の全モジュールで使い回す。** 各所で `WHERE id = :id AND user_id = :sessionUserId` を書かせない。
 
 **スロット番号はサーバーが決める（B-4）。** 作成時に `slotNumber` を省略すると、空いている最小の番号が割り当てられる。一覧APIは `CLOSED` を既定で返さないため、クライアントは自力で空きを計算できない（Q-008）。残枠は `GET /api/blogs` の `slots` で返す。
+
+### 管理者の「認可」と「認証」を分ける（B-6・Q-012）
+
+B-6 の完了条件は「MONITORが `/admin` へアクセスできない」であり、これは**認可**の話である。`requireAdmin` がセッションから解決したユーザーの `role` を見て弾く。
+
+**誰がどうログインするか（認証）は Q-012 で決める。** `SPEC.md` 3.2 は Supabase Auth・メール＋ワンタイムリンク・ADMINロール制御の「いずれか」としており、Supabase は必須ではない。現状このリポジトリに Supabase は入っていない。
+
+認証手段が変わっても `requireAdmin` は影響を受けない。セッションからユーザーを解決した後の判定だからである。
 
 ### 画面のテストは B-9 の基盤の上に書く
 
