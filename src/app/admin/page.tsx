@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { headers } from 'next/headers';
 import { requireAdmin } from '@/modules/auth';
 
@@ -5,19 +6,32 @@ import { requireAdmin } from '@/modules/auth';
  * `/admin` の入口（TASKS B-6）。
  *
  * **B-6 は「MONITORが `/admin` へアクセスできない」ことまで。**
- * SPEC 6.2 の `/admin/dashboard`（集計）は G-7、モニター一覧は B-7。
+ * SPEC 6.2 の `/admin/dashboard`（集計）は G-7。モニター一覧は B-7。
  * ここにその内容を作らない。
  */
 export default async function AdminHomePage() {
-  // レイアウトで弾いているため、ここへ来るのは ADMIN のみ
-  const admin = await requireAdmin((await headers()).get('cookie'));
+  // **レイアウトの判定だけに頼らない**（B-6）。理由の表示はレイアウトの
+  // 仕事なので、ここでは何も描かずに戻る。例外をそのまま投げると
+  // 拒否のたびにエラー境界へ落ち、未処理例外としてログに残る
+  const admin = await requireAdmin((await headers()).get('cookie')).catch(
+    () => null,
+  );
+  if (admin === null) {
+    return null;
+  }
 
   return (
     <div>
       <h1 className="text-lg font-bold">管理画面</h1>
       <p className="mt-2 text-sm">{admin.displayName} さん</p>
-      <p className="mt-4 text-sm leading-relaxed">
-        モニター一覧は B-7、ダッシュボードは G-7 で追加します。
+      <nav className="mt-6">
+        <Link href="/admin/users" className="text-sm underline">
+          モニター一覧
+        </Link>
+      </nav>
+
+      <p className="mt-6 text-sm leading-relaxed">
+        ダッシュボードは G-7 で追加します。
       </p>
     </div>
   );

@@ -54,6 +54,10 @@ export default defineConfig({
         // （npm run test:integration）。ここで数えると、実際には検証済みの
         // コードを「未カバー」として扱うことになる
         '**/repository.ts',
+        // admin-list も同じ。問い合わせと整形だけで、判断を持たない（B-7）。
+        // 判断を持つ集計は admin-counts.ts の toBlogCounts に切り出してあり、
+        // そちらはユニットテストで数える
+        '**/admin-list.ts',
       ],
       thresholds: {
         lines: 80,

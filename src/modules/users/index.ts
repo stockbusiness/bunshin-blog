@@ -14,6 +14,12 @@ export {
 } from './repository';
 
 export {
+  listMonitorsForAdmin,
+  type AdminMonitorSummary,
+  type OnboardingStatus,
+} from './admin-list';
+
+export {
   hasAllConsents,
   missingConsents,
   isActiveUser,
