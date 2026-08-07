@@ -33,6 +33,7 @@
 | A-4 | 共通ロガー・エラーレスポンス・権限判定の入口・モジュール境界 | A-1 | 秘密情報がログに出ないことをテストで確認。`can()` が定義されユニットテストがある。`docs/MODULE_RULES.md` が存在する | `src/lib/logger.ts` `src/lib/errors.ts` `src/lib/entitlements.ts` `docs/MODULE_RULES.md` |
 | A-5 | テスト基盤とCI | A-1 | lint / typecheck / test / build がCIで成功 | `.github/` `vitest.config.ts` |
 | A-6 | ドキュメント初期化 | A-1 | README / ARCHITECTURE / STATUS / HISTORY / OPEN_QUESTIONS が存在 | `docs/` |
+| A-7 | 日時ヘルパー（JST基準・週境界） | A-1 | JSTでの日付境界と月曜始まりの週境界がテストで確認できる。UTC基準の日付をJSTへ変換できる | `src/lib/datetime.ts` |
 
 **A-2が最重要。** SPEC 5章は疑似記法のため、`jsonb`の中身・リレーション名・インデックス・`onDelete`をこのタスクで確定させ、`docs/DATA_MODEL.md` に記録する。以降のスキーマ変更は必ずタスク化する。
 
@@ -43,6 +44,18 @@
 - 課金テーブル・プラン設計・決済連携は Phase 0 では作らない
 - `can()` の呼び出し箇所の追加は各モジュールのタスクで行う。A-4 では関数の定義とテストのみ
 - 新しい `Capability` は、それを必要とするモジュールのタスクで追加する
+
+### A-7 を単独タスクにする理由
+
+`docs/DATA_MODEL.md` 10章で「変換ヘルパーは `src/lib/datetime.ts` に集約する。各モジュールで独自に日付計算を書かない」と定めたが、これを作るタスクが存在しなかった。
+
+利用者は **E-9（週4本の上限判定）と G-2・G-6（日次集計）の両方**にまたがる。どちらか片方のタスクに含めると、先に着手した側の都合で設計が決まり、もう一方が独自の日付計算を書き始める。10章のルールが空文になるため、`src/lib/` の基盤として A-3・A-4 と同列に置く。
+
+対象は以下。
+
+- JSTでの日付境界（`metrics_daily.metric_date` などの `date` 列を求める）
+- 月曜始まりの週境界（`planned_publish_week`、週4本の上限判定の集計区間）
+- UTC基準で返る外部APIの日付をJSTへ変換する（Search Console）
 
 ---
 
@@ -204,4 +217,4 @@
 ID / 状態（未着手・実装中・レビュー中・完了）/ PR番号 / 完了日 / 残課題
 ```
 
-**タスク総数：52**
+**タスク総数：53**
