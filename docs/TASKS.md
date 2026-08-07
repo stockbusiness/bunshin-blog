@@ -82,12 +82,23 @@ B-3 で作る所有権検証は **Phase B〜H の全モジュールが使う土�
 | B-1 | LIFF認証（IDトークン検証） | A-2 | 改竄トークンを拒否。クライアント送信のuser_idを信用しない | `src/modules/auth/` |
 | B-2 | ユーザー登録・規約同意・データ利用同意 | B-1 | 同意なしで他APIが403 | `src/modules/users/` |
 | B-3 | ブログCRUD | B-2 | 自分のブログのみ取得・更新できる | `src/modules/blogs/` |
-| B-4 | 3ブログ上限とslot制御 | B-3 | 4件目の登録が拒否される。slot重複が拒否される | `src/modules/blogs/` |
+| B-4 | 3ブログ上限とslot制御 | B-3 | 4件目の登録が拒否される。slot重複が拒否される。`CLOSED` のスロットを再利用できない（OPEN_QUESTIONS Q-008） | `src/modules/blogs/` |
 | B-5 | ブログ設定画面（LIFF） | B-4 | スマートフォンで全項目を編集できる | `src/app/liff/blogs/` |
 | B-6 | 管理者認証（Supabase Auth） | A-3 | MONITORが `/admin` へアクセスできない | `src/modules/auth/` |
 | B-7 | 管理者ユーザー一覧 | B-6 | モニター一覧とオンボーディング状況が表示される | `src/app/admin/users/` |
 
 **所有権検証は B-3 で共通ヘルパーとして実装し、以降の全モジュールで使い回す。** 各所で `WHERE id = :id AND user_id = :sessionUserId` を書かせない。
+
+### 設定ミスは ADMIN の介入で救済する（Q-007・Q-008）
+
+モニターは **WordPress接続先を変更できず**（Q-007）、**`CLOSED` にしたスロットも再利用できない**（Q-008）。この2つが重なると、オンボーディングでの接続ミスが1/3の枠を恒久的に潰す。
+
+そのため **ADMIN の手動介入を正規の救済手段とする**（SPEC 3.1）。
+
+- ADMIN は `site_url` の変更とスロットの解放ができる
+- **記事を投稿していないブログに限る**（`wordpress_posts` が0件）。投稿済みを消すと実測データが失われる
+- 介入は `audit_logs` に残す
+- **Phase 0 では専用の管理UIとAPIを作らない。** SQLまたは管理画面の既存機能で行う（SPEC 10.3 と同じ扱い）。手順は H-6 に記載する
 
 ---
 
