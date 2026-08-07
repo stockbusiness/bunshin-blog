@@ -23,6 +23,20 @@ const serverEnvSchema = z.object({
         value.startsWith('postgresql://') || value.startsWith('postgres://'),
       { message: 'postgresql:// または postgres:// で始まる必要があります' },
     ),
+
+  /**
+   * LINE Login チャネルID（B-1）。
+   *
+   * LIFF の IDトークン検証で `client_id` として送り、`aud` の一致確認にも使う。
+   * 数字のみのID。チャネルシークレットではないため秘密ではないが、
+   * 環境ごとに変わるため環境変数で持つ。
+   */
+  LINE_LOGIN_CHANNEL_ID: z
+    .string()
+    .min(1)
+    .refine((value) => /^\d+$/.test(value), {
+      message: '数字のみのチャネルIDである必要があります',
+    }),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;

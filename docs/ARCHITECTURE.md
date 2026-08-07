@@ -44,7 +44,7 @@ LINE ──> LIFF画面 ─┐
 |---|---|
 | ジョブ基盤（Inngest / Trigger.dev / Supabase Edge Functions） | 未選定。E-1 で決める |
 | AIプロバイダー（Anthropic / OpenAI） | 未選定。SPEC 4.1 は「1社利用」とのみ定める。E-3 で決める |
-| 認証（LIFF / Supabase Auth） | 未実装。B-1 / B-6 |
+| 管理者認証（Supabase Auth） | 未実装。B-6 |
 
 ---
 
@@ -94,7 +94,7 @@ SPEC 4.2 のツリーに従い、ソースは全て `src/` 配下に置く（OPE
 
 `src/instrumentation.ts` がサーバー起動時に `getServerEnv()` を呼ぶ。欠落があれば**変数名を表示して `exit 1`** する。`next build` では実行されない。
 
-検証対象は `DATABASE_URL` と `NODE_ENV` のみ。**変数は「それを使うタスク」で追加する。** 未実装機能の変数を先回りして定義しない。
+検証対象は `DATABASE_URL` `LINE_LOGIN_CHANNEL_ID` `NODE_ENV`。**変数は「それを使うタスク」で追加する。** 未実装機能の変数を先回りして定義しない。
 
 ### ログ
 
@@ -166,9 +166,9 @@ npm run build
 
 ## 8. 現在の実装状況
 
-Phase A（A-1〜A-8）が完了。**ドメインロジックはまだ1行も無い**（`src/modules/` は空ディレクトリ）。
+Phase A（A-1〜A-8）が完了。Phase B は B-1（LIFF認証のIDトークン検証）まで。
 
-認証・DB接続・LINE連携・WordPress連携・AI呼び出しはいずれも未実装。
+実装済みのモジュールは `auth` のみ。DB接続・WordPress連携・AI呼び出しは未実装。LINE連携はIDトークンの検証のみで、メッセージ送信は未実装。
 
 進捗は `docs/IMPLEMENTATION_STATUS.md`、決定の経緯は `docs/IMPLEMENTATION_HISTORY.md` を参照。
 
