@@ -1,0 +1,101 @@
+import { AppError } from '@/lib/errors';
+
+/**
+ * `blogs.article_ratio`（jsonb）の取り扱い（B-5）。
+ *
+ * DATA_MODEL 3章の定義:
+ *
+ * ```ts
+ * {
+ *   revenue: number;          // 収益記事の本数（9.2.4の算出値）
+ *   traffic: number;          // 集客記事の本数
+ *   weeklyPublishCap: number; // 既定 4（SPEC 2.2）
+ * }
+ * ```
+ *
+ * **`revenue` と `traffic` は利用者に編集させない**（OPEN_QUESTIONS Q-011）。
+ * SPEC 9.2.4 の算出値であり、編集させると SPEC 9.2「判定は必ずコード側で行う」
+ * に反する。設定画面から変えられるのは `weeklyPublishCap` のみ。
+ */
+
+export interface ArticleRatio {
+  revenue: number;
+  traffic: number;
+  weeklyPublishCap: number;
+}
+
+/** 週の公開上限。SPEC 2.2「週4本を超えて公開する処理を実装してはならない」 */
+export const WEEKLY_PUBLISH_CAP_MAX = 4;
+export const WEEKLY_PUBLISH_CAP_MIN = 1;
+
+/** 新規作成時の既定値。SPEC 9.3 の初期30記事・週4本 */
+export const DEFAULT_ARTICLE_RATIO: ArticleRatio = {
+  revenue: 7,
+  traffic: 23,
+  weeklyPublishCap: WEEKLY_PUBLISH_CAP_MAX,
+};
+
+export const ARTICLE_RATIO_ERROR_CODES = {
+  invalidPublishCap: 'BLOG_PUBLISH_CAP_INVALID',
+} as const;
+
+function toCount(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+/**
+ * jsonb の値を `ArticleRatio` として読む。
+ *
+ * **壊れた値でも例外を投げない。** jsonb は型を保証しないため、
+ * 想定外の形が入っていても設定画面が開けなくなるのは避ける。
+ * 欠けている項目は既定値で埋める。
+ */
+export function parseArticleRatio(value: unknown): ArticleRatio {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return { ...DEFAULT_ARTICLE_RATIO };
+  }
+
+  const source = value as Record<string, unknown>;
+
+  return {
+    revenue: toCount(source['revenue'], DEFAULT_ARTICLE_RATIO.revenue),
+    traffic: toCount(source['traffic'], DEFAULT_ARTICLE_RATIO.traffic),
+    weeklyPublishCap: toCount(
+      source['weeklyPublishCap'],
+      DEFAULT_ARTICLE_RATIO.weeklyPublishCap,
+    ),
+  };
+}
+
+/** 週の公開上限が不正 */
+export function invalidPublishCapError(requested: number): AppError {
+  return new AppError(
+    ARTICLE_RATIO_ERROR_CODES.invalidPublishCap,
+    422,
+    `投稿頻度は週${String(WEEKLY_PUBLISH_CAP_MIN)}〜${String(WEEKLY_PUBLISH_CAP_MAX)}本で指定してください`,
+    { details: { requested, max: WEEKLY_PUBLISH_CAP_MAX } },
+  );
+}
+
+/**
+ * 週の公開上限だけを差し替える。
+ *
+ * **`revenue` と `traffic` はそのまま引き継ぐ**（Q-011）。上限だけを
+ * 受け取って全体を組み立て直すと、算出値が既定値で上書きされる。
+ *
+ * @throws {AppError} 1〜4 以外（422）
+ */
+export function withWeeklyPublishCap(
+  current: ArticleRatio,
+  weeklyPublishCap: number,
+): ArticleRatio {
+  if (
+    !Number.isInteger(weeklyPublishCap) ||
+    weeklyPublishCap < WEEKLY_PUBLISH_CAP_MIN ||
+    weeklyPublishCap > WEEKLY_PUBLISH_CAP_MAX
+  ) {
+    throw invalidPublishCapError(weeklyPublishCap);
+  }
+
+  return { ...current, weeklyPublishCap };
+}

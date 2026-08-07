@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { AppError, toErrorHttpResponse } from '@/lib/errors';
 import { requireConsentedUser } from '@/modules/auth';
 import {
+  WEEKLY_PUBLISH_CAP_MAX,
+  WEEKLY_PUBLISH_CAP_MIN,
   closeBlogForUser,
   requireBlogForUser,
   updateBlogForUser,
@@ -28,6 +30,14 @@ const updateSchema = z.object({
   penName: z.string().max(100).nullable().optional(),
   purpose: z.enum(['AFFILIATE', 'DISPLAY_AD', 'MIXED']).optional(),
   status: z.enum(['SETUP', 'ACTIVE', 'PAUSED']).optional(),
+  // 投稿頻度（B-5）。article_ratio の他の項目は受け取らない。
+  // revenue / traffic は SPEC 9.2.4 の算出値（OPEN_QUESTIONS Q-011）
+  weeklyPublishCap: z
+    .number()
+    .int()
+    .min(WEEKLY_PUBLISH_CAP_MIN)
+    .max(WEEKLY_PUBLISH_CAP_MAX)
+    .optional(),
 });
 
 type Context = { params: Promise<{ id: string }> };
