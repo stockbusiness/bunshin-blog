@@ -155,7 +155,7 @@ npm run build
 
 ### 守るべき原則
 
-- **テナント越境の防止。** 所有権検証は B-3 で共通ヘルパーとして実装し、以降の全モジュールで使い回す（SPEC 14.1）
+- **テナント越境の防止。** 所有権検証は B-3 で `src/modules/blogs/ownership.ts` に実装済み。以降の全モジュールで使い回す（SPEC 14.1、MODULE_RULES 1）。**所有していない資源は 403 ではなく 404** を返す
 - **日時は `timestamptz`、業務上の基準時刻は JST、週の開始は月曜**（DATA_MODEL 10章）
 - **記事本文の正本判定は content hash で行う。** 生成時刻の比較では利用者の修正が必ず失われる（DATA_MODEL 11章）
 - **秘密情報は暗号化して保存し、復号値をAPIレスポンス・ログへ出さない**（DATA_MODEL 7章）
@@ -176,9 +176,9 @@ npm run build
 
 ## 8. 現在の実装状況
 
-Phase A（A-1〜A-8）が完了。Phase B は B-2（ユーザー登録・同意）まで。
+Phase A（A-1〜A-9）が完了。Phase B は B-3（ブログCRUD）まで。
 
-実装済みのモジュールは `auth` と `users`。Route Handler は `POST /api/auth/liff` のみ。WordPress連携・AI呼び出しは未実装。LINE連携はIDトークンの検証のみで、メッセージ送信は未実装。
+実装済みのモジュールは `auth` `users` `blogs`。Route Handler は `POST /api/auth/liff` と `/api/blogs`（GET/POST）、`/api/blogs/:id`（GET/PATCH/DELETE）。WordPress連携・AI呼び出しは未実装。LINE連携はIDトークンの検証のみで、メッセージ送信は未実装。
 
 ### 認証と同意
 

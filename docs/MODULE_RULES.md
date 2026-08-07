@@ -15,9 +15,22 @@
 const blog = await prisma.blog.findUnique({ where: { id: blogId } });
 
 // 正しい：所有モジュールの公開関数を経由する
-import { getBlogForUser } from '@/modules/blogs';
-const blog = await getBlogForUser({ blogId, userId });
+import { requireBlogForUser } from '@/modules/blogs';
+const blog = await requireBlogForUser({ blogId, userId });
 ```
+
+**所有権検証のヘルパーは B-3 で `src/modules/blogs/ownership.ts` に実装した。**
+ブログ配下の資源を扱うモジュール（`wordpress` `affiliate` `banners` `personas`
+`content-planning` など）は、自分のテーブルを触る前に `requireBlogForUser` を通す。
+
+| 関数 | 用途 |
+|---|---|
+| `requireBlogForUser({ userId, blogId })` | 自分のブログを取る。無ければ404 |
+| `ownedBy({ userId, id })` | `where` 条件を作る。手で組み立てない |
+| `requireFound(value)` | `null` を404に変換する |
+
+**所有していない資源は 403 ではなく 404 を返す。** 403 だと「そのIDは存在するが
+他人のものだ」と伝わり、IDの総当たりで他ユーザーの資源の有無を調べられる。
 
 **理由。** テナント越境（SPEC 14.1）を防ぐ所有権検証は B-3 で共通ヘルパーとして実装し、以降の全モジュールで使い回すと決まっている。各モジュールが直接テーブルを引くと、この検証を通らない経路が生まれる。`WHERE id = :id AND user_id = :sessionUserId` を各所で書かせないためのルールでもある。
 
