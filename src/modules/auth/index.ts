@@ -16,4 +16,27 @@ export {
   type VerifyLiffIdTokenOptions,
 } from './liff/verify-id-token';
 
+export {
+  authenticateWithLiff,
+  type AuthenticateOptions,
+  type AuthenticateResult,
+} from './liff/authenticate';
+
+export {
+  createSessionToken,
+  verifySessionToken,
+  buildSessionCookie,
+  SESSION_COOKIE_NAME,
+  SESSION_TTL_DAYS,
+  type SessionPayload,
+  type SessionOptions,
+} from './session';
+
+export {
+  requireUser,
+  requireConsentedUser,
+  readSessionCookie,
+  type GuardOptions,
+} from './guard';
+
 export { AUTH_ERROR_CODES, type AuthErrorCode } from './errors';

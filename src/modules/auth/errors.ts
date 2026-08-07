@@ -12,6 +12,12 @@ export const AUTH_ERROR_CODES = {
   invalidIdToken: 'AUTH_INVALID_ID_TOKEN',
   /** LINEの検証エンドポイントへ到達できなかった */
   verificationUnavailable: 'AUTH_VERIFICATION_UNAVAILABLE',
+  /** セッションが無い・不正・期限切れ */
+  unauthenticated: 'AUTH_UNAUTHENTICATED',
+  /** 利用規約またはデータ利用への同意が済んでいない */
+  consentRequired: 'AUTH_CONSENT_REQUIRED',
+  /** 停止・退会などで利用できない状態 */
+  userNotActive: 'AUTH_USER_NOT_ACTIVE',
 } as const;
 
 export type AuthErrorCode =
