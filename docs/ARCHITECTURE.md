@@ -32,7 +32,7 @@ LINE ──> LIFF画面 ─┐
 | 言語 | TypeScript 5.9 | `strict` + `noUncheckedIndexedAccess` ほか |
 | UI | React 19 / Tailwind CSS 4 | |
 | バリデーション | zod 4 | 環境変数、jsonb の検証（DATA_MODEL 3章） |
-| ORM | Prisma **6系** | 7系は非対応。OPEN_QUESTIONS Q-004 |
+| ORM | Prisma **6系** | 7系は `datasource` の `url` を廃止しており非対応。Phase 0 は6系で進める（Q-004 解決済み） |
 | DB | PostgreSQL | 26テーブル・30 enum |
 | テスト | Vitest 4 + v8 カバレッジ | しきい値80% |
 | Lint / 整形 | ESLint 9（flat config）/ Prettier 3 | |
@@ -182,7 +182,7 @@ Phase A のうち A-1〜A-5 が完了。**ドメインロジックはまだ1行�
 |---|---|---|
 | Q-001 | アフィリエイトリンクのリダイレクト方式 | Phase C 着手前 |
 | Q-002 | ドメイン・サーバー費用の負担者 | モニター募集前 |
-| Q-004 | Prisma 7 へ移行するか | B-1 着手前 |
+| Q-005 | Search Console の日次データをJSTの暦日へどう対応づけるか | G-2 着手前 |
 
 ---
 
