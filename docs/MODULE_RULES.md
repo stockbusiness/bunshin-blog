@@ -78,7 +78,7 @@ import { verifyIdToken } from '@/modules/auth';
 
 ## 現時点で想定している依存の向き
 
-矢印は「import する側 → される側」。
+矢印は「**import する側 → される側**」。`auth --> users` は「`auth` が `users` を import する」という意味であり、逆向きに読まない。
 
 ```mermaid
 graph TD
@@ -118,12 +118,13 @@ graph TD
   end
 
   auth --> users
-  users --> blogs
-  blogs --> wordpress
-  blogs --> personas
-  blogs --> affiliate
-  blogs --> banners
-  blogs --> experiments
+  blogs --> users
+  wordpress --> blogs
+  personas --> users
+  personas --> blogs
+  affiliate --> blogs
+  banners --> blogs
+  experiments --> blogs
   wordpress --> jobs
   cp --> blogs
   cp --> affiliate
@@ -147,10 +148,10 @@ graph TD
 - **`src/lib`** — 誰にも依存しない。全モジュールが依存してよい
 - **`jobs`** — ドメインモジュールを import しない。ジョブハンドラの登録は `src/app/` 側で行う。これを守らないと `jobs → wordpress → jobs` の循環になる
 - **`audit`** — 誰にも依存しない。全モジュールから呼ばれる
-- **`auth`** — `src/lib` のみ。ユーザー情報が要る場合は `users` を経由する
-- **`users`** — `auth`
+- **`users`** — `src/lib` のみ。`users` テーブルを所有し、他モジュールへ `AppUser` として渡す
+- **`auth`** — `users`。IDトークンを検証し、`line_user_id` から内部ユーザーを解決してセッションを発行する（B-1・B-2）
 - **`blogs`** — `users`
-- **`wordpress` `personas` `affiliate` `banners` `experiments`** — `blogs`（＋ `wordpress` は `jobs`）
+- **`wordpress` `personas` `affiliate` `banners` `experiments`** — `blogs`（＋ `wordpress` は `jobs`、`personas` は `users` も）
 - **`content-planning`** — `blogs` `affiliate` `personas` `jobs`
 - **`content-generation`** — `content-planning` `personas` `ai-costs` `jobs`
 - **`approvals`** — `content-generation` `blogs` `line`

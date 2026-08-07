@@ -89,12 +89,13 @@ SPEC 4.2 のツリーに従い、ソースは全て `src/` 配下に置く（OPE
 | `errors.ts` | `AppError` と共通エラーレスポンス | A-4 |
 | `entitlements.ts` | 権限判定の入口。Phase 0 は常に `true` | A-4 |
 | `datetime.ts` | JST基準の日付・週境界 | A-7 |
+| `db.ts` | Prisma クライアント。`src/modules/` の外から使わない | B-2 |
 
 ### 環境変数
 
 `src/instrumentation.ts` がサーバー起動時に `getServerEnv()` を呼ぶ。欠落があれば**変数名を表示して `exit 1`** する。`next build` では実行されない。
 
-検証対象は `DATABASE_URL` `LINE_LOGIN_CHANNEL_ID` `NODE_ENV`。**変数は「それを使うタスク」で追加する。** 未実装機能の変数を先回りして定義しない。
+検証対象は `DATABASE_URL` `LINE_LOGIN_CHANNEL_ID` `SESSION_SECRET` `NODE_ENV`。**変数は「それを使うタスク」で追加する。** 未実装機能の変数を先回りして定義しない。
 
 ### ログ
 
@@ -166,9 +167,15 @@ npm run build
 
 ## 8. 現在の実装状況
 
-Phase A（A-1〜A-8）が完了。Phase B は B-1（LIFF認証のIDトークン検証）まで。
+Phase A（A-1〜A-8）が完了。Phase B は B-2（ユーザー登録・同意）まで。
 
-実装済みのモジュールは `auth` のみ。DB接続・WordPress連携・AI呼び出しは未実装。LINE連携はIDトークンの検証のみで、メッセージ送信は未実装。
+実装済みのモジュールは `auth` と `users`。Route Handler は `POST /api/auth/liff` のみ。WordPress連携・AI呼び出しは未実装。LINE連携はIDトークンの検証のみで、メッセージ送信は未実装。
+
+### 認証と同意
+
+セッションは**署名付きCookie**（`bunshin_session`、30日）。モニター10名の規模でセッションストアを持つ必要が無いため。**CookieにはユーザーIDと期限だけを入れ、ロールと同意状態は毎回DBを見る。** 権限をはく奪しても古いCookieが有効なまま、という状態を作らないため。
+
+APIの入口は `requireUser`（同意を見ない。オンボーディング用）と `requireConsentedUser`（同意必須）の2つ。**オンボーディング以外の全APIは後者を使う。** 各Route Handlerが個別に同意を確認すると必ず書き忘れが出る。
 
 進捗は `docs/IMPLEMENTATION_STATUS.md`、決定の経緯は `docs/IMPLEMENTATION_HISTORY.md` を参照。
 

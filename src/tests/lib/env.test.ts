@@ -8,12 +8,14 @@ import {
 
 const VALID_DATABASE_URL = 'postgresql://user:s3cr3t-pw@localhost:5432/bunshin';
 const VALID_CHANNEL_ID = '1234567890';
+const VALID_SESSION_SECRET = 'x'.repeat(48);
 
 /** 必須の環境変数が全て揃った状態 */
 function validEnv(overrides: Record<string, string | undefined> = {}) {
   return {
     DATABASE_URL: VALID_DATABASE_URL,
     LINE_LOGIN_CHANNEL_ID: VALID_CHANNEL_ID,
+    SESSION_SECRET: VALID_SESSION_SECRET,
     ...overrides,
   };
 }
@@ -56,6 +58,7 @@ describe('parseServerEnv', () => {
 
     expect(env.DATABASE_URL).toBe(VALID_DATABASE_URL);
     expect(env.LINE_LOGIN_CHANNEL_ID).toBe(VALID_CHANNEL_ID);
+    expect(env.SESSION_SECRET).toBe(VALID_SESSION_SECRET);
   });
 
   it('NODE_ENV が未設定なら development を既定値にする', () => {
@@ -76,6 +79,7 @@ describe('parseServerEnv', () => {
       expect(envError.missing).toEqual([
         'DATABASE_URL',
         'LINE_LOGIN_CHANNEL_ID',
+        'SESSION_SECRET',
       ]);
       expect(envError.invalid).toEqual([]);
       expect(envError.message).toContain('DATABASE_URL');
@@ -109,6 +113,15 @@ describe('parseServerEnv', () => {
     }
   });
 
+  it('短すぎる SESSION_SECRET を拒否する', () => {
+    try {
+      parseServerEnv(validEnv({ SESSION_SECRET: 'too-short' }));
+      expect.unreachable('例外が投げられていない');
+    } catch (error) {
+      expect((error as EnvValidationError).invalid).toEqual(['SESSION_SECRET']);
+    }
+  });
+
   it('数字以外のチャネルIDを拒否する', () => {
     try {
       parseServerEnv(validEnv({ LINE_LOGIN_CHANNEL_ID: 'not-a-number' }));
@@ -129,6 +142,7 @@ describe('parseServerEnv', () => {
       expect(envError.missing).toEqual([
         'DATABASE_URL',
         'LINE_LOGIN_CHANNEL_ID',
+        'SESSION_SECRET',
       ]);
       expect(envError.invalid).toEqual(['NODE_ENV']);
       expect(envError.message).toContain('DATABASE_URL');

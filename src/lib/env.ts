@@ -37,6 +37,16 @@ const serverEnvSchema = z.object({
     .refine((value) => /^\d+$/.test(value), {
       message: '数字のみのチャネルIDである必要があります',
     }),
+
+  /**
+   * セッションCookieの署名鍵（B-2）。
+   *
+   * 32文字以上を要求する。短い鍵はHMACの総当たりを現実的にする。
+   * 環境ごとに別の値を使い、本番の値をリポジトリへ入れない（SPEC 14.2）。
+   */
+  SESSION_SECRET: z
+    .string()
+    .min(32, { message: '32文字以上である必要があります' }),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
