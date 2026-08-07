@@ -47,7 +47,8 @@
     "format:check": "prettier --check .",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
-    "db:validate": "prisma validate"
+    "db:validate": "prisma validate",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "type": "module"
 }

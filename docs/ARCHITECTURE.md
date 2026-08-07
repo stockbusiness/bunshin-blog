@@ -117,7 +117,7 @@ JSON 1行で出力する。`warn` / `error` は stderr、それ以外は stdout�
 
 **`verify` ジョブ** — `lint` / `format:check` / `typecheck` / `test:coverage` / `build`
 
-**`schema` ジョブ** — PostgreSQL 16 のサービスコンテナを立て、`prisma validate` → `migrate deploy` で適用 → スキーマとの乖離検出 → テーブル数・enum型数・CHECK制約の確認 → CHECK制約が実際に効くことの確認
+**`schema` ジョブ** — PostgreSQL 16 のサービスコンテナを立て、`prisma validate` → `migrate deploy` で適用 → スキーマとの乖離検出 → テーブル数・enum型数・CHECK制約の確認 → CHECK制約が実際に効くことの確認 → **統合テストの実行**
 
 ### ローカルでの実行
 
@@ -134,7 +134,16 @@ npm run build
 
 対象は `src/lib/` と `src/modules/`（画面と設定は除外）。しきい値は lines / functions / branches / statements すべて 80%。
 
-統合テスト（C-6）用のプロジェクト分割は未実施。
+### テストの種類
+
+| 種類 | 設定 | 実行 |
+|---|---|---|
+| ユニット | `vitest.config.ts` | `npm run test`。DB不要 |
+| 統合 | `vitest.integration.config.ts` | `npm run test:integration`。**実PostgreSQLが必要** |
+
+**所有権検証のように「SQLの条件そのもの」を検証する対象は統合テストで書く。** 差し替え可能な fake は書いたとおりに動くだけで、越境を弾いている証明にならない。
+
+統合テストは同一DBを共有するため直列で実行し、各テストの前に全テーブルを `TRUNCATE ... CASCADE` する。テーブル名は `pg_tables` から動的に集めるため、テーブル追加時の更新漏れが起きない。
 
 ---
 
