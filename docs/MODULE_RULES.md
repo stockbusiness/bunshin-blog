@@ -89,6 +89,23 @@ import { verifyIdToken } from '@/modules/auth';
 
 ---
 
+## 4. ブラウザで動くコードからサーバー専用のコードを import しない
+
+`src/lib/` には**サーバーでしか動かないもの**と**ブラウザでも動くもの**が混在する。クライアントコンポーネント（`'use client'`）とそこから辿るファイルは、前者を import してはならない。
+
+| 区分 | ファイル |
+|---|---|
+| サーバー専用 | `db.ts`（Prisma）、`env.ts`（`process.env` の全件検証）、`src/modules/**` |
+| ブラウザでも動く | `liff/`、`datetime.ts`、`errors.ts` の型 |
+
+**理由。** `db.ts` は Prisma を、`env.ts` はサーバー専用の環境変数を読む。クライアントコンポーネントから辿れる位置に置くとビルドが壊れるか、最悪の場合サーバー側の設定値がバンドルへ混入する（SPEC 14.2）。
+
+**`NEXT_PUBLIC_` が付く変数は `env.ts` の検証対象に入れない。** ビルド時にバンドルへ焼き付く値であり、サーバー起動時に確認しても実際の失敗を防げない。設定漏れはブラウザ側で検出し、画面に出す（B-8 の `src/lib/liff/config.ts`）。
+
+**`process.env` をオブジェクトのまま渡してキーで引かない。** Next.js が値へ置き換えるのは `process.env.NEXT_PUBLIC_XXX` という形の記述だけで、動的なキー参照はブラウザで `undefined` になる。
+
+---
+
 ## 現時点で想定している依存の向き
 
 矢印は「**import する側 → される側**」。`auth --> users` は「`auth` が `users` を import する」という意味であり、逆向きに読まない。
@@ -96,7 +113,8 @@ import { verifyIdToken } from '@/modules/auth';
 ```mermaid
 graph TD
   subgraph L0["基盤（src/lib）"]
-    lib["env / logger / errors / entitlements"]
+    lib["env / logger / errors / entitlements / datetime"]
+    libc["liff（ブラウザ側）"]
   end
 
   subgraph L1["基盤モジュール"]
@@ -158,7 +176,7 @@ graph TD
 
 箇条書きでの同じ内容。
 
-- **`src/lib`** — 誰にも依存しない。全モジュールが依存してよい
+- **`src/lib`** — 誰にも依存しない。全モジュールが依存してよい。ただし `src/lib/liff` はブラウザ側で、`src/lib` 内のサーバー専用ファイルにも依存しない（本ルール4）
 - **`jobs`** — ドメインモジュールを import しない。ジョブハンドラの登録は `src/app/` 側で行う。これを守らないと `jobs → wordpress → jobs` の循環になる
 - **`audit`** — 誰にも依存しない。全モジュールから呼ばれる
 - **`users`** — `src/lib` のみ。`users` テーブルを所有し、他モジュールへ `AppUser` として渡す

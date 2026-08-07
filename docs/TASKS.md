@@ -86,7 +86,7 @@ B-3 で作る所有権検証は **Phase B〜H の全モジュールが使う土�
 | B-5 | ブログ設定画面（LIFF） | B-4, B-8 | ブログ名・ペンネーム・想定読者・収益方針・投稿頻度をスマートフォンで編集できる。ジャンルと算出値は表示のみ（OPEN_QUESTIONS Q-009〜Q-011） | `src/app/liff/blogs/` |
 | B-6 | 管理者認証（Supabase Auth） | A-3 | MONITORが `/admin` へアクセスできない | `src/modules/auth/` |
 | B-7 | 管理者ユーザー一覧 | B-6 | モニター一覧とオンボーディング状況が表示される | `src/app/admin/users/` |
-| B-8 | LIFFクライアント基盤 | B-1 | LIFF外で開くと案内が出る。初期化後にセッションCookieが確立し、以降のAPI呼び出しが200を返す | `src/app/liff/` |
+| B-8 | LIFFクライアント基盤 | B-1 | 設定漏れ・初期化失敗・認証失敗のときに画面へ案内が出る。初期化後にセッションCookieが確立する | `src/app/liff/`, `src/lib/liff/` |
 
 **所有権検証は B-3 で共通ヘルパーとして実装し、以降の全モジュールで使い回す。** 各所で `WHERE id = :id AND user_id = :sessionUserId` を書かせない。
 
