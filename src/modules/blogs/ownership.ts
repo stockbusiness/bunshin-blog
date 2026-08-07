@@ -12,12 +12,14 @@ import { AppError } from '@/lib/errors';
  * - クライアント指定の `user_id` を信用する
  */
 
-/** blogs モジュール固有のエラーコード */
+/**
+ * 所有権に関するエラーコード。
+ *
+ * slot の上限・重複は `slots.ts` の `BLOG_SLOT_ERROR_CODES`（B-4）。
+ */
 export const BLOG_ERROR_CODES = {
   /** 存在しない、または自分のものではない */
   notFound: 'BLOG_NOT_FOUND',
-  /** slot の重複など、登録できない状態 */
-  conflict: 'BLOG_CONFLICT',
 } as const;
 
 /**

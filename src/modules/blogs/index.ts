@@ -14,6 +14,7 @@ export {
   createBlogForUser,
   updateBlogForUser,
   closeBlogForUser,
+  getSlotUsageForUser,
 } from './repository';
 
 export {
@@ -22,5 +23,16 @@ export {
   notFoundError,
   BLOG_ERROR_CODES,
 } from './ownership';
+
+export {
+  BLOG_SLOT_NUMBERS,
+  BLOG_SLOT_ERROR_CODES,
+  MAX_BLOGS_PER_USER,
+  availableSlots,
+  isBlogSlotNumber,
+  resolveSlotNumber,
+} from './slots';
+
+export type { BlogSlotNumber, BlogSlotOccupancy, BlogSlotUsage } from './slots';
 
 export type { AppBlog, CreateBlogInput, UpdateBlogInput } from './types';

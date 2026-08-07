@@ -17,12 +17,18 @@ export interface AppBlog {
   createdAt: Date;
 }
 
-/** 新規作成の入力。`userId` は含めない（セッションから取る） */
+/**
+ * 新規作成の入力。`userId` は含めない（セッションから取る）。
+ *
+ * `slotNumber` は省略できる。省略すると空いている最小の番号が割り当てられる
+ * （B-4）。クライアントは `CLOSED` を含む使用状況を持たないため、
+ * 自力で空きを決められない。
+ */
 export interface CreateBlogInput {
   name: string;
   slug: string;
   targetReader: string;
-  slotNumber: number;
+  slotNumber?: number | undefined;
   penName?: string | undefined;
   purpose?: AppBlog['purpose'] | undefined;
 }
