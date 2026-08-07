@@ -7,6 +7,44 @@ import {
 } from '@/lib/env';
 
 const VALID_DATABASE_URL = 'postgresql://user:s3cr3t-pw@localhost:5432/bunshin';
+const VALID_CHANNEL_ID = '1234567890';
+
+/** 必須の環境変数が全て揃った状態 */
+function validEnv(overrides: Record<string, string | undefined> = {}) {
+  return {
+    DATABASE_URL: VALID_DATABASE_URL,
+    LINE_LOGIN_CHANNEL_ID: VALID_CHANNEL_ID,
+    ...overrides,
+  };
+}
+
+/** 必須の環境変数を process.env に設定し、後始末する */
+function withEnv<T>(
+  values: Record<string, string | undefined>,
+  run: () => T,
+): T {
+  const previous = new Map<string, string | undefined>();
+  for (const [key, value] of Object.entries(values)) {
+    previous.set(key, process.env[key]);
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
+
+  try {
+    return run();
+  } finally {
+    for (const [key, value] of previous) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+}
 
 afterEach(() => {
   resetServerEnvCache();
@@ -14,15 +52,14 @@ afterEach(() => {
 
 describe('parseServerEnv', () => {
   it('必須の環境変数が揃っていれば検証を通す', () => {
-    const env = parseServerEnv({ DATABASE_URL: VALID_DATABASE_URL });
+    const env = parseServerEnv(validEnv());
 
     expect(env.DATABASE_URL).toBe(VALID_DATABASE_URL);
+    expect(env.LINE_LOGIN_CHANNEL_ID).toBe(VALID_CHANNEL_ID);
   });
 
   it('NODE_ENV が未設定なら development を既定値にする', () => {
-    const env = parseServerEnv({ DATABASE_URL: VALID_DATABASE_URL });
-
-    expect(env.NODE_ENV).toBe('development');
+    expect(parseServerEnv(validEnv()).NODE_ENV).toBe('development');
   });
 
   it('未設定の環境変数があれば EnvValidationError を投げる', () => {
@@ -36,9 +73,13 @@ describe('parseServerEnv', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(EnvValidationError);
       const envError = error as EnvValidationError;
-      expect(envError.missing).toEqual(['DATABASE_URL']);
+      expect(envError.missing).toEqual([
+        'DATABASE_URL',
+        'LINE_LOGIN_CHANNEL_ID',
+      ]);
       expect(envError.invalid).toEqual([]);
       expect(envError.message).toContain('DATABASE_URL');
+      expect(envError.message).toContain('LINE_LOGIN_CHANNEL_ID');
       expect(envError.message).toContain('未設定の環境変数');
     }
   });
@@ -46,7 +87,7 @@ describe('parseServerEnv', () => {
   it('空文字と空白のみの値は未設定として扱う', () => {
     for (const value of ['', '   ']) {
       try {
-        parseServerEnv({ DATABASE_URL: value });
+        parseServerEnv(validEnv({ DATABASE_URL: value }));
         expect.unreachable('例外が投げられていない');
       } catch (error) {
         expect((error as EnvValidationError).missing).toEqual(['DATABASE_URL']);
@@ -56,7 +97,9 @@ describe('parseServerEnv', () => {
 
   it('設定されているが不正な値は invalid に分類する', () => {
     try {
-      parseServerEnv({ DATABASE_URL: 'mysql://user@localhost:3306/bunshin' });
+      parseServerEnv(
+        validEnv({ DATABASE_URL: 'mysql://user@localhost:3306/bunshin' }),
+      );
       expect.unreachable('例外が投げられていない');
     } catch (error) {
       const envError = error as EnvValidationError;
@@ -66,13 +109,27 @@ describe('parseServerEnv', () => {
     }
   });
 
+  it('数字以外のチャネルIDを拒否する', () => {
+    try {
+      parseServerEnv(validEnv({ LINE_LOGIN_CHANNEL_ID: 'not-a-number' }));
+      expect.unreachable('例外が投げられていない');
+    } catch (error) {
+      expect((error as EnvValidationError).invalid).toEqual([
+        'LINE_LOGIN_CHANNEL_ID',
+      ]);
+    }
+  });
+
   it('複数の変数が同時に不正なら全ての名前を報告する', () => {
     try {
       parseServerEnv({ NODE_ENV: 'staging' });
       expect.unreachable('例外が投げられていない');
     } catch (error) {
       const envError = error as EnvValidationError;
-      expect(envError.missing).toEqual(['DATABASE_URL']);
+      expect(envError.missing).toEqual([
+        'DATABASE_URL',
+        'LINE_LOGIN_CHANNEL_ID',
+      ]);
       expect(envError.invalid).toEqual(['NODE_ENV']);
       expect(envError.message).toContain('DATABASE_URL');
       expect(envError.message).toContain('NODE_ENV');
@@ -82,7 +139,9 @@ describe('parseServerEnv', () => {
   // SPEC 14.2「ログへ秘密情報を出力しない」
   it('エラーメッセージに環境変数の値を含めない', () => {
     try {
-      parseServerEnv({ DATABASE_URL: 'mysql://user:s3cr3t-pw@localhost/db' });
+      parseServerEnv(
+        validEnv({ DATABASE_URL: 'mysql://user:s3cr3t-pw@localhost/db' }),
+      );
       expect.unreachable('例外が投げられていない');
     } catch (error) {
       const envError = error as EnvValidationError;
@@ -94,10 +153,9 @@ describe('parseServerEnv', () => {
   });
 
   it('スキーマに無い環境変数は結果に含めない', () => {
-    const env = parseServerEnv({
-      DATABASE_URL: VALID_DATABASE_URL,
-      UNRELATED_SECRET: 'should-not-appear',
-    });
+    const env = parseServerEnv(
+      validEnv({ UNRELATED_SECRET: 'should-not-appear' }),
+    );
 
     expect(env).not.toHaveProperty('UNRELATED_SECRET');
     expect(JSON.stringify(env)).not.toContain('should-not-appear');
@@ -106,34 +164,18 @@ describe('parseServerEnv', () => {
 
 describe('getServerEnv', () => {
   it('process.env を検証して同じインスタンスを返す', () => {
-    const previous = process.env.DATABASE_URL;
-    process.env.DATABASE_URL = VALID_DATABASE_URL;
-
-    try {
+    withEnv(validEnv(), () => {
       const first = getServerEnv();
       const second = getServerEnv();
 
       expect(first.DATABASE_URL).toBe(VALID_DATABASE_URL);
       expect(second).toBe(first);
-    } finally {
-      if (previous === undefined) {
-        delete process.env.DATABASE_URL;
-      } else {
-        process.env.DATABASE_URL = previous;
-      }
-    }
+    });
   });
 
   it('必須の環境変数が無ければ例外を投げる', () => {
-    const previous = process.env.DATABASE_URL;
-    delete process.env.DATABASE_URL;
-
-    try {
+    withEnv({ DATABASE_URL: undefined }, () => {
       expect(() => getServerEnv()).toThrow(EnvValidationError);
-    } finally {
-      if (previous !== undefined) {
-        process.env.DATABASE_URL = previous;
-      }
-    }
+    });
   });
 });
