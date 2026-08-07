@@ -1,22 +1,50 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
+const alias = {
+  '@': fileURLToPath(new URL('./src', import.meta.url)),
+};
+
+/**
+ * ユニットテストと画面テストをまとめて動かす（A-5・B-9）。
+ *
+ * **実行環境が違うため project を分ける。** ロジックは `node` で走らせる
+ * （`Response` など Node の実装をそのまま使いたい）。画面は DOM が要るので
+ * `jsdom` で走らせる。全体を `jsdom` にすると、DOM を必要としない
+ * テストまで遅くなり、`fetch` 周りの実装も差し替わる。
+ *
+ * 統合テストは実DBを要するため別設定（`vitest.integration.config.ts`）。
+ */
 export default defineConfig({
-  resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
-    },
-  },
   test: {
-    environment: 'node',
-    include: ['src/tests/**/*.test.ts', 'src/**/*.test.ts'],
-    // 統合テストは実DBを要するため、別設定（vitest.integration.config.ts）で動かす
-    exclude: ['src/tests/integration/**'],
+    projects: [
+      {
+        resolve: { alias },
+        test: {
+          name: 'unit',
+          environment: 'node',
+          include: ['src/tests/**/*.test.ts', 'src/**/*.test.ts'],
+          exclude: ['src/tests/integration/**'],
+        },
+      },
+      {
+        resolve: { alias },
+        test: {
+          name: 'component',
+          environment: 'jsdom',
+          include: ['src/tests/**/*.test.tsx'],
+          setupFiles: ['./src/tests/setup/component.ts'],
+        },
+      },
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text-summary', 'lcov'],
       reportsDirectory: 'coverage',
-      // 計測対象はロジックを持つコードのみ。画面と設定は対象外にする
+      // 計測対象はロジックを持つコードのみ。**画面（`src/app/**`）は
+      // component project で検証しているが、ここでは数えない。**
+      // `src/app` にはRoute Handlerも含まれ、そちらは実DBの統合テストで
+      // 検証しているため、まとめて含めると実態と合わない数字になる
       include: ['src/lib/**/*.ts', 'src/modules/**/*.ts'],
       exclude: [
         '**/*.test.ts',
