@@ -51,3 +51,20 @@
 
 - **例外：`prisma/` はリポジトリ直下のまま。`src/` 配下へ移動しない**
 - `TASKS.md` 本体の表記修正は A-1 のPRに含めず、別PR（`docs/fix-tasks-paths`）で行う
+
+### Q-004 Prisma のメジャーバージョン
+
+- 発生タスク：A-5
+- 状況：A-2 の `prisma/schema.prisma` は `datasource db { url = env("DATABASE_URL") }` を持つ。**Prisma 7 はこの記法を廃止**しており、`prisma validate` が `P1012` で失敗する
+
+  ```
+  The datasource property `url` is no longer supported in schema files.
+  Move connection URLs for Migrate to `prisma.config.ts`
+  ```
+
+  Prisma 6.19.3 では検証が通り、26テーブル・30 enum の初期SQLも生成できることを確認した
+- 選択肢：
+  - (a) **Prisma 6 系に固定する**（A-5 で採用）。`schema.prisma` は無変更で済む
+  - (b) Prisma 7 へ上げる。`schema.prisma` から `url` を削除し、`prisma.config.ts` を追加する。A-2 の成果物に手を入れるため、DATA_MODEL 9章に従い単独タスク・単独PRが必要
+- 影響範囲：`prisma/schema.prisma`、DB接続の実装（B-1以降）、CI
+- 状態：**暫定決定（2026-08-06）。A-5 では (a) を採用し `prisma@^6.19.3` に固定した。** Phase B でDB接続を実装する前に (b) へ移行するかを決める必要がある。移行するなら B-1 着手前が最も安い

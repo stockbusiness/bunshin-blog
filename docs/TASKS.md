@@ -30,12 +30,20 @@
 | A-1 | Next.js + TypeScript 基盤作成 | — | build / typecheck が成功 | ルート一式 |
 | A-2 | `schema.prisma` 全テーブル定義 | A-1 | SPEC 5章の全テーブルが定義され、migrate が成功 | `prisma/` |
 | A-3 | 環境変数バリデーション | A-1 | 未設定時に起動が失敗し、欠落名が表示される | `src/lib/env.ts` |
-| A-4 | 共通ロガー・エラーレスポンス | A-1 | 秘密情報がログに出ないことをテストで確認 | `src/lib/logger.ts` `src/lib/errors.ts` |
+| A-4 | 共通ロガー・エラーレスポンス・権限判定の入口・モジュール境界 | A-1 | 秘密情報がログに出ないことをテストで確認。`can()` が定義されユニットテストがある。`docs/MODULE_RULES.md` が存在する | `src/lib/logger.ts` `src/lib/errors.ts` `src/lib/entitlements.ts` `docs/MODULE_RULES.md` |
 | A-5 | テスト基盤とCI | A-1 | lint / typecheck / test / build がCIで成功 | `.github/` `vitest.config.ts` |
 | A-6 | ドキュメント初期化 | A-1 | README / ARCHITECTURE / STATUS / HISTORY / OPEN_QUESTIONS が存在 | `docs/` |
 | A-7 | 日時ヘルパー（JST基準・週境界） | A-1 | JSTでの日付境界と月曜始まりの週境界がテストで確認できる。UTC基準の日付をJSTへ変換できる | `src/lib/datetime.ts` |
 
 **A-2が最重要。** SPEC 5章は疑似記法のため、`jsonb`の中身・リレーション名・インデックス・`onDelete`をこのタスクで確定させ、`docs/DATA_MODEL.md` に記録する。以降のスキーマ変更は必ずタスク化する。
+
+### A-4 の `src/lib/entitlements.ts` について
+
+将来のオプション課金に備え、権限判定の入口を1箇所に集約する。**Phase 0 では課金を実装しないため `can()` は常に `true` を返す空実装**とし、将来ここだけを差し替えれば課金判定が有効になる形にする。
+
+- 課金テーブル・プラン設計・決済連携は Phase 0 では作らない
+- `can()` の呼び出し箇所の追加は各モジュールのタスクで行う。A-4 では関数の定義とテストのみ
+- 新しい `Capability` は、それを必要とするモジュールのタスクで追加する
 
 ### A-7 を単独タスクにする理由
 
@@ -75,7 +83,7 @@
 | C-2 | 接続テスト（7項目） | C-1 | 権限不足を個別のエラーコードで返す | `src/modules/wordpress/` |
 | C-3 | 下書き投稿 | C-2 | `status: draft` 以外で投稿されない | `src/modules/wordpress/` |
 | C-4 | 冪等性（idempotency_key） | C-3 | 同一ジョブ再実行で二重投稿されない | `src/modules/jobs/` |
-| C-5 | 投稿更新とWP同期 | C-4 | content hash が同一なら更新しない。公開状態を取り込む | `src/modules/wordpress/` |
+| C-5 | 投稿更新とWP同期 | C-4 | content hash が同一なら更新しない。公開状態を取り込む。`user_edited_at` の追加と、未編集判定の実装（DATA_MODEL 11章） | `src/modules/wordpress/` `prisma/` |
 | C-6 | テナント越境の統合テスト | C-5 | 2ユーザー×2ブログで越境投稿が発生しない | `src/tests/integration/` |
 
 **C-6は必ず単独タスクにする。** 他タスクのついでに書かせると省略される。
