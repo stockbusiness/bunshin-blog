@@ -95,12 +95,20 @@ B-3 で作る所有権検証は **Phase B〜H の全モジュールが使う土�
 
 | ID | タスク | 依存 | 完了条件 | 主な変更先 |
 |---|---|---|---|---|
-| C-1 | 接続情報の暗号化保存 | A-3, B-4 | 復号値がAPIレスポンス・ログに出ない | `src/modules/wordpress/` |
+| C-1 | 接続情報の暗号化保存 | A-3, B-4 | 復号値がAPIレスポンス・ログに出ない。**接続後の `site_url` 変更が拒否される**（OPEN_QUESTIONS Q-007） | `src/modules/wordpress/` |
 | C-2 | 接続テスト（7項目） | C-1 | 権限不足を個別のエラーコードで返す | `src/modules/wordpress/` |
 | C-3 | 下書き投稿 | C-2 | `status: draft` 以外で投稿されない | `src/modules/wordpress/` |
 | C-4 | 冪等性（idempotency_key） | C-3 | 同一ジョブ再実行で二重投稿されない | `src/modules/jobs/` |
 | C-5 | 投稿更新とWP同期 | C-4 | content hash が同一なら更新しない。公開状態を取り込む。`user_edited_at` の追加と、未編集判定の実装（DATA_MODEL 11章） | `src/modules/wordpress/` `prisma/` |
 | C-6 | テナント越境の統合テスト | C-5 | 2ユーザー×2ブログで越境投稿が発生しない | `src/tests/integration/` |
+
+### WordPress接続先は後から変えられない（Q-007）
+
+接続後に `site_url` を別のサイトへ変更できない。接続先が変わると `wordpress_posts`・`metrics_daily`・Search Console のデータが別サイトのものと混ざり、実験データとして読めなくなるため。
+
+- **同一 `site_url` のままの再接続は許可する。** 認証情報の入れ替え・権限の付け直し・接続エラーからの復旧に必要
+- `disconnect` で `REVOKED` にしても `site_url` は保持し、再接続時に一致を確認する
+- サイトを変えたい場合はブログを `CLOSED` にして作り直す
 
 **C-6は必ず単独タスクにする。** 他タスクのついでに書かせると省略される。
 
