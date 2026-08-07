@@ -1,3 +1,12 @@
+import type { ArticleRatio } from './article-ratio';
+
+/** ブログに割り当てられたジャンル。決まるのは E-4 の審査（Q-009） */
+export interface AppBlogGenre {
+  id: string;
+  name: string;
+  category: string;
+}
+
 /**
  * blogs モジュールが外部へ渡すブログ表現（B-3）。
  *
@@ -15,6 +24,10 @@ export interface AppBlog {
   slotNumber: number;
   launchDate: Date | null;
   createdAt: Date;
+  /** 記事構成。`weeklyPublishCap` 以外は算出値（B-5・Q-011） */
+  articleRatio: ArticleRatio;
+  /** 未審査なら `null`。設定画面では表示のみ（Q-009） */
+  genre: AppBlogGenre | null;
 }
 
 /**
@@ -33,7 +46,12 @@ export interface CreateBlogInput {
   purpose?: AppBlog['purpose'] | undefined;
 }
 
-/** 更新の入力。指定した項目のみ変える */
+/**
+ * 更新の入力。指定した項目のみ変える。
+ *
+ * **`genre` と `article_ratio.revenue` / `traffic` は含めない。**
+ * 前者は E-4 の審査で決まり（Q-009）、後者は算出値（Q-011）。
+ */
 export interface UpdateBlogInput {
   name?: string | undefined;
   slug?: string | undefined;
@@ -41,4 +59,6 @@ export interface UpdateBlogInput {
   penName?: string | null | undefined;
   purpose?: AppBlog['purpose'] | undefined;
   status?: Exclude<AppBlog['status'], 'CLOSED'> | undefined;
+  /** 週の公開上限（1〜4）。`article_ratio` の他の項目は保持される */
+  weeklyPublishCap?: number | undefined;
 }

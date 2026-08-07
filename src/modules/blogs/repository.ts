@@ -1,6 +1,11 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { AppError } from '@/lib/errors';
+import {
+  DEFAULT_ARTICLE_RATIO,
+  parseArticleRatio,
+  withWeeklyPublishCap,
+} from './article-ratio';
 import { ownedBy, requireFound } from './ownership';
 import {
   MAX_BLOGS_PER_USER,
@@ -33,7 +38,19 @@ interface BlogRecord {
   slotNumber: number;
   launchDate: Date | null;
   createdAt: Date;
+  articleRatio: unknown;
+  genre: { id: string; name: string; category: string } | null;
 }
+
+/**
+ * ジャンルを一緒に引く（B-5）。
+ *
+ * `genres` は `blogs` モジュールの所有テーブル（MODULE_RULES）。
+ * 設定画面では表示のみで、変更は E-4 の審査を経由する（Q-009）。
+ */
+const WITH_GENRE = {
+  genre: { select: { id: true, name: true, category: true } },
+} as const;
 
 function toAppBlog(record: BlogRecord): AppBlog {
   return {
@@ -48,6 +65,8 @@ function toAppBlog(record: BlogRecord): AppBlog {
     slotNumber: record.slotNumber,
     launchDate: record.launchDate,
     createdAt: record.createdAt,
+    articleRatio: parseArticleRatio(record.articleRatio),
+    genre: record.genre,
   };
 }
 
@@ -69,6 +88,7 @@ export async function listBlogsForUser(
       userId,
       ...(options.includeClosed === true ? {} : { status: { not: 'CLOSED' } }),
     },
+    include: WITH_GENRE,
     orderBy: LIST_ORDER,
   });
 
@@ -86,6 +106,7 @@ export async function findBlogForUser(params: {
 }): Promise<AppBlog | null> {
   const record = await prisma.blog.findFirst({
     where: ownedBy({ userId: params.userId, id: params.blogId }),
+    include: WITH_GENRE,
   });
 
   return record === null ? null : toAppBlog(record);
@@ -198,8 +219,9 @@ export async function createBlogForUser(
         penName: input.penName ?? null,
         ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
         // 記事構成の既定値。SPEC 9.3 の初期30記事・週4本
-        articleRatio: { revenue: 7, traffic: 23, weeklyPublishCap: 4 },
+        articleRatio: { ...DEFAULT_ARTICLE_RATIO },
       },
+      include: WITH_GENRE,
     });
 
     return toAppBlog(record);
@@ -217,6 +239,10 @@ export async function createBlogForUser(
  *
  * `updateMany` を所有権付きで使う。`update` は主キーのみで対象を決めるため、
  * 所有権を条件に含められない。
+ *
+ * `weeklyPublishCap` を指定した場合、**`article_ratio` の他の項目は
+ * 現在の値を引き継ぐ**（B-5・Q-011）。上限だけを受け取って全体を
+ * 組み立て直すと、SPEC 9.2.4 の算出値が既定値で上書きされる。
  */
 export async function updateBlogForUser(
   params: { userId: string; blogId: string },
@@ -230,6 +256,15 @@ export async function updateBlogForUser(
   if (input.penName !== undefined) data['penName'] = input.penName;
   if (input.purpose !== undefined) data['purpose'] = input.purpose;
   if (input.status !== undefined) data['status'] = input.status;
+
+  if (input.weeklyPublishCap !== undefined) {
+    // 現在値が要るため先に引く。所有していなければここで404になり、
+    // 不正な上限を投げる前に止まる
+    const current = await requireBlogForUser(params);
+    data['articleRatio'] = {
+      ...withWeeklyPublishCap(current.articleRatio, input.weeklyPublishCap),
+    };
+  }
 
   if (Object.keys(data).length === 0) {
     return requireBlogForUser(params);
