@@ -18,7 +18,15 @@ export default defineConfig({
       reportsDirectory: 'coverage',
       // 計測対象はロジックを持つコードのみ。画面と設定は対象外にする
       include: ['src/lib/**/*.ts', 'src/modules/**/*.ts'],
-      exclude: ['**/*.test.ts', '**/index.ts'],
+      exclude: [
+        '**/*.test.ts',
+        '**/index.ts',
+        // repository はDBへの問い合わせそのもの。所有権の条件が効いているかは
+        // fake では確かめられないため、実DBに対する統合テストで検証する
+        // （npm run test:integration）。ここで数えると、実際には検証済みの
+        // コードを「未カバー」として扱うことになる
+        '**/repository.ts',
+      ],
       thresholds: {
         lines: 80,
         functions: 80,
