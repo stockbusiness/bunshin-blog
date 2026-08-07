@@ -88,3 +88,31 @@
   - (c) `metrics_daily` にデータ源のタイムゾーンを持たせ、Search Console 由来の行は「UTC基準の日」として区別する
 - 影響範囲：G-2（取得ジョブ）、G-6（`metrics_daily` 集計）、G-7（管理ダッシュボード）。手動収益入力（G-5）はJST基準のため、混在すると同じ `metric_date` の行で基準が食い違う
 - 状態：**未解決。G-2 着手前に決定が必要。** A-7 では推測で実装せず、UTCの**瞬間**をJST暦日に変換する `toJstDate(instant)` のみを提供した。日付文字列の割り直しは実装していない
+
+### Q-006 `blogs.targetReader` のカラム名が snake_case になっていない
+
+- 発生タスク：A-8（初期マイグレーションの生成中に判明）
+- 状況：`DATA_MODEL.md` 1章は「テーブル名・カラム名は snake_case」と定めているが、`prisma/schema.prisma:292` の `Blog.targetReader` に `@map` が無く、**DBのカラム名が `"targetReader"` になる**
+
+  ```prisma
+  // prisma/schema.prisma:292（Blog）
+  targetReader      String              // @map が無い → "targetReader"
+
+  // prisma/schema.prisma:388（BlogPersonaSetting）
+  targetReader      Json  @map("target_reader")   // こちらは正しい
+  ```
+
+  実カラム26テーブル分を走査した結果、**snake_case でないのはこの1件のみ**。同じ概念が `blogs` と `blog_persona_settings` で別名になっている
+- 選択肢：
+  - (a) **`@map("target_reader")` を追加して揃える。** 初期マイグレーション作成前の今なら1行の変更で済む
+  - (b) そのままにする。以降 `blogs` だけ SQL で `"targetReader"` とクォートが必要になる
+  - (c) 後で直す。初期マイグレーション適用後は `ALTER TABLE ... RENAME COLUMN` の追加マイグレーションが必要
+- 影響範囲：`prisma/schema.prisma`、初期マイグレーション、B-3・B-5（ブログCRUDと設定画面）、G-7（ダッシュボードの生SQL）
+- 状態：**解決（2026-08-07）。(a) を採用。`@map("target_reader")` を追加した**
+
+決定内容：
+
+- `prisma/schema.prisma` の `Blog.targetReader` に `@map("target_reader")` を追加
+- 初期マイグレーションを再生成し、**26テーブルの全実カラムが snake_case であることを確認**
+- `blogs.target_reader` と `blog_persona_settings.target_reader` で名前が揃った
+- 本件は初期マイグレーション適用前だったため、追加のマイグレーションは不要

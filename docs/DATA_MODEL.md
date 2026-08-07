@@ -199,16 +199,18 @@ TASKS G-1。ブログ単位のOAuthトークンを暗号化保存する。SPEC 1
 
 本スキーマは構造チェック（リレーションの対応、`@@map` の重複、UUID型の付与）を通過している。
 
-A-5 で CI に組み込み、以下を毎PRで実行している（`.github/workflows/ci.yml` の `schema` ジョブ）。
+A-5 で CI に組み込み、A-8 でマイグレーション運用に切り替えた。以下を毎PRで実行している（`.github/workflows/ci.yml` の `schema` ジョブ）。
 
 | 検証 | 状態 |
 |---|---|
 | `prisma validate` | ✅ 通過 |
-| 初期SQLの生成（`prisma migrate diff --from-empty`） | ✅ 26テーブル・30 enum |
-| 実PostgreSQLへの適用（`prisma db push`） | ✅ CIのサービスコンテナで実行 |
-| `prisma migrate dev --name init` によるマイグレーションのコミット | ❌ 未実施 |
+| 初期マイグレーションのコミット（A-8） | ✅ `prisma/migrations/`。26テーブル・30 enum |
+| 実PostgreSQLへの適用（`prisma migrate deploy`） | ✅ CIのサービスコンテナで実行 |
+| スキーマとマイグレーションの乖離検出 | ✅ CIで実行 |
 
-**初期マイグレーションはまだリポジトリに存在しない。** 9章の「マイグレーションを単独のPRで適用」に従い、別タスクとして起票する。
+CI は `db push` ではなく **`migrate deploy`** で適用し、適用後のDBと `schema.prisma` を `migrate diff --exit-code` で比較する。スキーマだけ変えてマイグレーションを足し忘れると失敗する。
+
+4章でDB側にも入れると定めたCHECK制約2件（`blogs_slot_range` / `content_items_outbound_max`）は Prisma のスキーマで表現できないため、初期マイグレーションに手で追記している。CIで存在と実効性を確認している。
 
 `prisma validate` は Prisma 6 系でのみ通る。Prisma 7 は `datasource` の `url` を廃止したため、本スキーマは通らない（OPEN_QUESTIONS Q-004）。
 
