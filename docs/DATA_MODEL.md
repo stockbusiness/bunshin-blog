@@ -199,13 +199,18 @@ TASKS G-1。ブログ単位のOAuthトークンを暗号化保存する。SPEC 1
 
 本スキーマは構造チェック（リレーションの対応、`@@map` の重複、UUID型の付与）を通過している。
 
-**`npx prisma validate` および `prisma migrate dev` は未実行。** 実行環境からPrismaのエンジンバイナリを取得できなかったため。ローカルまたはCIで以下を実行し、通ることを A-2 の完了条件とする。
+A-5 で CI に組み込み、以下を毎PRで実行している（`.github/workflows/ci.yml` の `schema` ジョブ）。
 
-```bash
-npx prisma validate
-npx prisma format
-npx prisma migrate dev --name init
-```
+| 検証 | 状態 |
+|---|---|
+| `prisma validate` | ✅ 通過 |
+| 初期SQLの生成（`prisma migrate diff --from-empty`） | ✅ 26テーブル・30 enum |
+| 実PostgreSQLへの適用（`prisma db push`） | ✅ CIのサービスコンテナで実行 |
+| `prisma migrate dev --name init` によるマイグレーションのコミット | ❌ 未実施 |
+
+**初期マイグレーションはまだリポジトリに存在しない。** 9章の「マイグレーションを単独のPRで適用」に従い、別タスクとして起票する。
+
+`prisma validate` は Prisma 6 系でのみ通る。Prisma 7 は `datasource` の `url` を廃止したため、本スキーマは通らない（OPEN_QUESTIONS Q-004）。
 
 ---
 
