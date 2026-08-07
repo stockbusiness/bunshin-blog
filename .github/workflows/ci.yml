@@ -128,15 +128,17 @@ jobs:
           CHECKS=$(psql "$DATABASE_URL" -tAc \
             "select count(*) from pg_constraint
              where contype='c' and conname in
-               ('blogs_slot_range','content_items_outbound_max')")
+               ('blogs_slot_range','content_items_outbound_max',
+                'admin_login_tokens_expiry_after_creation',
+                'admin_login_tokens_used_after_creation')")
           echo "テーブル数: $TABLES / enum型数: $TYPES / CHECK制約: $CHECKS"
           if [ "$TABLES" -lt 1 ]; then
             echo "::error::テーブルが作成されていない"
             exit 1
           fi
-          # DATA_MODEL 4章でDB側にも入れると定めた2件
-          if [ "$CHECKS" -ne 2 ]; then
-            echo "::error::CHECK制約が2件そろっていない（$CHECKS 件）"
+          # DATA_MODEL 4章でDB側にも入れると定めた4件
+          if [ "$CHECKS" -ne 4 ]; then
+            echo "::error::CHECK制約が4件そろっていない（$CHECKS 件）"
             exit 1
           fi
 
