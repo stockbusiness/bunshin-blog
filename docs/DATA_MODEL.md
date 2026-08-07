@@ -180,7 +180,7 @@ SPEC 6.2の `/admin/prompts`（バージョン・有効化・ロールバック�
 
 ### `affiliate_links` / `link_clicks`
 
-TASKS D-8の自前リダイレクタ。SPEC 20.1でリダイレクト方式をPhase A着手前に決定するとしているため、**方式が確定するまでこの2テーブルは確定版ではない。**
+TASKS D-8の自前リダイレクタ。**OPEN_QUESTIONS Q-001 で方式が確定した**（2026-08-07）。案件ごとに `REDIRECT` / `DIRECT` を切り替え、**この2テーブルは `REDIRECT` の案件でのみ使う**。`DIRECT` の案件では行が作られない。
 
 ### `search_console_connections`
 
