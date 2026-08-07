@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { use, useEffect, useState } from 'react';
+import { use, useEffect, useId, useState } from 'react';
 import {
   BlogApiError,
   fetchBlog,
@@ -147,79 +147,99 @@ export default function BlogSettingsPage({
         className="mt-4 flex flex-col gap-5"
       >
         <Field label="ブログ名">
-          <input
-            type="text"
-            value={form.name}
-            onChange={(e) => update('name', e.target.value)}
-            maxLength={100}
-            required
-            className="w-full rounded border p-3 text-base"
-          />
+          {(fieldProps) => (
+            <input
+              {...fieldProps}
+              type="text"
+              value={form.name}
+              onChange={(e) => update('name', e.target.value)}
+              maxLength={100}
+              required
+              className="w-full rounded border p-3 text-base"
+            />
+          )}
         </Field>
 
         <Field label="ペンネーム" hint="記事の書き手として表示されます">
-          <input
-            type="text"
-            value={form.penName ?? ''}
-            onChange={(e) => update('penName', e.target.value)}
-            maxLength={100}
-            className="w-full rounded border p-3 text-base"
-          />
+          {(fieldProps) => (
+            <input
+              {...fieldProps}
+              type="text"
+              value={form.penName ?? ''}
+              onChange={(e) => update('penName', e.target.value)}
+              maxLength={100}
+              className="w-full rounded border p-3 text-base"
+            />
+          )}
         </Field>
 
         <Field label="想定読者" hint="誰に向けて書くかを具体的に">
-          <textarea
-            value={form.targetReader}
-            onChange={(e) => update('targetReader', e.target.value)}
-            maxLength={500}
-            required
-            rows={4}
-            className="w-full rounded border p-3 text-base"
-          />
+          {(fieldProps) => (
+            <textarea
+              {...fieldProps}
+              value={form.targetReader}
+              onChange={(e) => update('targetReader', e.target.value)}
+              maxLength={500}
+              required
+              rows={4}
+              className="w-full rounded border p-3 text-base"
+            />
+          )}
         </Field>
 
         <Field label="収益方針">
-          <select
-            value={form.purpose}
-            onChange={(e) => update('purpose', e.target.value as BlogPurpose)}
-            className="w-full rounded border p-3 text-base"
-          >
-            {PURPOSE_VALUES.map((value) => (
-              <option key={value} value={value}>
-                {PURPOSE_LABELS[value]}
-              </option>
-            ))}
-          </select>
+          {(fieldProps) => (
+            <select
+              {...fieldProps}
+              value={form.purpose}
+              onChange={(e) => update('purpose', e.target.value as BlogPurpose)}
+              className="w-full rounded border p-3 text-base"
+            >
+              {PURPOSE_VALUES.map((value) => (
+                <option key={value} value={value}>
+                  {PURPOSE_LABELS[value]}
+                </option>
+              ))}
+            </select>
+          )}
         </Field>
 
         <Field label="投稿頻度" hint="週の公開本数の上限（最大4本）">
-          <select
-            value={form.weeklyPublishCap}
-            onChange={(e) => update('weeklyPublishCap', Number(e.target.value))}
-            className="w-full rounded border p-3 text-base"
-          >
-            {PUBLISH_CAP_CHOICES.map((value) => (
-              <option key={value} value={value}>
-                週 {value} 本
-              </option>
-            ))}
-          </select>
+          {(fieldProps) => (
+            <select
+              {...fieldProps}
+              value={form.weeklyPublishCap}
+              onChange={(e) =>
+                update('weeklyPublishCap', Number(e.target.value))
+              }
+              className="w-full rounded border p-3 text-base"
+            >
+              {PUBLISH_CAP_CHOICES.map((value) => (
+                <option key={value} value={value}>
+                  週 {value} 本
+                </option>
+              ))}
+            </select>
+          )}
         </Field>
 
         <Field label="状態">
-          <select
-            value={form.status}
-            onChange={(e) =>
-              update('status', e.target.value as FormState['status'])
-            }
-            className="w-full rounded border p-3 text-base"
-          >
-            {SELECTABLE_STATUSES.map((value) => (
-              <option key={value} value={value}>
-                {STATUS_LABELS[value]}
-              </option>
-            ))}
-          </select>
+          {(fieldProps) => (
+            <select
+              {...fieldProps}
+              value={form.status}
+              onChange={(e) =>
+                update('status', e.target.value as FormState['status'])
+              }
+              className="w-full rounded border p-3 text-base"
+            >
+              {SELECTABLE_STATUSES.map((value) => (
+                <option key={value} value={value}>
+                  {STATUS_LABELS[value]}
+                </option>
+              ))}
+            </select>
+          )}
         </Field>
 
         <button
@@ -241,6 +261,13 @@ export default function BlogSettingsPage({
   );
 }
 
+/**
+ * 入力欄1つぶんの見出しと補足。
+ *
+ * **補足を `<label>` の中に入れない。** 中に入れると読み上げ時の項目名が
+ * 「ペンネーム 記事の書き手として表示されます」になり、項目名として
+ * 使えなくなる。`aria-describedby` で別に結びつける。
+ */
 function Field({
   label,
   hint,
@@ -248,14 +275,29 @@ function Field({
 }: {
   label: string;
   hint?: string;
-  children: React.ReactNode;
+  children: (props: {
+    id: string;
+    'aria-describedby': string | undefined;
+  }) => React.ReactNode;
 }) {
+  const id = useId();
+  const hintId = `${id}-hint`;
+
   return (
-    <label className="flex flex-col gap-2">
-      <span className="text-sm font-bold">{label}</span>
-      {hint === undefined ? null : <span className="text-xs">{hint}</span>}
-      {children}
-    </label>
+    <div className="flex flex-col gap-2">
+      <label htmlFor={id} className="text-sm font-bold">
+        {label}
+      </label>
+      {hint === undefined ? null : (
+        <p id={hintId} className="text-xs">
+          {hint}
+        </p>
+      )}
+      {children({
+        id,
+        'aria-describedby': hint === undefined ? undefined : hintId,
+      })}
+    </div>
   );
 }
 
