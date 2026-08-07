@@ -289,7 +289,7 @@ model Blog {
   slug              String
   genreId           String?     @map("genre_id") @db.Uuid
   penName           String?     @map("pen_name")
-  targetReader      String
+  targetReader      String      @map("target_reader")
   purpose           BlogPurpose @default(AFFILIATE)
   status            BlogStatus  @default(SETUP)
   slotNumber        Int         @map("slot_number")

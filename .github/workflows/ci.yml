@@ -148,7 +148,7 @@ jobs:
 
           # slot_number は 1〜3 のみ許可される（blogs_slot_range）
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c \
-            "insert into blogs (id, user_id, name, slug, \"targetReader\",
+            "insert into blogs (id, user_id, name, slug, target_reader,
                                 article_ratio, slot_number, updated_at)
              values ('00000000-0000-0000-0000-000000000002',
                      '00000000-0000-0000-0000-000000000001',
@@ -156,7 +156,7 @@ jobs:
           echo "slot_number=3 は登録できた"
 
           if psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c \
-            "insert into blogs (id, user_id, name, slug, \"targetReader\",
+            "insert into blogs (id, user_id, name, slug, target_reader,
                                 article_ratio, slot_number, updated_at)
              values ('00000000-0000-0000-0000-000000000003',
                      '00000000-0000-0000-0000-000000000001',

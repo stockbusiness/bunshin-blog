@@ -108,4 +108,11 @@
   - (b) そのままにする。以降 `blogs` だけ SQL で `"targetReader"` とクォートが必要になる
   - (c) 後で直す。初期マイグレーション適用後は `ALTER TABLE ... RENAME COLUMN` の追加マイグレーションが必要
 - 影響範囲：`prisma/schema.prisma`、初期マイグレーション、B-3・B-5（ブログCRUDと設定画面）、G-7（ダッシュボードの生SQL）
-- 状態：**未解決。初期マイグレーションをコミットする前に決定が必要。** (c) になると後戻りのコストが跳ね上がるため。A-8 では `prisma/schema.prisma` を変更しない指示に従い、現状のまま生成している
+- 状態：**解決（2026-08-07）。(a) を採用。`@map("target_reader")` を追加した**
+
+決定内容：
+
+- `prisma/schema.prisma` の `Blog.targetReader` に `@map("target_reader")` を追加
+- 初期マイグレーションを再生成し、**26テーブルの全実カラムが snake_case であることを確認**
+- `blogs.target_reader` と `blog_persona_settings.target_reader` で名前が揃った
+- 本件は初期マイグレーション適用前だったため、追加のマイグレーションは不要

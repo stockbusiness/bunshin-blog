@@ -133,7 +133,7 @@ CREATE TABLE "blogs" (
     "slug" TEXT NOT NULL,
     "genre_id" UUID,
     "pen_name" TEXT,
-    "targetReader" TEXT NOT NULL,
+    "target_reader" TEXT NOT NULL,
     "purpose" "BlogPurpose" NOT NULL DEFAULT 'AFFILIATE',
     "status" "BlogStatus" NOT NULL DEFAULT 'SETUP',
     "slot_number" INTEGER NOT NULL,
