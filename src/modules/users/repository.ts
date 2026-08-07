@@ -80,6 +80,36 @@ export async function findById(
 }
 
 /**
+ * メールアドレスから ADMIN を引く（B-11）。
+ *
+ * **`role = 'ADMIN'` の行だけを返す。** MONITOR のアドレスに管理画面の
+ * ログインリンクを送らないため、絞り込みをここで行う。
+ *
+ * **見つからない理由を区別しない。** 「未登録」と「MONITOR だった」を
+ * 呼び出し側へ伝えると、どのアドレスが管理者かを外から調べられる。
+ */
+export async function findAdminByEmail(email: string): Promise<AppUser | null> {
+  const normalized = email.trim().toLowerCase();
+  if (normalized === '') {
+    return null;
+  }
+
+  const record = await prisma.user.findFirst({
+    where: { email: normalized, role: 'ADMIN' },
+    select: {
+      id: true,
+      role: true,
+      displayName: true,
+      status: true,
+      termsAcceptedAt: true,
+      dataUseConsentAt: true,
+    },
+  });
+
+  return record === null ? null : toAppUser(record);
+}
+
+/**
  * `line_user_id` でユーザーを引き、無ければ作る。
  *
  * **`lineUserId` は検証済みのIDトークンから来たものだけを渡すこと**

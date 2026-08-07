@@ -7,6 +7,7 @@
 export {
   findByLineUserId,
   findById,
+  findAdminByEmail,
   findOrCreateByLineUserId,
   recordConsent,
   type UsersDb,
