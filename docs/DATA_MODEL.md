@@ -191,7 +191,9 @@ TASKS G-1。ブログ単位のOAuthトークンを暗号化保存する。SPEC 1
 - `wordpress_connections.app_password_encrypted`
 - `search_console_connections.refresh_token_encrypted`
 
-**`wordpress_connections.site_url` は接続後に変更できない**（OPEN_QUESTIONS Q-007）。同一 `site_url` のままの認証情報の入れ替えは許可する。`disconnect` で `connection_status` を `REVOKED` にしても `site_url` は保持し、再接続時に一致を確認する。
+**`wordpress_connections.site_url` はモニターからは変更できない**（OPEN_QUESTIONS Q-007）。同一 `site_url` のままの認証情報の入れ替えは許可する。`disconnect` で `connection_status` を `REVOKED` にしても `site_url` は保持し、再接続時に一致を確認する。
+
+**ADMIN は設定ミスの救済として `site_url` を変更できる。** 記事を投稿していないブログに限り、介入を `audit_logs` に残す（Q-008）。
 
 **復号値をAPIレスポンス・ログ・エラートラッキングへ出力しない。** A-4のロガーで、これらのフィールド名を含むオブジェクトはマスクする。
 
