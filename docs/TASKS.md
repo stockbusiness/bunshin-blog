@@ -34,6 +34,7 @@
 | A-5 | テスト基盤とCI | A-1 | lint / typecheck / test / build がCIで成功 | `.github/` `vitest.config.ts` |
 | A-6 | ドキュメント初期化 | A-1 | README / ARCHITECTURE / STATUS / HISTORY / OPEN_QUESTIONS が存在 | `docs/` |
 | A-7 | 日時ヘルパー（JST基準・週境界） | A-1 | JSTでの日付境界と月曜始まりの週境界がテストで確認できる。UTC基準の日付をJSTへ変換できる | `src/lib/datetime.ts` |
+| A-8 | 初期マイグレーション | A-2, A-5 | `prisma/migrations/` がコミットされ、CIで `migrate deploy` が成功する。スキーマとの乖離が検出できる | `prisma/migrations/` `.github/` |
 
 **A-2が最重要。** SPEC 5章は疑似記法のため、`jsonb`の中身・リレーション名・インデックス・`onDelete`をこのタスクで確定させ、`docs/DATA_MODEL.md` に記録する。以降のスキーマ変更は必ずタスク化する。
 
@@ -56,6 +57,12 @@
 - JSTでの日付境界（`metrics_daily.metric_date` などの `date` 列を求める）
 - 月曜始まりの週境界（`planned_publish_week`、週4本の上限判定の集計区間）
 - UTC基準で返る外部APIの日付をJSTへ変換する（Search Console）
+
+### A-8 を単独タスクにする理由
+
+`DATA_MODEL.md` 9章が「マイグレーションを単独のPRで適用」「機能実装のPRにマイグレーションを混ぜない」と定めている。A-5 のCIは `db push` でスキーマの適用可能性を確認しているだけで、`prisma/migrations/` は存在しない。
+
+**B-1 でDBを使い始める前に初期マイグレーションを確定させる。** 履歴なしで進むと、以降のスキーマ変更の差分管理ができなくなる。
 
 ---
 
@@ -217,4 +224,4 @@
 ID / 状態（未着手・実装中・レビュー中・完了）/ PR番号 / 完了日 / 残課題
 ```
 
-**タスク総数：53**
+**タスク総数：54**

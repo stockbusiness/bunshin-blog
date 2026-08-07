@@ -88,7 +88,7 @@ SPEC 4.2 のツリーに従い、ソースは全て `src/` 配下に置く（OPE
 | `logger.ts` | 構造化ログ。秘密情報のマスク | A-4 |
 | `errors.ts` | `AppError` と共通エラーレスポンス | A-4 |
 | `entitlements.ts` | 権限判定の入口。Phase 0 は常に `true` | A-4 |
-| `datetime.ts` | JST基準の日付・週境界（**未実装**） | A-7 |
+| `datetime.ts` | JST基準の日付・週境界 | A-7 |
 
 ### 環境変数
 
@@ -116,7 +116,7 @@ JSON 1行で出力する。`warn` / `error` は stderr、それ以外は stdout�
 
 **`verify` ジョブ** — `lint` / `format:check` / `typecheck` / `test:coverage` / `build`
 
-**`schema` ジョブ** — PostgreSQL 16 のサービスコンテナを立て、`prisma validate` →初期SQLの生成→ `prisma db push` で実DBへ適用→テーブル数・enum型数の確認
+**`schema` ジョブ** — PostgreSQL 16 のサービスコンテナを立て、`prisma validate` → `migrate deploy` で適用 → スキーマとの乖離検出 → テーブル数・enum型数・CHECK制約の確認 → CHECK制約が実際に効くことの確認
 
 ### ローカルでの実行
 
@@ -141,7 +141,7 @@ npm run build
 
 `prisma/schema.prisma` に26テーブル・30 enum。設計の根拠・`jsonb` の構造・`onDelete` の方針・インデックスの根拠は `docs/DATA_MODEL.md` にある。
 
-**初期マイグレーションはまだコミットされていない。** CIでは `db push` でスキーマの適用可能性のみを確認している。マイグレーションは単独PRで適用する（DATA_MODEL 9章）。
+初期マイグレーションは `prisma/migrations/` にコミットされている（A-8）。CIは `migrate deploy` で適用し、適用後のDBと `schema.prisma` の乖離を検出する。以降のスキーマ変更は単独PRで適用する（DATA_MODEL 9章）。
 
 ### 守るべき原則
 
@@ -166,7 +166,7 @@ npm run build
 
 ## 8. 現在の実装状況
 
-Phase A のうち A-1〜A-5 が完了。**ドメインロジックはまだ1行も無い**（`src/modules/` は空ディレクトリ）。
+Phase A（A-1〜A-8）が完了。**ドメインロジックはまだ1行も無い**（`src/modules/` は空ディレクトリ）。
 
 認証・DB接続・LINE連携・WordPress連携・AI呼び出しはいずれも未実装。
 
@@ -183,6 +183,7 @@ Phase A のうち A-1〜A-5 が完了。**ドメインロジックはまだ1行�
 | Q-001 | アフィリエイトリンクのリダイレクト方式 | Phase C 着手前 |
 | Q-002 | ドメイン・サーバー費用の負担者 | モニター募集前 |
 | Q-005 | Search Console の日次データをJSTの暦日へどう対応づけるか | G-2 着手前 |
+| Q-006 | `blogs.targetReader` のカラム名 | 初期マイグレーションのマージ前 |
 
 ---
 

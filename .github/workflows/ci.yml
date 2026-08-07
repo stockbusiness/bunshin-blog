@@ -92,16 +92,29 @@ jobs:
       - name: スキーマを検証
         run: npx prisma validate
 
-      - name: 初期SQLを生成できることを確認
-        run: |
-          npx prisma migrate diff \
-            --from-empty \
-            --to-schema-datamodel prisma/schema.prisma \
-            --script > /tmp/init.sql
-          echo "生成行数: $(wc -l < /tmp/init.sql)"
+      - name: マイグレーションを適用
+        run: npx prisma migrate deploy
 
-      - name: 実際のPostgreSQLへ適用
-        run: npx prisma db push --skip-generate --accept-data-loss
+      - name: マイグレーションとスキーマの乖離を検出
+        run: |
+          # 適用後のDBと schema.prisma を比較する。差分があれば
+          # マイグレーションの追加漏れ（--exit-code は差分ありで 2）
+          set +e
+          npx prisma migrate diff \
+            --from-schema-datasource prisma/schema.prisma \
+            --to-schema-datamodel prisma/schema.prisma \
+            --script --exit-code > /tmp/drift.sql
+          STATUS=$?
+          set -e
+          if [ "$STATUS" -eq 2 ]; then
+            echo "::error::schema.prisma とマイグレーションが一致していない"
+            cat /tmp/drift.sql
+            exit 1
+          fi
+          if [ "$STATUS" -ne 0 ]; then
+            exit "$STATUS"
+          fi
+          echo "乖離なし"
 
       - name: 適用結果を確認
         run: |
@@ -112,8 +125,44 @@ jobs:
             "select count(*) from pg_type t
              join pg_namespace n on n.oid = t.typnamespace
              where n.nspname='public' and t.typtype='e'")
-          echo "テーブル数: $TABLES / enum型数: $TYPES"
+          CHECKS=$(psql "$DATABASE_URL" -tAc \
+            "select count(*) from pg_constraint
+             where contype='c' and conname in
+               ('blogs_slot_range','content_items_outbound_max')")
+          echo "テーブル数: $TABLES / enum型数: $TYPES / CHECK制約: $CHECKS"
           if [ "$TABLES" -lt 1 ]; then
             echo "::error::テーブルが作成されていない"
             exit 1
           fi
+          # DATA_MODEL 4章でDB側にも入れると定めた2件
+          if [ "$CHECKS" -ne 2 ]; then
+            echo "::error::CHECK制約が2件そろっていない（$CHECKS 件）"
+            exit 1
+          fi
+
+      - name: CHECK制約が実際に効くことを確認
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c \
+            "insert into users (id, display_name, updated_at)
+             values ('00000000-0000-0000-0000-000000000001','検証用',now())"
+
+          # slot_number は 1〜3 のみ許可される（blogs_slot_range）
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c \
+            "insert into blogs (id, user_id, name, slug, \"targetReader\",
+                                article_ratio, slot_number, updated_at)
+             values ('00000000-0000-0000-0000-000000000002',
+                     '00000000-0000-0000-0000-000000000001',
+                     'ok','ok','r','{}'::jsonb,3,now())"
+          echo "slot_number=3 は登録できた"
+
+          if psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c \
+            "insert into blogs (id, user_id, name, slug, \"targetReader\",
+                                article_ratio, slot_number, updated_at)
+             values ('00000000-0000-0000-0000-000000000003',
+                     '00000000-0000-0000-0000-000000000001',
+                     'ng','ng','r','{}'::jsonb,4,now())" \
+            > /dev/null 2>&1; then
+            echo "::error::slot_number=4 が登録できてしまった"
+            exit 1
+          fi
+          echo "slot_number=4 は拒否された"
