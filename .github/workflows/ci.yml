@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# 同一ブランチへの連続pushでは古い実行を打ち切る
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  verify:
+    name: lint / typecheck / test / build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: 依存をインストール
+        run: npm ci
+
+      - name: lint
+        run: npm run lint
+
+      - name: 整形の確認
+        run: npm run format:check
+
+      - name: typecheck
+        run: npm run typecheck
+
+      - name: test（カバレッジ付き）
+        run: npm run test:coverage
+
+      - name: build
+        run: npm run build
+
+      - name: カバレッジを保存
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  schema:
+    name: prisma schema
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: bunshin_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/bunshin_ci
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: 依存をインストール
+        run: npm ci
+
+      - name: スキーマを検証
+        run: npx prisma validate
+
+      - name: 初期SQLを生成できることを確認
+        run: |
+          npx prisma migrate diff \
+            --from-empty \
+            --to-schema-datamodel prisma/schema.prisma \
+            --script > /tmp/init.sql
+          echo "生成行数: $(wc -l < /tmp/init.sql)"
+
+      - name: 実際のPostgreSQLへ適用
+        run: npx prisma db push --skip-generate --accept-data-loss
+
+      - name: 適用結果を確認
+        run: |
+          psql "$DATABASE_URL" -c "\dt"
+          TABLES=$(psql "$DATABASE_URL" -tAc \
+            "select count(*) from information_schema.tables where table_schema='public'")
+          TYPES=$(psql "$DATABASE_URL" -tAc \
+            "select count(*) from pg_type t
+             join pg_namespace n on n.oid = t.typnamespace
+             where n.nspname='public' and t.typtype='e'")
+          echo "テーブル数: $TABLES / enum型数: $TYPES"
+          if [ "$TABLES" -lt 1 ]; then
+            echo "::error::テーブルが作成されていない"
+            exit 1
+          fi
