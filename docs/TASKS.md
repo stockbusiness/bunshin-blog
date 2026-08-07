@@ -83,7 +83,7 @@ B-3 で作る所有権検証は **Phase B〜H の全モジュールが使う土�
 | B-2 | ユーザー登録・規約同意・データ利用同意 | B-1 | 同意なしで他APIが403 | `src/modules/users/` |
 | B-3 | ブログCRUD | B-2 | 自分のブログのみ取得・更新できる | `src/modules/blogs/` |
 | B-4 | 3ブログ上限とslot制御 | B-3 | 4件目の登録が拒否される。slot重複が拒否される。`CLOSED` のスロットを再利用できない（OPEN_QUESTIONS Q-008） | `src/modules/blogs/` |
-| B-5 | ブログ設定画面（LIFF） | B-4, B-8 | スマートフォンで全項目を編集できる（対象項目は OPEN_QUESTIONS Q-009〜Q-011 の決定後に確定） | `src/app/liff/blogs/` |
+| B-5 | ブログ設定画面（LIFF） | B-4, B-8 | ブログ名・ペンネーム・想定読者・収益方針・投稿頻度をスマートフォンで編集できる。ジャンルと算出値は表示のみ（OPEN_QUESTIONS Q-009〜Q-011） | `src/app/liff/blogs/` |
 | B-6 | 管理者認証（Supabase Auth） | A-3 | MONITORが `/admin` へアクセスできない | `src/modules/auth/` |
 | B-7 | 管理者ユーザー一覧 | B-6 | モニター一覧とオンボーディング状況が表示される | `src/app/admin/users/` |
 | B-8 | LIFFクライアント基盤 | B-1 | LIFF外で開くと案内が出る。初期化後にセッションCookieが確立し、以降のAPI呼び出しが200を返す | `src/app/liff/` |
