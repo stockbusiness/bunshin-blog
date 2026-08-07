@@ -67,4 +67,11 @@
   - (a) **Prisma 6 系に固定する**（A-5 で採用）。`schema.prisma` は無変更で済む
   - (b) Prisma 7 へ上げる。`schema.prisma` から `url` を削除し、`prisma.config.ts` を追加する。A-2 の成果物に手を入れるため、DATA_MODEL 9章に従い単独タスク・単独PRが必要
 - 影響範囲：`prisma/schema.prisma`、DB接続の実装（B-1以降）、CI
-- 状態：**暫定決定（2026-08-06）。A-5 では (a) を採用し `prisma@^6.19.3` に固定した。** Phase B でDB接続を実装する前に (b) へ移行するかを決める必要がある。移行するなら B-1 着手前が最も安い
+- 状態：**解決（2026-08-06）。(a) を採用。Phase 0 は Prisma 6 系で進める**
+
+決定内容：
+
+- `prisma@^6.19.3` に固定する。`prisma/schema.prisma` は無変更のまま
+- **Phase 0 の期間中は 7系へ上げない。** 7系で得られるもののうち Phase 0 で使う予定のものが無い一方、26テーブルのスキーマがCIで実DBへ適用できている現状を崩すリスクがある
+- 移行を検討するのは Phase 0 終了後。実施する場合は `schema.prisma` の変更と `prisma.config.ts` の追加を伴うため、DATA_MODEL 9章に従い単独タスク・単独PRで行う
+- 依存の更新でうっかり 7系に上がらないよう、`package.json` の指定は `^6` の範囲に留める
