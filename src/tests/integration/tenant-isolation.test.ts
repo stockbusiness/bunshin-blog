@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
+import * as affiliate from '@/modules/affiliate';
 import * as blogs from '@/modules/blogs';
 import * as wordpress from '@/modules/wordpress';
 import {
@@ -413,6 +414,28 @@ describe('他人のブログIDを指定する', () => {
           contentItemId: alice.contentItemIds[0],
         }),
     ],
+    [
+      '案件を一覧する',
+      (): Promise<unknown> =>
+        affiliate.listOffersForUser({
+          userId: bob.userId,
+          blogId: alice.blogIds[0],
+        }),
+    ],
+    [
+      '案件を登録する',
+      (): Promise<unknown> =>
+        affiliate.createOfferForUser(
+          { userId: bob.userId, blogId: alice.blogIds[0] },
+          {
+            name: '割り込み案件',
+            aspName: 'ASP',
+            landingPageUrl: 'https://lp.example.com/a',
+            affiliateUrl: 'https://asp.example/click?a=x',
+            conversionType: 'FREE_SIGNUP',
+          },
+        ),
+    ],
   ])('%s と 404 になる', async (_label, attempt) => {
     const before = await snapshot(alice);
 
@@ -623,6 +646,15 @@ describe('認証情報が越境しない（SPEC 14.2）', () => {
  */
 describe('入口の網羅', () => {
   const covered = {
+    affiliate: [
+      'listOffersForUser',
+      'findOfferForUser',
+      'requireOfferForUser',
+      'createOfferForUser',
+      'updateOfferForUser',
+      'endOfferForUser',
+      'readLinkableOfferForUser',
+    ],
     blogs: [
       'listBlogsForUser',
       'findBlogForUser',
@@ -645,6 +677,7 @@ describe('入口の網羅', () => {
   } as const;
 
   it.each([
+    ['affiliate', affiliate, covered.affiliate],
     ['blogs', blogs, covered.blogs],
     ['wordpress', wordpress, covered.wordpress],
   ])(
