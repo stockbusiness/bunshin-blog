@@ -1,0 +1,87 @@
+/**
+ * ジョブ基盤の型（TASKS E-1、SPEC 4.3）。
+ *
+ * **`jobs` モジュールはドメインモジュールを import しない**（MODULE_RULES 3）。
+ * ハンドラの登録は `src/app/` 側で行う。ここには「ジョブとは何か」だけを置く。
+ */
+
+export type JobStatus =
+  'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'CANCELLED';
+
+/**
+ * ジョブの種類（SPEC 4.3）。
+ *
+ * **文字列で持つ**（DBの列も `text`）。enum にすると、種類を増やすたびに
+ * マイグレーションが要る。値の一覧はここで固定する。
+ */
+export const JOB_TYPES = [
+  'BLOG_ANALYSIS',
+  'PLAN_GENERATION',
+  'ARTICLE_GENERATION',
+  'ARTICLE_REGENERATION',
+  'WORDPRESS_POST',
+  'WORDPRESS_SYNC',
+  'SEARCH_CONSOLE_FETCH',
+  'GA4_FETCH',
+  'PROPOSAL_SELECTION',
+  'LINE_NOTIFY',
+  'LINK_CHECK',
+] as const;
+
+export type JobType = (typeof JOB_TYPES)[number];
+
+export function isJobType(value: string): value is JobType {
+  return (JOB_TYPES as readonly string[]).includes(value);
+}
+
+/** ジョブの外向け表現 */
+export interface AppJob {
+  id: string;
+  jobType: string;
+  userId: string | null;
+  blogId: string | null;
+  targetId: string | null;
+  status: JobStatus;
+  attemptCount: number;
+  idempotencyKey: string;
+  input: unknown;
+  output: unknown;
+  errorCode: string | null;
+  errorMessage: string | null;
+  startedAt: Date | null;
+  completedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * 投入の入力。
+ *
+ * **`idempotencyKey` は呼び出し側が決める**（SPEC 7.3「`content_item_id`
+ * ごとの冪等性キー」）。同じキーで2回投入しても行は増えない。
+ */
+export interface EnqueueJobInput {
+  jobType: JobType;
+  idempotencyKey: string;
+  input: unknown;
+  userId?: string | undefined;
+  blogId?: string | undefined;
+  targetId?: string | undefined;
+}
+
+export interface EnqueueResult {
+  job: AppJob;
+  /** 新規に積んだなら `true`、既にあったなら `false` */
+  created: boolean;
+}
+
+/**
+ * ジョブの処理。
+ *
+ * 戻り値は `output_json` に保存する。例外を投げると失敗として記録され、
+ * 上限まで再試行される。
+ */
+export type JobHandler = (job: AppJob) => Promise<unknown>;
+
+/** 種類ごとのハンドラ。登録は `src/app/` 側（MODULE_RULES 3） */
+export type JobHandlerRegistry = Readonly<Partial<Record<JobType, JobHandler>>>;
