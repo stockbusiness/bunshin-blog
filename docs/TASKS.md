@@ -215,7 +215,7 @@ B-1 が実装したのは**サーバー側のIDトークン検証**であり、�
 | D-4 | `user_personas` | B-2 | ユーザー共通人格を編集できる | `src/modules/personas/` |
 | D-5 | `blog_persona_settings` | D-4, B-4 | ブログ別の上書き設定が保存される | `src/modules/personas/` |
 | D-6 | `persona_facts` | D-4 | `AI_INFERENCE` かつ `UNVERIFIED` が一人称利用不可のフラグを持つ | `src/modules/personas/` |
-| D-7 | LINE返信からのfacts保存 | D-6 | 返信が `persona_facts` または `revision_requests` に保存される | `src/modules/line/` |
+| D-7 | LINE返信からのfacts保存 | D-6 | 返信が `persona_facts` または `revision_requests` に保存される。**着手前に Q-015 の決定が要る**（`revision_requests` 側は `approvals` が無いと書けない） | `src/modules/line/` |
 | D-8 | アフィリエイトリダイレクタとクリック計測 | D-1 | リンク方式に従って組み立てられ、**`REDIRECT` の案件でクリックが記録される**。`DIRECT` の案件は直リンクのまま（OPEN_QUESTIONS Q-001） | `src/app/go/` `src/modules/analytics/` |
 | D-9 | 案件のリンク方式のテーブル追加 | A-8 | `migrate deploy` が成功し、スキーマとの乖離が無い。既定が `DIRECT` になる | `prisma/`, `docs/DATA_MODEL.md` |
 | D-10 | サブIDのパラメータ名のテーブル追加 | A-8 | `migrate deploy` が成功し、スキーマとの乖離が無い。既定が `NULL`（サブIDを付けない）になる | `prisma/`, `docs/DATA_MODEL.md` |
