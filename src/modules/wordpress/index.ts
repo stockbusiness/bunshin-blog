@@ -17,7 +17,20 @@ export {
   findWordpressConnectionForUser,
   readWordpressCredentialsForUser,
   testWordpressConnectionForUser,
+  publishDraftForUser,
+  findWordpressPostForUser,
 } from './repository';
+
+export {
+  publishDraft,
+  contentHash,
+  toPostStatus,
+  POST_TITLE_MAX_LENGTH,
+  POST_CONTENT_MAX_BYTES,
+  type PublishDraftInput,
+  type PublishDraftResult,
+  type ExistingPost,
+} from './draft';
 
 export {
   runConnectionTest,
@@ -81,13 +94,19 @@ export {
   notConnectedError,
   credentialsUnreadableError,
   WORDPRESS_TEST_ERROR_CODES,
+  WORDPRESS_POST_ERROR_CODES,
+  postFailedError,
+  publishedPostNotEditableError,
   type WordpressErrorCode,
   type WordpressTestErrorCode,
+  type WordpressPostErrorCode,
 } from './errors';
 
 export type {
   AppWordpressConnection,
+  AppWordpressPost,
   WordpressConnectionStatus,
+  WordpressPostStatus,
   ConnectWordpressInput,
   WordpressCredentials,
 } from './types';

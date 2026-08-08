@@ -102,3 +102,59 @@ export const WORDPRESS_TEST_ERROR_CODES = {
 
 export type WordpressTestErrorCode =
   (typeof WORDPRESS_TEST_ERROR_CODES)[keyof typeof WORDPRESS_TEST_ERROR_CODES];
+
+/**
+ * 下書き投稿の失敗（TASKS C-3、SPEC 7.3）。
+ *
+ * 接続テスト（C-2）とは別のコード体系にする。**同じ「権限が無い」でも、
+ * 接続時点の確認と投稿時の失敗は原因も対処も違う**（後者は権限が
+ * 途中で変わった、記事が消された、等）。
+ */
+export const WORDPRESS_POST_ERROR_CODES = {
+  /** タイトル・本文が空、または大きすぎる */
+  invalidContent: 'WORDPRESS_POST_INVALID_CONTENT',
+  /** WordPress へ到達できなかった */
+  unreachable: 'WORDPRESS_POST_UNREACHABLE',
+  /** WordPress が投稿を拒否した */
+  postFailed: 'WORDPRESS_POST_FAILED',
+  /** 下書き以外の状態で作成された（SPEC 7.3 に反する） */
+  notDraft: 'WORDPRESS_POST_NOT_DRAFT',
+  /** 公開済みの記事を承認なしに更新しようとした（DATA_MODEL 11章） */
+  publishedNotEditable: 'WORDPRESS_POST_PUBLISHED_NOT_EDITABLE',
+} as const;
+
+export type WordpressPostErrorCode =
+  (typeof WORDPRESS_POST_ERROR_CODES)[keyof typeof WORDPRESS_POST_ERROR_CODES];
+
+/**
+ * 投稿の失敗を表す。
+ *
+ * **原因の詳細は `cause` に入れる。** クライアントへ返るのは
+ * `message` と `details` だけで、到達先や内部の理由は含めない。
+ */
+export function postFailedError(
+  code: WordpressPostErrorCode,
+  message: string,
+  cause?: unknown,
+  details?: Record<string, unknown>,
+): AppError {
+  return new AppError(code, 502, message, {
+    ...(cause === undefined ? {} : { cause }),
+    ...(details === undefined ? {} : { details }),
+  });
+}
+
+/**
+ * 公開済みの記事を承認なしに更新しようとしたことを表す。
+ *
+ * **公開済み記事の更新は承認を必須とする**（DATA_MODEL 11章）。
+ * こちらから上書きすると、モニターが WordPress 上で加えた修正が消える。
+ * 承認を経る経路は C-5・F-6 で作る。
+ */
+export function publishedPostNotEditableError(status: string): AppError {
+  return new AppError(
+    WORDPRESS_POST_ERROR_CODES.publishedNotEditable,
+    409,
+    `下書き以外の記事は更新できません（現在: ${status}）。公開済み記事の更新には承認が必要です`,
+  );
+}
