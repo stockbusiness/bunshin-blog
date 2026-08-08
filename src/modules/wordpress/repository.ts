@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { decryptSecret, encryptSecret, getEncryptionKey } from '@/lib/crypto';
 import { notFoundError, requireBlogForUser } from '@/modules/blogs';
@@ -343,18 +344,11 @@ export async function publishDraftForUser(
 
   const now = new Date();
   const saved = result.created
-    ? await prisma.wordpressPost.create({
-        data: {
-          blogId,
-          contentItemId: params.contentItemId,
-          wpPostId: result.wpPostId,
-          wpPostUrl: result.wpPostUrl,
-          wpEditUrl: result.wpEditUrl,
-          wpStatus: result.wpStatus,
-          lastContentHash: result.contentHash,
-          postedAt: now,
-        },
-        select: POST_SELECT,
+    ? await createPostRow({
+        blogId,
+        contentItemId: params.contentItemId,
+        result,
+        now,
       })
     : await prisma.wordpressPost.update({
         where: { contentItemId: params.contentItemId },
@@ -371,6 +365,52 @@ export async function publishDraftForUser(
       });
 
   return toAppPost(saved);
+}
+
+/**
+ * 投稿の記録を作る（C-6）。
+ *
+ * **記事が別のブログのものなら、DBの複合外部キーが弾く。**
+ * `wordpress_posts (content_item_id, blog_id)` → `content_items (id, blog_id)`
+ * （C-6-schema）。ここで確かめようとすると `wordpress` が `content_items` を
+ * 直接読むことになり、MODULE_RULES 1 に反する。
+ *
+ * **弾かれた場合は 404 に揃える。** 他の越境と同じ見え方にする。
+ *
+ * なお、この時点では WordPress 側に下書きが1件できている（外部呼び出しが
+ * 先にあるため）。**残るのは指定した本人のサイトで、相手には影響しない。**
+ * 事前に防ぐにはモジュール境界を越えるしかなく、割に合わない。
+ */
+async function createPostRow(params: {
+  blogId: string;
+  contentItemId: string;
+  result: PublishDraftResult;
+  now: Date;
+}): Promise<WordpressPostRow> {
+  try {
+    return await prisma.wordpressPost.create({
+      data: {
+        blogId: params.blogId,
+        contentItemId: params.contentItemId,
+        wpPostId: params.result.wpPostId,
+        wpPostUrl: params.result.wpPostUrl,
+        wpEditUrl: params.result.wpEditUrl,
+        wpStatus: params.result.wpStatus,
+        lastContentHash: params.result.contentHash,
+        postedAt: params.now,
+      },
+      select: POST_SELECT,
+    });
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2003'
+    ) {
+      throw notFoundError('記事');
+    }
+
+    throw error;
+  }
 }
 
 /**

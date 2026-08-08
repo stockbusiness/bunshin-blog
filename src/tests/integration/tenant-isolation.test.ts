@@ -1,0 +1,737 @@
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import type { PrismaClient } from '@prisma/client';
+import * as blogs from '@/modules/blogs';
+import * as wordpress from '@/modules/wordpress';
+import {
+  assertMigrationsApplied,
+  createTestPrisma,
+  resetDatabase,
+} from './helpers/db';
+import { createUser } from './helpers/factories';
+
+/**
+ * テナント越境の統合テスト（TASKS C-6、SPEC 14.1）。
+ *
+ * 完了条件は「**2ユーザー×2ブログで越境投稿が発生しない**」。
+ *
+ * ## なぜ単独のタスクなのか
+ *
+ * TASKS が「**C-6は必ず単独タスクにする。他タスクのついでに書かせると
+ * 省略される**」と定めている。各タスクの統合テストは自分の機能を通すのが
+ * 主目的で、越境は「ついでに1件」で済まされやすい。ここは逆で、
+ * **越境させようとすることだけが目的**である。
+ *
+ * ## 攻め方
+ *
+ * 素直な「他人のブログIDを指定する」だけでは足りない。所有権の判定を
+ * すり抜ける経路が2つある。
+ *
+ * - **自分のブログID + 他人の記事ID。** ブログの所有権は通る
+ * - **他人のブログID + 自分の記事ID。** 記事の所有権は通る
+ *
+ * どちらも、片側だけを見ていると通ってしまう。
+ *
+ * ## 何を確かめるか
+ *
+ * 拒否されることだけでなく、**攻撃のあとに相手のデータが1バイトも
+ * 変わっていないこと**まで見る。「エラーは返ったが書き込みは起きていた」
+ * を見逃さないため。
+ */
+
+const SITE_A = 'https://blog-a.example.com';
+const SITE_B = 'https://blog-b.example.com';
+const INPUT = { title: '記事', content: '<p>本文</p>' };
+
+let prisma: PrismaClient;
+
+interface Tenant {
+  userId: string;
+  /** 1人につき2ブログ（完了条件の「2ユーザー×2ブログ」） */
+  blogIds: [string, string];
+  contentItemIds: [string, string];
+  siteUrl: string;
+}
+
+let alice: Tenant;
+let bob: Tenant;
+
+beforeAll(async () => {
+  prisma = createTestPrisma();
+  await assertMigrationsApplied(prisma);
+});
+
+afterAll(async () => {
+  await prisma.$disconnect();
+});
+
+/**
+ * 投稿先として使う `content_items` を1件作る（Phase E の代役）。
+ *
+ * `content_plans` は `(blog_id, plan_type, version)` で一意なため、
+ * 同じブログでは既存の構成案を使い回す。
+ */
+async function createContentItem(blogId: string): Promise<string> {
+  const plan =
+    (await prisma.contentPlan.findFirst({
+      where: { blogId },
+      select: { id: true },
+    })) ??
+    (await prisma.contentPlan.create({
+      data: {
+        blogId,
+        planType: 'INITIAL',
+        status: 'DRAFT',
+        strategySnapshot: {},
+      },
+      select: { id: true },
+    }));
+
+  const sequenceNo =
+    (await prisma.contentItem.count({ where: { contentPlanId: plan.id } })) + 1;
+
+  const item = await prisma.contentItem.create({
+    data: {
+      contentPlanId: plan.id,
+      blogId,
+      sequenceNo,
+      contentType: 'AFFILIATE',
+      title: '記事',
+      searchIntent: '購入検討',
+      objective: 'REVENUE',
+      publishPriority: 1,
+    },
+    select: { id: true },
+  });
+
+  return item.id;
+}
+
+/**
+ * 偽WordPressが返す投稿ID。
+ *
+ * **1件ごとに変える。** 固定にすると `wordpress_posts` の
+ * `(blog_id, wp_post_id)` 制約に当たり、越境とは無関係な理由で落ちる。
+ */
+let nextWpPostId = 1000;
+
+/** すべて成功する WordPress を模す。**越境が通れば必ず投稿が起きる** */
+function responder(
+  input: wordpress.WordpressRequest,
+): Partial<wordpress.WordpressApiResponse> {
+  const method = (input.method ?? 'GET').toUpperCase();
+
+  if (input.path === '/') {
+    return { status: 200, json: { namespaces: ['wp/v2'] } };
+  }
+  if (input.path.startsWith('/wp/v2/users/me')) {
+    return {
+      status: 200,
+      json: { id: 1, capabilities: { upload_files: true } },
+    };
+  }
+  if (input.path === '/wp/v2/posts' && method === 'POST') {
+    nextWpPostId += 1;
+
+    return {
+      status: 201,
+      json: {
+        id: nextWpPostId,
+        status: 'draft',
+        link: `https://example.com/?p=${nextWpPostId}`,
+        content: { raw: (input.body as { content?: string })?.content ?? '' },
+      },
+    };
+  }
+  if (/^\/wp\/v2\/posts\/\d+\?context=edit$/.test(input.path)) {
+    return {
+      status: 200,
+      json: {
+        id: 4242,
+        status: 'draft',
+        date_gmt: '2026-08-08T01:00:00',
+        content: { raw: (input.body as { content?: string })?.content ?? '' },
+      },
+    };
+  }
+  if (/^\/wp\/v2\/posts\/\d+$/.test(input.path) && method === 'POST') {
+    return {
+      status: 200,
+      json: {
+        id: 4242,
+        status: 'draft',
+        content: { raw: (input.body as { content?: string })?.content ?? '' },
+      },
+    };
+  }
+  if (method === 'DELETE') {
+    return { status: 200, json: { deleted: true } };
+  }
+
+  return { status: 200, headers: { allow: 'GET, POST' }, json: [] };
+}
+
+/** 呼ばれたリクエストを記録するクライアント */
+function createFactory(calls: wordpress.WordpressRequest[]) {
+  return (): wordpress.WordpressClient => ({
+    async request(request) {
+      calls.push(request);
+      const result = responder(request);
+
+      return {
+        status: result.status ?? 200,
+        headers: result.headers ?? {},
+        json: result.json ?? null,
+        raw: JSON.stringify(result.json ?? null),
+      };
+    },
+  });
+}
+
+async function createTenant(
+  displayName: string,
+  siteUrl: string,
+  slugPrefix: string,
+): Promise<Tenant> {
+  const user = await createUser(prisma, { displayName });
+
+  const created = [];
+  for (const slotNumber of [1, 2] as const) {
+    const blog = await blogs.createBlogForUser(user.id, {
+      name: `${displayName}のブログ${slotNumber}`,
+      slug: `${slugPrefix}-${slotNumber}`,
+      targetReader: '読者',
+      slotNumber,
+    });
+
+    await wordpress.connectWordpressForUser(
+      { userId: user.id, blogId: blog.id },
+      {
+        siteUrl: `${siteUrl}/${slotNumber}`,
+        wpUsername: `${slugPrefix}${slotNumber}`,
+        appPassword: `pass ${slugPrefix} ${slotNumber} abcd efgh`,
+      },
+    );
+    // C-2 を通さないと投稿できない
+    await wordpress.testWordpressConnectionForUser(
+      { userId: user.id, blogId: blog.id },
+      createFactory([]),
+    );
+
+    created.push({
+      blogId: blog.id,
+      contentItemId: await createContentItem(blog.id),
+    });
+  }
+
+  const [first, second] = created as [
+    { blogId: string; contentItemId: string },
+    { blogId: string; contentItemId: string },
+  ];
+
+  return {
+    userId: user.id,
+    blogIds: [first.blogId, second.blogId],
+    contentItemIds: [first.contentItemId, second.contentItemId],
+    siteUrl,
+  };
+}
+
+/** 相手のデータをまるごと写し取る（攻撃の前後で比べる） */
+async function snapshot(tenant: Tenant): Promise<string> {
+  const rows = await prisma.blog.findMany({
+    where: { userId: tenant.userId },
+    orderBy: { slotNumber: 'asc' },
+    include: { wordpress: true },
+  });
+
+  const posts = await prisma.wordpressPost.findMany({
+    where: { blogId: { in: tenant.blogIds } },
+    orderBy: { contentItemId: 'asc' },
+  });
+
+  return JSON.stringify({ rows, posts });
+}
+
+beforeEach(async () => {
+  await resetDatabase(prisma);
+
+  alice = await createTenant('アリス', SITE_A, 'alice');
+  bob = await createTenant('ボブ', SITE_B, 'bob');
+
+  // アリスは2ブログとも投稿済みにしておく（奪う対象を用意する）
+  for (const index of [0, 1] as const) {
+    await wordpress.publishDraftForUser(
+      {
+        userId: alice.userId,
+        blogId: alice.blogIds[index],
+        contentItemId: alice.contentItemIds[index],
+      },
+      INPUT,
+      createFactory([]),
+    );
+  }
+});
+
+describe('前提', () => {
+  it('2ユーザー×2ブログが揃っている', async () => {
+    expect(await blogs.listBlogsForUser(alice.userId)).toHaveLength(2);
+    expect(await blogs.listBlogsForUser(bob.userId)).toHaveLength(2);
+    expect(await prisma.blog.count()).toBe(4);
+    expect(await prisma.wordpressPost.count()).toBe(2);
+  });
+
+  // 攻撃が「たまたま失敗した」のではないことを示す対照
+  it('自分のブログには投稿できる', async () => {
+    const calls: wordpress.WordpressRequest[] = [];
+
+    await wordpress.publishDraftForUser(
+      {
+        userId: bob.userId,
+        blogId: bob.blogIds[0],
+        contentItemId: bob.contentItemIds[0],
+      },
+      INPUT,
+      createFactory(calls),
+    );
+
+    expect(calls.length).toBeGreaterThan(0);
+    expect(await prisma.wordpressPost.count()).toBe(3);
+  });
+});
+
+describe('他人のブログIDを指定する', () => {
+  it.each([
+    [
+      'ブログを引く',
+      async (): Promise<unknown> =>
+        blogs.findBlogForUser({ userId: bob.userId, blogId: alice.blogIds[0] }),
+    ],
+  ])('%s（null が返る）', async (_label, attempt) => {
+    expect(await attempt()).toBeNull();
+  });
+
+  it.each([
+    [
+      'ブログを引く（必須）',
+      (): Promise<unknown> =>
+        blogs.requireBlogForUser({
+          userId: bob.userId,
+          blogId: alice.blogIds[0],
+        }),
+    ],
+    [
+      'ブログを更新する',
+      (): Promise<unknown> =>
+        blogs.updateBlogForUser(
+          { userId: bob.userId, blogId: alice.blogIds[0] },
+          { name: '乗っ取り' },
+        ),
+    ],
+    [
+      'ブログを閉じる',
+      (): Promise<unknown> =>
+        blogs.closeBlogForUser({
+          userId: bob.userId,
+          blogId: alice.blogIds[0],
+        }),
+    ],
+    [
+      '接続情報を保存する',
+      (): Promise<unknown> =>
+        wordpress.connectWordpressForUser(
+          { userId: bob.userId, blogId: alice.blogIds[0] },
+          {
+            siteUrl: 'https://attacker.example.com',
+            wpUsername: 'attacker',
+            appPassword: 'aaaa bbbb cccc dddd eeee ffff',
+          },
+        ),
+    ],
+    [
+      '接続を切る',
+      (): Promise<unknown> =>
+        wordpress.disconnectWordpressForUser({
+          userId: bob.userId,
+          blogId: alice.blogIds[0],
+        }),
+    ],
+    [
+      '接続を引く',
+      (): Promise<unknown> =>
+        wordpress.findWordpressConnectionForUser({
+          userId: bob.userId,
+          blogId: alice.blogIds[0],
+        }),
+    ],
+    [
+      '認証情報を読む',
+      (): Promise<unknown> =>
+        wordpress.readWordpressCredentialsForUser({
+          userId: bob.userId,
+          blogId: alice.blogIds[0],
+        }),
+    ],
+    [
+      '接続テストを走らせる',
+      (): Promise<unknown> =>
+        wordpress.testWordpressConnectionForUser(
+          { userId: bob.userId, blogId: alice.blogIds[0] },
+          createFactory([]),
+        ),
+    ],
+    [
+      '投稿する',
+      (): Promise<unknown> =>
+        wordpress.publishDraftForUser(
+          {
+            userId: bob.userId,
+            blogId: alice.blogIds[0],
+            contentItemId: alice.contentItemIds[0],
+          },
+          INPUT,
+          createFactory([]),
+        ),
+    ],
+    [
+      '同期する',
+      (): Promise<unknown> =>
+        wordpress.syncWordpressPostForUser(
+          {
+            userId: bob.userId,
+            blogId: alice.blogIds[0],
+            contentItemId: alice.contentItemIds[0],
+          },
+          createFactory([]),
+        ),
+    ],
+    [
+      '投稿の記録を引く',
+      (): Promise<unknown> =>
+        wordpress.findWordpressPostForUser({
+          userId: bob.userId,
+          blogId: alice.blogIds[0],
+          contentItemId: alice.contentItemIds[0],
+        }),
+    ],
+  ])('%s と 404 になる', async (_label, attempt) => {
+    const before = await snapshot(alice);
+
+    await expect(attempt()).rejects.toMatchObject({ status: 404 });
+
+    // **エラーは返ったが書き込みは起きていた、を見逃さない**
+    expect(await snapshot(alice)).toBe(before);
+  });
+
+  /**
+   * **存在しないIDと他人のIDを区別しない。**
+   * 区別すると、IDを総当たりして他人のブログの存在を調べられる。
+   */
+  it('存在しないブログIDと同じ扱いになる', async () => {
+    const missing = '00000000-0000-4000-8000-000000000000';
+
+    const owned = await blogs
+      .requireBlogForUser({ userId: bob.userId, blogId: alice.blogIds[0] })
+      .catch((error: unknown) => error);
+    const unknown = await blogs
+      .requireBlogForUser({ userId: bob.userId, blogId: missing })
+      .catch((error: unknown) => error);
+
+    expect((owned as { code: string }).code).toBe(
+      (unknown as { code: string }).code,
+    );
+    expect((owned as { message: string }).message).toBe(
+      (unknown as { message: string }).message,
+    );
+  });
+});
+
+/**
+ * **所有権の判定をすり抜ける経路。**
+ *
+ * ブログか記事の片側だけを見ていると通る。C-3 の「他ブログの
+ * content_item に紐づく投稿を触らせない」がここを塞いでいる。
+ */
+describe('自分のブログID + 他人の記事ID', () => {
+  it('投稿できない', async () => {
+    const calls: wordpress.WordpressRequest[] = [];
+    const before = await snapshot(alice);
+
+    await expect(
+      wordpress.publishDraftForUser(
+        {
+          userId: bob.userId,
+          // ボブ自身のブログ。所有権の判定は通る
+          blogId: bob.blogIds[0],
+          // アリスの記事
+          contentItemId: alice.contentItemIds[0],
+        },
+        INPUT,
+        createFactory(calls),
+      ),
+    ).rejects.toMatchObject({ status: 404 });
+
+    // **ボブのサイトへも投稿しない**（アリスの記事がボブのブログに出る）
+    expect(calls).toHaveLength(0);
+    expect(await snapshot(alice)).toBe(before);
+    expect(await prisma.wordpressPost.count()).toBe(2);
+  });
+
+  it('同期できない', async () => {
+    const calls: wordpress.WordpressRequest[] = [];
+    const before = await snapshot(alice);
+
+    await expect(
+      wordpress.syncWordpressPostForUser(
+        {
+          userId: bob.userId,
+          blogId: bob.blogIds[0],
+          contentItemId: alice.contentItemIds[0],
+        },
+        createFactory(calls),
+      ),
+    ).rejects.toMatchObject({ status: 404 });
+
+    expect(calls).toHaveLength(0);
+    expect(await snapshot(alice)).toBe(before);
+  });
+
+  it('投稿の記録を読めない', async () => {
+    expect(
+      await wordpress.findWordpressPostForUser({
+        userId: bob.userId,
+        blogId: bob.blogIds[0],
+        contentItemId: alice.contentItemIds[0],
+      }),
+    ).toBeNull();
+  });
+});
+
+/** 同じ利用者の中でも、ブログをまたいだ混線を許さない */
+describe('自分の2つのブログの間', () => {
+  it('別スロットの記事を、もう片方のブログから投稿できない', async () => {
+    const calls: wordpress.WordpressRequest[] = [];
+
+    await expect(
+      wordpress.publishDraftForUser(
+        {
+          userId: alice.userId,
+          blogId: alice.blogIds[1],
+          // スロット1の記事
+          contentItemId: alice.contentItemIds[0],
+        },
+        INPUT,
+        createFactory(calls),
+      ),
+    ).rejects.toMatchObject({ status: 404 });
+
+    expect(calls).toHaveLength(0);
+  });
+
+  it('別スロットの記事の記録を、もう片方のブログから読めない', async () => {
+    expect(
+      await wordpress.findWordpressPostForUser({
+        userId: alice.userId,
+        blogId: alice.blogIds[1],
+        contentItemId: alice.contentItemIds[0],
+      }),
+    ).toBeNull();
+  });
+});
+
+describe('一覧と集計に他人が混ざらない', () => {
+  it('ブログ一覧は自分のものだけ', async () => {
+    const list = await blogs.listBlogsForUser(bob.userId);
+
+    expect(list).toHaveLength(2);
+    expect(list.map((blog) => blog.id).sort()).toEqual([...bob.blogIds].sort());
+    for (const blog of list) {
+      expect(alice.blogIds).not.toContain(blog.id);
+    }
+  });
+
+  /** `CLOSED` を含めても増えない（他人の閉じたブログが漏れない） */
+  it('CLOSED を含めても他人は出ない', async () => {
+    await blogs.closeBlogForUser({
+      userId: alice.userId,
+      blogId: alice.blogIds[0],
+    });
+
+    const list = await blogs.listBlogsForUser(bob.userId, {
+      includeClosed: true,
+    });
+
+    expect(list.map((blog) => blog.id).sort()).toEqual([...bob.blogIds].sort());
+  });
+
+  // アリスが2枠使っていても、ボブの空き枠の数え方に影響しない
+  it('スロットの使用状況が他人と混ざらない', async () => {
+    const usage = await blogs.getSlotUsageForUser(bob.userId);
+
+    expect(usage.used).toHaveLength(2);
+    for (const entry of usage.used) {
+      expect(bob.blogIds).toContain(entry.blogId);
+    }
+  });
+});
+
+describe('認証情報が越境しない（SPEC 14.2）', () => {
+  it('他人の認証情報を読み出せない', async () => {
+    await expect(
+      wordpress.readWordpressCredentialsForUser({
+        userId: bob.userId,
+        blogId: alice.blogIds[0],
+      }),
+    ).rejects.toMatchObject({ status: 404 });
+  });
+
+  /**
+   * **暗号文を自分のブログへ写しても読めない。**
+   * AAD が行と列に縛っている（C-1）。DBを直接書き換えられる立場でも、
+   * 他人の認証情報は復号できない。
+   */
+  it('暗号文をコピーしても復号できない', async () => {
+    const victim = await prisma.wordpressConnection.findUniqueOrThrow({
+      where: { blogId: alice.blogIds[0] },
+      select: { wpUsernameEncrypted: true, appPasswordEncrypted: true },
+    });
+
+    await prisma.wordpressConnection.update({
+      where: { blogId: bob.blogIds[0] },
+      data: {
+        wpUsernameEncrypted: victim.wpUsernameEncrypted,
+        appPasswordEncrypted: victim.appPasswordEncrypted,
+      },
+    });
+
+    await expect(
+      wordpress.readWordpressCredentialsForUser({
+        userId: bob.userId,
+        blogId: bob.blogIds[0],
+      }),
+    ).rejects.toMatchObject({
+      code: wordpress.WORDPRESS_ERROR_CODES.credentialsUnreadable,
+    });
+  });
+});
+
+/**
+ * **入口が増えたらこのテストも増やす。**
+ *
+ * C-6 は「他タスクのついでに書かせると省略される」ため単独タスクに
+ * なっている。新しい `...ForUser` が生えたときに**ここが落ちる**ように
+ * しておかないと、同じことが起きる。
+ */
+describe('入口の網羅', () => {
+  const covered = {
+    blogs: [
+      'listBlogsForUser',
+      'findBlogForUser',
+      'requireBlogForUser',
+      'createBlogForUser',
+      'updateBlogForUser',
+      'closeBlogForUser',
+      'getSlotUsageForUser',
+    ],
+    wordpress: [
+      'connectWordpressForUser',
+      'disconnectWordpressForUser',
+      'findWordpressConnectionForUser',
+      'readWordpressCredentialsForUser',
+      'testWordpressConnectionForUser',
+      'publishDraftForUser',
+      'syncWordpressPostForUser',
+      'findWordpressPostForUser',
+    ],
+  } as const;
+
+  it.each([
+    ['blogs', blogs, covered.blogs],
+    ['wordpress', wordpress, covered.wordpress],
+  ])(
+    '%s の ...ForUser が全て把握されている',
+    (_name, module_, expected: readonly string[]) => {
+      const actual = Object.keys(module_)
+        .filter((key) => key.endsWith('ForUser'))
+        .sort();
+
+      expect(actual).toEqual([...expected].sort());
+    },
+  );
+
+  /**
+   * `createBlogForUser` は他人のブログを指定しようがない（`userId` しか
+   * 取らない）。**越境の攻撃面が無いことを明示しておく**
+   */
+  it('createBlogForUser は userId しか取らない', async () => {
+    const blog = await blogs.createBlogForUser(bob.userId, {
+      name: '3つめ',
+      slug: 'bob-3',
+      targetReader: '読者',
+      slotNumber: 3,
+    });
+
+    expect(blog.userId).toBe(bob.userId);
+  });
+});
+
+/**
+ * **C-6 で実際に見つかった穴**（C-6-schema で塞いだ）。
+ *
+ * 相手が**まだ投稿していない**記事IDが対象。既に投稿済みなら
+ * 「既存行の `blog_id` が違う」で弾かれるが、行が無いと誰も
+ * 確かめていなかった。`content_item_id` は unique なので、一度
+ * 登録されると**持ち主はその記事を二度と投稿できない**。
+ */
+describe('自分のブログID + 他人の未投稿の記事ID', () => {
+  let untouched: string;
+
+  beforeEach(async () => {
+    // アリスの3つめの記事。まだ投稿していない
+    untouched = await createContentItem(alice.blogIds[0]);
+  });
+
+  it('自分のブログの投稿として登録できない', async () => {
+    await expect(
+      wordpress.publishDraftForUser(
+        {
+          userId: bob.userId,
+          blogId: bob.blogIds[0],
+          contentItemId: untouched,
+        },
+        INPUT,
+        createFactory([]),
+      ),
+    ).rejects.toMatchObject({ status: 404 });
+
+    expect(
+      await prisma.wordpressPost.count({ where: { contentItemId: untouched } }),
+    ).toBe(0);
+  });
+
+  /** 塞げていないと、この投稿が永久にできなくなる */
+  it('持ち主はそのあと普通に投稿できる', async () => {
+    await wordpress
+      .publishDraftForUser(
+        {
+          userId: bob.userId,
+          blogId: bob.blogIds[0],
+          contentItemId: untouched,
+        },
+        INPUT,
+        createFactory([]),
+      )
+      .catch(() => undefined);
+
+    const post = await wordpress.publishDraftForUser(
+      {
+        userId: alice.userId,
+        blogId: alice.blogIds[0],
+        contentItemId: untouched,
+      },
+      INPUT,
+      createFactory([]),
+    );
+
+    expect(post.blogId).toBe(alice.blogIds[0]);
+  });
+});
