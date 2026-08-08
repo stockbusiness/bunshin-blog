@@ -261,6 +261,7 @@ A-5 で CI に組み込み、A-8 でマイグレーション運用に切り替�
 | 初期マイグレーションのコミット（A-8） | ✅ `prisma/migrations/`。26テーブル・30 enum |
 | 追加マイグレーション（B-10） | ✅ `admin_login_tokens`。**27テーブル**になった |
 | 追加マイグレーション（D-9） | ✅ `affiliate_offers.link_mode` と `LinkMode`。**31 enum** になった |
+| 追加マイグレーション（D-10） | ✅ `affiliate_offers.sub_id_param`。既定は `NULL`（サブIDを付けない） |
 | 実PostgreSQLへの適用（`prisma migrate deploy`） | ✅ CIのサービスコンテナで実行 |
 | スキーマとマイグレーションの乖離検出 | ✅ CIで実行 |
 

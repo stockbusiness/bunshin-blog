@@ -477,6 +477,12 @@ model AffiliateOffer {
   status         OfferStatus    @default(DRAFT)
   /// リンクの出し方。既定は DIRECT（安全側・Q-001）
   linkMode       LinkMode       @default(DIRECT) @map("link_mode")
+  /// サブIDのパラメータ名（D-10・OPEN_QUESTIONS Q-014）。
+  ///
+  /// ASPによって名前が違う（sub / s1 / argument など）。
+  /// **NULL ならサブIDを付けない。** ASPの情報が無くても案件は登録でき、
+  /// 分かったものから ADMIN が SQL で埋める。
+  subIdParam     String?        @map("sub_id_param")
   startsAt       DateTime?      @map("starts_at") @db.Date
   endsAt         DateTime?      @map("ends_at") @db.Date
   createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
