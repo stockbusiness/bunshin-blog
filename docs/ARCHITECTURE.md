@@ -42,7 +42,6 @@ LINE ──> LIFF画面 ─┐
 
 | 領域 | 状態 |
 |---|---|
-| ジョブ基盤（Inngest / Trigger.dev / Supabase Edge Functions） | 未選定。E-1 で決める |
 | AIプロバイダー（Anthropic / OpenAI） | 未選定。SPEC 4.1 は「1社利用」とのみ定める。E-3 で決める |
 
 管理者認証は決定済み。**Supabase は入れず、メール＋ワンタイムリンク**（Q-012）。実装は B-11。
@@ -171,19 +170,43 @@ npm run build
 
 ## 7. 非同期処理
 
-以下は必ずジョブ化する（SPEC 4.3）。**いずれも未実装。** 基盤は E-1 で作る。
+以下は必ずジョブ化する（SPEC 4.3）。**基盤は E-1 で実装済み。個別のハンドラは未実装。**
 
 初期ブログ分析／構成案生成／記事生成／再生成／WordPress投稿／WordPress同期／Search Console取得／GA4取得／定期提案選定／LINE通知送信／リンク切れ確認
 
 各ジョブは冪等性を持ち、同一処理の重複実行で二重投稿しない。
 
-`jobs` モジュールはドメインモジュールを import しない。ジョブハンドラの登録は `src/app/` 側で行う（MODULE_RULES 3）。
+`jobs` モジュールはドメインモジュールを import しない。ジョブハンドラの登録は `src/app/api/jobs/run/handlers.ts` で行う（MODULE_RULES 3）。
+
+### キューはPostgreSQL（E-1 で決定）
+
+**外部のキューサービスを使わない。** `jobs.idempotency_key` は unique、索引 `jobs(status, job_type)` は DATA_MODEL 5章が「ワーカーのポーリング」用と定めており、**A-2 の時点でDBをキューにする前提で設計されている**。10名×3ブログの規模で、契約・APIキー・障害点を増やす理由が無い。
+
+同時実行は `SELECT ... FOR UPDATE SKIP LOCKED` で取り合う。
+
+### Vercel（サーバーレス）での制約
+
+**常駐ワーカーを持てない。** Vercel Cron が `GET /api/jobs/run` を叩き、1回の起動でキューを消化する。設計上の要点は3つ。
+
+| 事情 | 対応 |
+|---|---|
+| 関数に実行時間の上限がある | **締め切りを持って抜ける。** 残りは次の起動に回す |
+| 上限を超えると関数が殺される | **`RUNNING` のまま残った行を回収する**（`started_at` が `LEASE_SECONDS` より古いものを `QUEUED` へ戻す） |
+| 1件が長引くと全体を巻き込む | **ジョブ単位でも時間を区切る** |
+
+再試行の待ち時間は**専用の列を持たず** `updated_at` と `attempt_count` から求める（`backoff.ts` と取得SQLで同じ式）。
+
+**`vercel.json` の cron は毎分。これには Vercel Pro が要る**（Hobby は1日1回まで）。Hobby の場合、承認された記事が最大24時間投稿されない。
+
+`CRON_SECRET` が未設定なら**ワーカーは動かない**（fail closed）。`src/lib/env.ts` の必須には入れていない。cron の設定漏れでアプリ全体を止めないため。
+
+**記事生成（E-10）は関数の上限に収まらない可能性がある。** AI呼び出しは分単位になり得る。E-1 の基盤は1件ごとに時間を区切って失敗として記録するところまでで、**分割は E-10 の課題**として残っている。
 
 ---
 
 ## 8. 現在の実装状況
 
-**26タスク／72 が完了**（2026-08-08）。Phase A・B は全件、Phase C は C-4・C-5・C-6 を残す。Phase D は D-9・D-10（どちらもスキーマ）のみ。
+**27タスク／72 が完了**（2026-08-08）。Phase A・B は全件、Phase C は C-4・C-5・C-6 を残す。Phase D は D-9・D-10（どちらもスキーマ）のみ。Phase E はジョブ基盤（E-1）だけ。
 
 | Phase | 完了 | 残り |
 |---|---|---|
@@ -191,7 +214,8 @@ npm run build
 | B | 11/11 | — |
 | C | 5/7 | C-4 冪等性、C-5 WP同期、C-6 越境テスト |
 | D | 2/10 | D-1〜D-8 |
-| E〜H | 0/44 | 全て |
+| E | 1/15 | E-2〜E-15 |
+| F〜H | 0/29 | 全て |
 
 ### 実装済みのモジュール
 
@@ -201,8 +225,9 @@ npm run build
 | `auth` | LIFF IDトークン検証、セッション、認可、管理者のワンタイムリンク |
 | `blogs` | CRUD、3スロット制御、記事構成比、管理者向け集計 |
 | `wordpress` | 接続情報の暗号化保存、接続テスト（7項目）、下書き投稿 |
+| `jobs` | キュー・再試行・状態管理（E-1）。**ハンドラは未登録** |
 
-`personas` `affiliate` `banners` `experiments` `content-planning` `content-generation` `approvals` `analytics` `ai-costs` `jobs` `audit` `line` は未実装（空ディレクトリ）。
+`personas` `affiliate` `banners` `experiments` `content-planning` `content-generation` `approvals` `analytics` `ai-costs` `audit` `line` は未実装（空ディレクトリ）。
 
 ### 共通基盤（`src/lib/`）
 
@@ -223,6 +248,7 @@ POST   /api/blogs/:id/wordpress/connect
 POST   /api/blogs/:id/wordpress/test
 DELETE /api/blogs/:id/wordpress/disconnect
 POST   /api/admin/login                 POST /api/admin/login/verify
+GET    /api/jobs/run                    ← Vercel Cron 専用
 ```
 
 ### 画面
@@ -231,7 +257,9 @@ POST   /api/admin/login                 POST /api/admin/login/verify
 
 ### まだ動かないもの
 
-**AI呼び出し・記事生成・LINE通知・ジョブ実行・計測は未実装。** Phase 0 の中核である「提案 → LINE承認 → 下書き投稿」のうち、**下書き投稿の部品だけができている**状態で、呼び出す側（承認とジョブ）が無い。
+**AI呼び出し・記事生成・LINE通知・計測は未実装。** Phase 0 の中核である「提案 → LINE承認 → 下書き投稿」のうち、**下書き投稿の部品だけができている**状態で、呼び出す側（承認）が無い。
+
+**ジョブ基盤はあるが、登録されたハンドラが1つも無い**ため実際には何も実行されない（E-1）。最初のハンドラは C-5 または F-7 で載る。
 
 **実WordPressでの動作確認をしていない**（C-2・C-3）。偽サーバーに対しては通しで確認済み。H-2 のオンボーディング前に1サイトで確かめる必要がある。
 
