@@ -3,6 +3,7 @@ import type { PrismaClient } from '@prisma/client';
 import * as affiliate from '@/modules/affiliate';
 import * as banners from '@/modules/banners';
 import * as blogs from '@/modules/blogs';
+import * as personas from '@/modules/personas';
 import * as wordpress from '@/modules/wordpress';
 import {
   assertMigrationsApplied,
@@ -686,6 +687,12 @@ describe('入口の網羅', () => {
       'updateBannerForUser',
       'endBannerForUser',
     ],
+    personas: [
+      'findUserPersonaForUser',
+      'requireUserPersonaForUser',
+      'saveUserPersonaForUser',
+      'updateUserPersonaForUser',
+    ],
     blogs: [
       'listBlogsForUser',
       'findBlogForUser',
@@ -711,6 +718,7 @@ describe('入口の網羅', () => {
     ['affiliate', affiliate, covered.affiliate],
     ['banners', banners, covered.banners],
     ['blogs', blogs, covered.blogs],
+    ['personas', personas, covered.personas],
     ['wordpress', wordpress, covered.wordpress],
   ])(
     '%s の ...ForUser が全て把握されている',
