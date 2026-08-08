@@ -72,3 +72,33 @@ export function credentialsUnreadableError(cause?: unknown): AppError {
     cause === undefined ? {} : { cause },
   );
 }
+
+/**
+ * 接続テストの検査項目（SPEC 7.2 の7項目）。
+ *
+ * **項目ごとに別のコードを返す**（TASKS C-2 の完了条件）。
+ * 「接続できません」だけでは、モニターが何を直せばよいか分からない。
+ */
+export const WORDPRESS_TEST_ERROR_CODES = {
+  /** 保存済みの `site_url` が形式として通らない（C-1 より前に入った行） */
+  invalidUrl: 'WORDPRESS_TEST_INVALID_URL',
+  /** REST API へ到達できない（DNS・TLS・タイムアウト・到達禁止アドレス） */
+  unreachable: 'WORDPRESS_TEST_UNREACHABLE',
+  /** 応答はあるが WordPress の REST API ではない */
+  notWordpress: 'WORDPRESS_TEST_NOT_WORDPRESS',
+  /** 認証に失敗した（ユーザー名またはアプリケーションパスワード） */
+  authFailed: 'WORDPRESS_TEST_AUTH_FAILED',
+  /** 投稿一覧を取得できない */
+  cannotListPosts: 'WORDPRESS_TEST_CANNOT_LIST_POSTS',
+  /** 下書きを作成する権限が無い */
+  cannotCreatePosts: 'WORDPRESS_TEST_CANNOT_CREATE_POSTS',
+  /** 投稿を編集する権限が無い */
+  cannotEditPosts: 'WORDPRESS_TEST_CANNOT_EDIT_POSTS',
+  /** メディアをアップロードする権限が無い */
+  cannotUploadMedia: 'WORDPRESS_TEST_CANNOT_UPLOAD_MEDIA',
+  /** テスト投稿を消せなかった。接続自体は成功している */
+  cleanupFailed: 'WORDPRESS_TEST_CLEANUP_FAILED',
+} as const;
+
+export type WordpressTestErrorCode =
+  (typeof WORDPRESS_TEST_ERROR_CODES)[keyof typeof WORDPRESS_TEST_ERROR_CODES];

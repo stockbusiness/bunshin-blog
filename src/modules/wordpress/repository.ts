@@ -1,6 +1,12 @@
 import { prisma } from '@/lib/db';
 import { decryptSecret, encryptSecret, getEncryptionKey } from '@/lib/crypto';
 import { notFoundError, requireBlogForUser } from '@/modules/blogs';
+import { createWordpressClient, type WordpressClient } from './client';
+import {
+  runConnectionTest,
+  type ConnectionTestResult,
+} from './connection-test';
+import { notConnectedError } from './errors';
 import {
   connectWordpress,
   disconnectWordpress,
@@ -152,4 +158,52 @@ export async function readWordpressCredentialsForUser(params: {
   const blogId = await requireOpenBlogId(params);
 
   return readWordpressCredentials({ blogId }, deps);
+}
+
+/**
+ * 接続テストを実行し、結果を保存する（C-2、SPEC 7.2・13.3）。
+ *
+ * **テスト結果は必ず保存する。** 成功なら `CONNECTED`、失敗なら `FAILED`。
+ * 管理画面（B-7 の一覧・G-7 のダッシュボード）が「いま繋がっているか」を
+ * 見るための唯一の情報になる。
+ *
+ * @param clientFactory 差し替え用。既定は `safeFetch` を使う実クライアント
+ */
+export async function testWordpressConnectionForUser(
+  params: { userId: string; blogId: string },
+  clientFactory?: (input: {
+    apiBaseUrl: string;
+    credentials: WordpressCredentials;
+  }) => WordpressClient,
+): Promise<ConnectionTestResult> {
+  const blogId = await requireOpenBlogId(params);
+
+  const record = await db.findByBlogId(blogId);
+  if (record === null || record.connectionStatus === 'REVOKED') {
+    throw notConnectedError();
+  }
+
+  const credentials = await readWordpressCredentials({ blogId }, deps);
+
+  const client = (clientFactory ?? createWordpressClient)({
+    apiBaseUrl: record.apiBaseUrl,
+    credentials,
+  });
+
+  const result = await runConnectionTest({
+    siteUrl: record.siteUrl,
+    client,
+  });
+
+  await db.update(blogId, {
+    connectionStatus: result.ok ? 'CONNECTED' : 'FAILED',
+    canCreatePosts: result.canCreatePosts,
+    canEditPosts: result.canEditPosts,
+    canUploadMedia: result.canUploadMedia,
+    lastTestedAt: new Date(),
+    lastErrorCode: result.failedCode,
+    lastErrorMessage: result.failedMessage,
+  });
+
+  return result;
 }
