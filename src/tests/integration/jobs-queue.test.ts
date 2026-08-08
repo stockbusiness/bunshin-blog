@@ -63,7 +63,7 @@ describe('投入', () => {
   it('ジョブを積める', async () => {
     const { job, created } = await enqueueJob({
       jobType: 'WORDPRESS_POST',
-      idempotencyKey: 'post:item-1',
+      idempotencyKey: 'WORDPRESS_POST:item-1',
       input: { contentItemId: 'item-1' },
     });
 
@@ -80,12 +80,12 @@ describe('投入', () => {
   it('同じキーでは積み直さない', async () => {
     const first = await enqueueJob({
       jobType: 'WORDPRESS_POST',
-      idempotencyKey: 'post:item-1',
+      idempotencyKey: 'WORDPRESS_POST:item-1',
       input: { n: 1 },
     });
     const second = await enqueueJob({
       jobType: 'WORDPRESS_POST',
-      idempotencyKey: 'post:item-1',
+      idempotencyKey: 'WORDPRESS_POST:item-1',
       input: { n: 2 },
     });
 
@@ -101,7 +101,7 @@ describe('投入', () => {
       Array.from({ length: 5 }, () =>
         enqueueJob({
           jobType: 'WORDPRESS_POST',
-          idempotencyKey: 'post:same',
+          idempotencyKey: 'WORDPRESS_POST:same',
           input: {},
         }),
       ),
@@ -130,7 +130,7 @@ describe('取得', () => {
   it('取ると RUNNING になり試行回数が増える', async () => {
     await enqueueJob({
       jobType: 'WORDPRESS_POST',
-      idempotencyKey: 'k1',
+      idempotencyKey: 'WORDPRESS_POST:k1',
       input: {},
     });
 
@@ -143,7 +143,7 @@ describe('取得', () => {
   it('登録していない種類は取らない', async () => {
     await enqueueJob({
       jobType: 'LINE_NOTIFY',
-      idempotencyKey: 'k1',
+      idempotencyKey: 'LINE_NOTIFY:k1',
       input: {},
     });
 
@@ -153,7 +153,7 @@ describe('取得', () => {
   it('空の種類一覧では取らない', async () => {
     await enqueueJob({
       jobType: 'WORDPRESS_POST',
-      idempotencyKey: 'k1',
+      idempotencyKey: 'WORDPRESS_POST:k1',
       input: {},
     });
 
@@ -163,12 +163,12 @@ describe('取得', () => {
   it('古いものから取る', async () => {
     const first = await enqueueJob({
       jobType: 'WORDPRESS_POST',
-      idempotencyKey: 'k1',
+      idempotencyKey: 'WORDPRESS_POST:k1',
       input: {},
     });
     await enqueueJob({
       jobType: 'WORDPRESS_POST',
-      idempotencyKey: 'k2',
+      idempotencyKey: 'WORDPRESS_POST:k2',
       input: {},
     });
 
@@ -180,7 +180,7 @@ describe('取得', () => {
     for (let index = 0; index < 3; index += 1) {
       await enqueueJob({
         jobType: 'WORDPRESS_POST',
-        idempotencyKey: `k${index}`,
+        idempotencyKey: `WORDPRESS_POST:k${index}`,
         input: {},
       });
     }
@@ -207,12 +207,12 @@ describe('取得', () => {
   it('ロックされた行を待たずに飛ばす', async () => {
     const first = await enqueueJob({
       jobType: 'WORDPRESS_POST',
-      idempotencyKey: 'k1',
+      idempotencyKey: 'WORDPRESS_POST:k1',
       input: {},
     });
     const second = await enqueueJob({
       jobType: 'WORDPRESS_POST',
-      idempotencyKey: 'k2',
+      idempotencyKey: 'WORDPRESS_POST:k2',
       input: {},
     });
 
@@ -236,7 +236,7 @@ describe('取得', () => {
   it('RUNNING のものは取らない', async () => {
     await enqueueJob({
       jobType: 'WORDPRESS_POST',
-      idempotencyKey: 'k1',
+      idempotencyKey: 'WORDPRESS_POST:k1',
       input: {},
     });
 
@@ -249,7 +249,7 @@ describe('待ち時間（再試行）', () => {
   async function claimAndFail(): Promise<string> {
     const { job } = await enqueueJob({
       jobType: 'WORDPRESS_POST',
-      idempotencyKey: `k-${Math.random()}`,
+      idempotencyKey: `WORDPRESS_POST:k-${Math.random()}`,
       input: {},
     });
     await claimNextJob(TYPES);
@@ -301,7 +301,7 @@ describe('待ち時間（再試行）', () => {
   it('上限に達したら FAILED で固定し、取らない', async () => {
     const { job } = await enqueueJob({
       jobType: 'WORDPRESS_POST',
-      idempotencyKey: 'k1',
+      idempotencyKey: 'WORDPRESS_POST:k1',
       input: {},
     });
 
@@ -327,7 +327,7 @@ describe('中断の回収（サーバーレスで必須）', () => {
   it('RUNNING のまま古くなった行を QUEUED へ戻す', async () => {
     const { job } = await enqueueJob({
       jobType: 'WORDPRESS_POST',
-      idempotencyKey: 'k1',
+      idempotencyKey: 'WORDPRESS_POST:k1',
       input: {},
     });
     await claimNextJob(TYPES);
@@ -344,7 +344,7 @@ describe('中断の回収（サーバーレスで必須）', () => {
   it('まだ動いているかもしれない行は戻さない', async () => {
     await enqueueJob({
       jobType: 'WORDPRESS_POST',
-      idempotencyKey: 'k1',
+      idempotencyKey: 'WORDPRESS_POST:k1',
       input: {},
     });
     await claimNextJob(TYPES);
@@ -356,7 +356,7 @@ describe('中断の回収（サーバーレスで必須）', () => {
   it('回収しても試行回数は戻さない', async () => {
     const { job } = await enqueueJob({
       jobType: 'WORDPRESS_POST',
-      idempotencyKey: 'k1',
+      idempotencyKey: 'WORDPRESS_POST:k1',
       input: {},
     });
     await claimNextJob(TYPES);
@@ -370,7 +370,7 @@ describe('中断の回収（サーバーレスで必須）', () => {
   it('回収を繰り返しても上限で止まる', async () => {
     const { job } = await enqueueJob({
       jobType: 'WORDPRESS_POST',
-      idempotencyKey: 'k1',
+      idempotencyKey: 'WORDPRESS_POST:k1',
       input: {},
     });
 
@@ -390,7 +390,7 @@ describe('完了', () => {
   it('成功として記録する', async () => {
     const { job } = await enqueueJob({
       jobType: 'WORDPRESS_POST',
-      idempotencyKey: 'k1',
+      idempotencyKey: 'WORDPRESS_POST:k1',
       input: {},
     });
     await claimNextJob(TYPES);
@@ -407,7 +407,7 @@ describe('完了', () => {
   it('成功したジョブは取られない', async () => {
     const { job } = await enqueueJob({
       jobType: 'WORDPRESS_POST',
-      idempotencyKey: 'k1',
+      idempotencyKey: 'WORDPRESS_POST:k1',
       input: {},
     });
     await claimNextJob(TYPES);
@@ -420,13 +420,13 @@ describe('完了', () => {
   it('冪等性キーで引ける', async () => {
     await enqueueJob({
       jobType: 'WORDPRESS_POST',
-      idempotencyKey: 'post:item-9',
+      idempotencyKey: 'WORDPRESS_POST:item-9',
       input: {},
     });
 
-    expect((await findJobByIdempotencyKey('post:item-9'))?.jobType).toBe(
-      'WORDPRESS_POST',
-    );
+    expect(
+      (await findJobByIdempotencyKey('WORDPRESS_POST:item-9'))?.jobType,
+    ).toBe('WORDPRESS_POST');
     expect(await findJobByIdempotencyKey('missing')).toBeNull();
   });
 });

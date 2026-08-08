@@ -6,7 +6,9 @@ import {
   MAX_ATTEMPTS,
   MAX_BACKOFF_SECONDS,
 } from './backoff';
+import { CHECKPOINT_FIELD, type JobCheckpoint } from './checkpoint';
 import { unknownJobTypeError } from './errors';
+import { assertIdempotencyKey } from './idempotency';
 import {
   isJobType,
   type AppJob,
@@ -142,6 +144,10 @@ export async function enqueueJob(
   if (!isJobType(input.jobType)) {
     throw unknownJobTypeError(input.jobType);
   }
+
+  // **積む前にキーの形を確かめる**（C-4）。種類が前置されていないキーは、
+  // 別の種類の同じ対象と衝突し、後から積んだほうが黙って捨てられる
+  assertIdempotencyKey(input.jobType, input.idempotencyKey);
 
   try {
     const created = await prisma.job.create({
@@ -308,6 +314,34 @@ export async function failJob(
   });
 
   return toAppJob(updated);
+}
+
+/**
+ * 外部呼び出しの印を書く（C-4、`checkpoint.ts`）。
+ *
+ * **`output_json` を使う。** 実行中は空いており、成功すれば `completeJob`
+ * が結果で上書きする。専用の列を足さない。
+ */
+export async function saveJobCheckpoint(
+  jobId: string,
+  checkpoint: JobCheckpoint | null,
+): Promise<void> {
+  const value: Prisma.InputJsonObject =
+    checkpoint === null
+      ? {}
+      : {
+          [CHECKPOINT_FIELD]: {
+            step: checkpoint.step,
+            attempt: checkpoint.attempt,
+            at: checkpoint.at,
+          },
+        };
+
+  await prisma.job.update({
+    where: { id: jobId },
+    data: { outputJson: checkpoint === null ? Prisma.JsonNull : value },
+    select: { id: true },
+  });
 }
 
 /** IDで引く。**ワーカーと管理用途のみ**（利用者向けの入口ではない） */
