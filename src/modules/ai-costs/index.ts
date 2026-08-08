@@ -16,7 +16,22 @@ export {
   listAiUsageForUser,
   summarizeByUserForAdmin,
   findAiUsageForAdmin,
+  notifyBudgetCrossings,
+  recordAiUsageAndNotify,
 } from './repository';
+
+export {
+  crossedThresholds,
+  readBudgetLimits,
+  shouldStopGeneration,
+  shouldDowngradeModel,
+  buildBudgetAlert,
+  BUDGET_THRESHOLDS,
+  type BudgetCrossing,
+  type BudgetLimits,
+  type BudgetScope,
+  type BudgetThreshold,
+} from './budget';
 
 export {
   AI_COST_ERROR_CODES,
