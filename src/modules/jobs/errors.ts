@@ -10,6 +10,10 @@ export const JOB_ERROR_CODES = {
   handlerFailed: 'JOB_HANDLER_FAILED',
   /** 1件あたりの実行時間を超えた */
   jobTimeout: 'JOB_TIMEOUT',
+  /** 冪等性キーの形が不正（C-4） */
+  invalidIdempotencyKey: 'JOB_INVALID_IDEMPOTENCY_KEY',
+  /** 前回の実行が外部呼び出しの最中に中断した（C-4） */
+  sideEffectUncertain: 'JOB_SIDE_EFFECT_UNCERTAIN',
   /** ワーカーの起動が認可されていない */
   runnerUnauthorized: 'JOB_RUNNER_UNAUTHORIZED',
   /** ワーカーの起動に必要な設定が無い */

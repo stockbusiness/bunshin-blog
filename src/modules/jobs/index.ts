@@ -18,7 +18,26 @@ export {
   reclaimStuckJobs,
   findJobById,
   findJobByIdempotencyKey,
+  saveJobCheckpoint,
 } from './repository';
+
+export {
+  buildIdempotencyKey,
+  assertIdempotencyKey,
+  matchesJobType,
+  IDEMPOTENCY_KEY_SEPARATOR,
+  IDEMPOTENCY_KEY_MAX_LENGTH,
+} from './idempotency';
+
+export {
+  performOnce,
+  readCheckpoint,
+  sideEffectUncertainError,
+  CHECKPOINT_FIELD,
+  type JobCheckpoint,
+  type PerformOnceOptions,
+  type SaveCheckpoint,
+} from './checkpoint';
 
 export {
   drainJobs,
