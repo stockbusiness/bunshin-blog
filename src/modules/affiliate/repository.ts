@@ -19,6 +19,11 @@ import type {
   UpdateOfferInput,
   UserExperience,
 } from './types';
+import {
+  evaluateLandingPage,
+  type EvaluateLandingPageOptions,
+  type LpEvaluation,
+} from './lp-evaluation';
 import { normalizeCreateOffer, normalizeUpdateOffer } from './validate';
 import { assertPeriod } from './validate';
 
@@ -301,4 +306,41 @@ export async function readLinkableOfferForUser(params: {
     linkMode: row.linkMode as LinkMode,
     subIdParam: row.subIdParam,
   };
+}
+
+/**
+ * LPを評価して結果を保存する（D-2、SPEC 9.2.3）。
+ *
+ * **保存済みの `landing_page_url` を使う。** 呼び出し側にURLを渡させない。
+ * 渡せると、案件と無関係な宛先へリクエストを出せてしまう（SSRF の入口が
+ * 増える。C-3 の「リクエストに接続情報を渡させない」と同じ考え）。
+ *
+ * **失敗したら列を触らない。** 前回の評価結果を消して `NULL` に戻すと、
+ * 一時的な障害で案件が選定から落ちる（SPEC 9.2.3 の足切り）。
+ *
+ * @throws {AppError} 他ブログの案件（404）・到達不可・HTMLでない
+ */
+export async function evaluateLandingPageForUser(
+  params: { userId: string; blogId: string; offerId: string },
+  options: { fetchFn?: EvaluateLandingPageOptions['fetchFn'] } = {},
+): Promise<{ offer: AppAffiliateOffer; evaluation: LpEvaluation }> {
+  const offer = await requireOfferForUser(params);
+
+  const evaluation = await evaluateLandingPage({
+    landingPageUrl: offer.landingPageUrl,
+    ...(options.fetchFn === undefined ? {} : { fetchFn: options.fetchFn }),
+  });
+
+  const row = await prisma.affiliateOffer.update({
+    where: { id: offer.id },
+    data: {
+      lpFormFields: evaluation.formFields,
+      lpMobileReady: evaluation.mobileReady,
+      lpContentLength: evaluation.contentLength,
+      lpEvaluatedAt: new Date(),
+    },
+    select: SELECT,
+  });
+
+  return { offer: toAppOffer(row), evaluation };
 }

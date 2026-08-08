@@ -73,3 +73,29 @@ export function redirectNotConfiguredError(): AppError {
     'リダイレクタの公開URLが設定されていません',
   );
 }
+
+/**
+ * LPの自動評価（TASKS D-2、SPEC 9.2.3・14.3）。
+ *
+ * **到達できない理由を細かく分けない。** 到達禁止アドレスと接続失敗を
+ * 区別すると、応答の違いで内部の構成を調べられる（SPEC 14.3）。
+ */
+export const LP_ERROR_CODES = {
+  /** LPへ到達できなかった */
+  lpUnreachable: 'AFFILIATE_LP_UNREACHABLE',
+  /** HTMLが返らなかった */
+  lpNotHtml: 'AFFILIATE_LP_NOT_HTML',
+  /** 取得はできたが評価できなかった */
+  lpUnavailable: 'AFFILIATE_LP_UNAVAILABLE',
+} as const;
+
+export type LpErrorCode = (typeof LP_ERROR_CODES)[keyof typeof LP_ERROR_CODES];
+
+/** LPの取得・評価の失敗を表す。到達先や内部の理由をメッセージへ含めない */
+export function lpFetchFailedError(
+  code: LpErrorCode,
+  message: string,
+  cause?: unknown,
+): AppError {
+  return new AppError(code, 502, message, cause === undefined ? {} : { cause });
+}

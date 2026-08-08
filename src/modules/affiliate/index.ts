@@ -20,7 +20,22 @@ export {
   updateOfferForUser,
   endOfferForUser,
   readLinkableOfferForUser,
+  evaluateLandingPageForUser,
 } from './repository';
+
+export {
+  evaluateLandingPage,
+  evaluateHtml,
+  countFormFields,
+  detectMobileReady,
+  LP_TIMEOUT_MS,
+  LP_MAX_BYTES,
+  LP_CONTENT_TYPES,
+  LP_FORM_FIELDS_GOOD,
+  LP_FORM_FIELDS_FAIR,
+  type LpEvaluation,
+  type EvaluateLandingPageOptions,
+} from './lp-evaluation';
 
 export {
   buildAffiliateLink,
@@ -61,7 +76,10 @@ export {
   invalidPeriodError,
   missingRedirectCodeError,
   redirectNotConfiguredError,
+  LP_ERROR_CODES,
+  lpFetchFailedError,
   type AffiliateErrorCode,
+  type LpErrorCode,
 } from './errors';
 
 export {
