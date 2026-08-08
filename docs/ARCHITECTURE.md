@@ -219,7 +219,7 @@ npm run build
 
 ## 8. 現在の実装状況
 
-**40タスク／75 が完了**（2026-08-08）。**Phase A・B・C は全件。** Phase D は **D-7 のみ**（Q-015 の決定待ち）。Phase E はジョブ基盤（E-1）だけ。
+**41タスク／75 が完了**（2026-08-08）。**Phase A・B・C は全件。** Phase D は **D-7 のみ**（Q-015 の決定待ち）。Phase E はジョブ基盤（E-1）とプロンプト管理（E-2）。Phase E はジョブ基盤（E-1）だけ。
 
 | Phase | 完了 | 残り |
 |---|---|---|
@@ -227,7 +227,7 @@ npm run build
 | B | 11/11 | — |
 | C | 9/9 | — |
 | D | 10/11 | D-7 LINE返信（**Q-015 の決定待ち**） |
-| E | 1/15 | E-2〜E-15 |
+| E | 2/15 | E-3〜E-15 |
 | F〜H | 0/29 | 全て |
 
 ### 実装済みのモジュール
@@ -243,8 +243,9 @@ npm run build
 | `banners` | バナーCRUD（表示位置・対象カテゴリ・有効期間） |
 | `personas` | ユーザー共通人格（D-4）、ブログ別設定と重ね合わせ（D-5）、本人の事実（D-6） |
 | `analytics` | クリック記録（D-8）。**`metrics_daily` は G-2、Search Console は G-1** |
+| `content-generation` | プロンプトの版管理（E-2）。**記事生成本体は E-10** |
 
-`experiments` `content-planning` `content-generation` `approvals` `ai-costs` `audit` `line` は未実装（空ディレクトリ）。
+`experiments` `content-planning` `approvals` `ai-costs` `audit` `line` は未実装（空ディレクトリ）。
 
 ### 共通基盤（`src/lib/`）
 
