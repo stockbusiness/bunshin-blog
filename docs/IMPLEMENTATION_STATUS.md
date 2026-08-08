@@ -24,5 +24,6 @@
 | B-11 | 完了 | #26 | 2026-08-07 | 実際の送信は未確認（Resend のAPIキーと送信元ドメインの認証が必要）。`APP_BASE_URL` `RESEND_API_KEY` `MAIL_FROM` の設定が要る |
 | B-9 | 完了 | #22 | 2026-08-07 | 対象は B-5 の2画面。B-8 の LiffProvider と `/liff` は未着手 |
 | B-8 | 完了 | #20 | 2026-08-07 | 実機（LINEアプリ）での確認は未実施。`NEXT_PUBLIC_LIFF_ID` の発行が必要。`/liff/home`（SPEC 6.1）はタスク未設定 |
+| C-1 | 完了 | #28 | 2026-08-08 | 保存のみ。**WordPressへの接続確認は C-2**（7項目・SPEC 7.2）。接続画面（`/liff/blogs/[blogId]/wordpress`）と接続状態の取得API（`GET`）も C-2。ADMIN による `site_url` の修正（Q-007・Q-008）は Phase 0 では SQL（H-6） |
 
 以降のタスクは着手時に行を追加する。
