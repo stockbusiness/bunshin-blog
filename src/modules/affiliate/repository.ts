@@ -387,7 +387,8 @@ export interface AppAffiliateLink {
  * まだ無い（MODULE_RULES 1 により直接読めない）。C-6 のときと同じ状況だが、
  * **`affiliate_links` に `blog_id` が無いため複合外部キーでも表せない**。
  * 影響は成果の紐付けが別ブログの記事IDになることまでで、他人を止めたり
- * 情報を漏らしたりはしない。`content-planning`（E-2）ができた時点で塞ぐ。
+ * 情報を漏らしたりはしない。**`content-planning` モジュールは E-4 で作られる**
+ * ので、その時点で塞ぐ。
  *
  * @throws {AppError} 他ブログの案件（404）・`DIRECT` の案件
  */
