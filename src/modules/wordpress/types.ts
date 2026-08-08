@@ -29,6 +29,9 @@ export interface AppWordpressConnection {
   updatedAt: Date;
 }
 
+/** WordPress 側の投稿状態（`wordpress_posts.wp_status`） */
+export type WordpressPostStatus = 'DRAFT' | 'PENDING' | 'PUBLISH' | 'TRASH';
+
 export type WordpressConnectionStatus =
   'UNTESTED' | 'CONNECTED' | 'FAILED' | 'REVOKED';
 
@@ -52,4 +55,25 @@ export interface ConnectWordpressInput {
 export interface WordpressCredentials {
   username: Secret;
   appPassword: Secret;
+}
+
+/**
+ * `wordpress_posts` の外向け表現（C-3）。
+ *
+ * WordPress 側の識別子と状態だけを持つ。記事本文は持たない
+ * （本文の正本は `article_versions` と WordPress 側・DATA_MODEL 11章）。
+ */
+export interface AppWordpressPost {
+  id: string;
+  blogId: string;
+  contentItemId: string;
+  wpPostId: number;
+  wpPostUrl: string | null;
+  wpEditUrl: string | null;
+  wpStatus: WordpressPostStatus;
+  /** WordPress が保存した本文のハッシュ。C-5 の編集検出に使う */
+  lastContentHash: string;
+  postedAt: Date;
+  publishedAt: Date | null;
+  lastSyncedAt: Date | null;
 }
