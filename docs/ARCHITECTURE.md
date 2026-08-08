@@ -219,14 +219,14 @@ npm run build
 
 ## 8. 現在の実装状況
 
-**39タスク／75 が完了**（2026-08-08）。**Phase A・B・C は全件。** Phase D は D-7・D-8 を残す。Phase E はジョブ基盤（E-1）だけ。
+**40タスク／75 が完了**（2026-08-08）。**Phase A・B・C は全件。** Phase D は **D-7 のみ**（Q-015 の決定待ち）。Phase E はジョブ基盤（E-1）だけ。
 
 | Phase | 完了 | 残り |
 |---|---|---|
 | A | 9/9 | — |
 | B | 11/11 | — |
 | C | 9/9 | — |
-| D | 9/11 | D-7 LINE返信、D-8 リダイレクタ |
+| D | 10/11 | D-7 LINE返信（**Q-015 の決定待ち**） |
 | E | 1/15 | E-2〜E-15 |
 | F〜H | 0/29 | 全て |
 
@@ -242,8 +242,9 @@ npm run build
 | `affiliate` | 案件CRUD（ブログ別）、リンクの組み立て（`REDIRECT` / `DIRECT` の切り替えとサブID）、LP自動評価 |
 | `banners` | バナーCRUD（表示位置・対象カテゴリ・有効期間） |
 | `personas` | ユーザー共通人格（D-4）、ブログ別設定と重ね合わせ（D-5）、本人の事実（D-6） |
+| `analytics` | クリック記録（D-8）。**`metrics_daily` は G-2、Search Console は G-1** |
 
-`experiments` `content-planning` `content-generation` `approvals` `analytics` `ai-costs` `audit` `line` は未実装（空ディレクトリ）。
+`experiments` `content-planning` `content-generation` `approvals` `ai-costs` `audit` `line` は未実装（空ディレクトリ）。
 
 ### 共通基盤（`src/lib/`）
 
@@ -265,6 +266,7 @@ POST   /api/blogs/:id/wordpress/test
 DELETE /api/blogs/:id/wordpress/disconnect
 POST   /api/admin/login                 POST /api/admin/login/verify
 GET    /api/jobs/run                    ← Vercel Cron 専用
+GET    /go/:code                        ← アフィリエイトリダイレクタ（認証なし）
 ```
 
 ### 画面

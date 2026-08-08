@@ -417,6 +417,17 @@ describe('他人のブログIDを指定する', () => {
         }),
     ],
     [
+      'リダイレクタのリンクを発行する',
+      (): Promise<unknown> =>
+        affiliate.ensureRedirectLinkForUser({
+          userId: bob.userId,
+          blogId: alice.blogIds[0],
+          offerId: '00000000-0000-4000-8000-000000000000',
+          contentItemId: alice.contentItemIds[0],
+          slotNumber: 1,
+        }),
+    ],
+    [
       'ブログ別の人格設定を引く',
       (): Promise<unknown> =>
         personas.findBlogPersonaSettingForUser({
@@ -686,6 +697,7 @@ describe('入口の網羅', () => {
       'endOfferForUser',
       'readLinkableOfferForUser',
       'evaluateLandingPageForUser',
+      'ensureRedirectLinkForUser',
     ],
     banners: [
       'listBannersForUser',
