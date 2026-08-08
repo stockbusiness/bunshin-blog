@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import * as affiliate from '@/modules/affiliate';
+import * as banners from '@/modules/banners';
 import * as blogs from '@/modules/blogs';
 import * as wordpress from '@/modules/wordpress';
 import {
@@ -415,6 +416,27 @@ describe('他人のブログIDを指定する', () => {
         }),
     ],
     [
+      'バナーを一覧する',
+      (): Promise<unknown> =>
+        banners.listBannersForUser({
+          userId: bob.userId,
+          blogId: alice.blogIds[0],
+        }),
+    ],
+    [
+      'バナーを登録する',
+      (): Promise<unknown> =>
+        banners.createBannerForUser(
+          { userId: bob.userId, blogId: alice.blogIds[0] },
+          {
+            name: '割り込みバナー',
+            imageUrl: 'https://cdn.example.com/a.png',
+            destinationUrl: 'https://asp.example/click?a=x',
+            slot: 'TOP',
+          },
+        ),
+    ],
+    [
       '案件を一覧する',
       (): Promise<unknown> =>
         affiliate.listOffersForUser({
@@ -656,6 +678,14 @@ describe('入口の網羅', () => {
       'readLinkableOfferForUser',
       'evaluateLandingPageForUser',
     ],
+    banners: [
+      'listBannersForUser',
+      'findBannerForUser',
+      'requireBannerForUser',
+      'createBannerForUser',
+      'updateBannerForUser',
+      'endBannerForUser',
+    ],
     blogs: [
       'listBlogsForUser',
       'findBlogForUser',
@@ -679,6 +709,7 @@ describe('入口の網羅', () => {
 
   it.each([
     ['affiliate', affiliate, covered.affiliate],
+    ['banners', banners, covered.banners],
     ['blogs', blogs, covered.blogs],
     ['wordpress', wordpress, covered.wordpress],
   ])(
