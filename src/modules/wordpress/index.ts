@@ -18,8 +18,17 @@ export {
   readWordpressCredentialsForUser,
   testWordpressConnectionForUser,
   publishDraftForUser,
+  syncWordpressPostForUser,
   findWordpressPostForUser,
 } from './repository';
+
+export {
+  syncPost,
+  fetchRemotePost,
+  isUserEdited,
+  type RemotePostState,
+  type SyncPostResult,
+} from './sync';
 
 export {
   publishDraft,
@@ -95,11 +104,15 @@ export {
   credentialsUnreadableError,
   WORDPRESS_TEST_ERROR_CODES,
   WORDPRESS_POST_ERROR_CODES,
+  WORDPRESS_SYNC_ERROR_CODES,
   postFailedError,
   publishedPostNotEditableError,
+  userEditedNotOverwritableError,
+  syncFailedError,
   type WordpressErrorCode,
   type WordpressTestErrorCode,
   type WordpressPostErrorCode,
+  type WordpressSyncErrorCode,
 } from './errors';
 
 export type {

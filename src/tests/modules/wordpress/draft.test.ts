@@ -184,7 +184,13 @@ describe('新規投稿', () => {
 });
 
 describe('既存投稿の更新', () => {
-  const existing: ExistingPost = { wpPostId: 4242, wpStatus: 'DRAFT' };
+  const existing: ExistingPost = {
+    wpPostId: 4242,
+    wpStatus: 'DRAFT',
+    // 送る本文と違うハッシュ。一致すると C-5 の判定で更新を飛ばす
+    lastContentHash: 'まだ何も書いていない',
+    userEditedAt: null,
+  };
 
   // SPEC 7.3「wp_post_id が存在する場合は新規投稿しない」
   it('新規作成せず既存の投稿を更新する', async () => {
@@ -251,6 +257,137 @@ describe('既存投稿の更新', () => {
   });
 });
 
+describe('content hash が同一なら更新しない（C-5、SPEC 7.3）', () => {
+  /** 前回こちらが書き込んだ本文と、これから送る本文が同じ場合 */
+  const unchanged: ExistingPost = {
+    wpPostId: 4242,
+    wpStatus: 'DRAFT',
+    lastContentHash: contentHash(INPUT.content),
+    userEditedAt: null,
+  };
+
+  it('WordPress を1回も呼ばない', async () => {
+    const { client, calls } = createClient();
+
+    const result = await publishDraft({
+      client,
+      input: INPUT,
+      existing: unchanged,
+      ...CAN_ALL,
+    });
+
+    expect(calls).toHaveLength(0);
+    expect(result.skipped).toBe(true);
+    expect(result.created).toBe(false);
+    expect(result.wpPostId).toBe(4242);
+    expect(result.contentHash).toBe(unchanged.lastContentHash);
+  });
+
+  // タイトルだけの変更は本文のハッシュに出ない。**内容が変われば更新する**
+  it('本文が違えば更新する', async () => {
+    const { client, calls } = createClient();
+
+    const result = await publishDraft({
+      client,
+      input: { ...INPUT, content: '<p>書き直した本文</p>' },
+      existing: unchanged,
+      ...CAN_ALL,
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(result.skipped).toBe(false);
+  });
+
+  /**
+   * 利用者が編集していても、送る内容が同じなら何も起きない。
+   * ここで弾くと、同じ内容の再実行が失敗になる。
+   */
+  it('利用者が編集していても、内容が同じなら失敗にしない', async () => {
+    const { client, calls } = createClient();
+
+    const result = await publishDraft({
+      client,
+      input: INPUT,
+      existing: { ...unchanged, userEditedAt: new Date() },
+      ...CAN_ALL,
+    });
+
+    expect(calls).toHaveLength(0);
+    expect(result.skipped).toBe(true);
+  });
+
+  // 公開済みの判定を飛ばさない
+  it('公開済みなら内容が同じでも拒否する', async () => {
+    const { client } = createClient();
+
+    await expect(
+      publishDraft({
+        client,
+        input: INPUT,
+        existing: { ...unchanged, wpStatus: 'PUBLISH' },
+        ...CAN_ALL,
+      }),
+    ).rejects.toMatchObject({
+      code: WORDPRESS_POST_ERROR_CODES.publishedNotEditable,
+    });
+  });
+});
+
+describe('利用者が編集した記事は上書きしない（C-5、DATA_MODEL 11章）', () => {
+  const edited: ExistingPost = {
+    wpPostId: 4242,
+    wpStatus: 'DRAFT',
+    lastContentHash: 'こちらが前回書いた本文',
+    userEditedAt: new Date('2026-08-08T00:00:00Z'),
+  };
+
+  it('承認なしでは更新しない', async () => {
+    const { client, calls } = createClient();
+
+    await expect(
+      publishDraft({ client, input: INPUT, existing: edited, ...CAN_ALL }),
+    ).rejects.toMatchObject({
+      code: WORDPRESS_POST_ERROR_CODES.userEditedNotOverwritable,
+      status: 409,
+    });
+
+    // **1回もリクエストを出さない**
+    expect(calls).toHaveLength(0);
+  });
+
+  // 既定は「上書きしない」。承認の経路がまだ無い以上、他に安全な既定が無い
+  it('approvedOverwrite を渡さなければ拒否する', async () => {
+    const { client } = createClient();
+
+    await expect(
+      publishDraft({
+        client,
+        input: INPUT,
+        existing: edited,
+        ...CAN_ALL,
+        approvedOverwrite: false,
+      }),
+    ).rejects.toMatchObject({
+      code: WORDPRESS_POST_ERROR_CODES.userEditedNotOverwritable,
+    });
+  });
+
+  it('承認を経ていれば更新する', async () => {
+    const { client, calls } = createClient();
+
+    const result = await publishDraft({
+      client,
+      input: INPUT,
+      existing: edited,
+      ...CAN_ALL,
+      approvedOverwrite: true,
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(result.skipped).toBe(false);
+  });
+});
+
 describe('公開済み記事は上書きしない（DATA_MODEL 11章）', () => {
   it.each<ExistingPost['wpStatus']>(['PUBLISH', 'PENDING', 'TRASH'])(
     '%s の記事は更新しない',
@@ -261,7 +398,12 @@ describe('公開済み記事は上書きしない（DATA_MODEL 11章）', () => 
         publishDraft({
           client,
           input: INPUT,
-          existing: { wpPostId: 4242, wpStatus },
+          existing: {
+            wpPostId: 4242,
+            wpStatus,
+            lastContentHash: 'x',
+            userEditedAt: null,
+          },
           ...CAN_ALL,
         }),
       ).rejects.toMatchObject({
@@ -281,7 +423,12 @@ describe('公開済み記事は上書きしない（DATA_MODEL 11章）', () => 
       publishDraft({
         client,
         input: INPUT,
-        existing: { wpPostId: 4242, wpStatus: 'PUBLISH' },
+        existing: {
+          wpPostId: 4242,
+          wpStatus: 'PUBLISH',
+          lastContentHash: 'x',
+          userEditedAt: null,
+        },
         ...CAN_ALL,
       }),
     ).rejects.toMatchObject({

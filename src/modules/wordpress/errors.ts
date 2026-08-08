@@ -121,6 +121,8 @@ export const WORDPRESS_POST_ERROR_CODES = {
   notDraft: 'WORDPRESS_POST_NOT_DRAFT',
   /** 公開済みの記事を承認なしに更新しようとした（DATA_MODEL 11章） */
   publishedNotEditable: 'WORDPRESS_POST_PUBLISHED_NOT_EDITABLE',
+  /** WordPress側で編集された記事を承認なしに上書きしようとした（C-5） */
+  userEditedNotOverwritable: 'WORDPRESS_POST_USER_EDITED',
 } as const;
 
 export type WordpressPostErrorCode =
@@ -142,6 +144,56 @@ export function postFailedError(
     ...(cause === undefined ? {} : { cause }),
     ...(details === undefined ? {} : { details }),
   });
+}
+
+/**
+ * WordPress 側の状態の取り込み（TASKS C-5、DATA_MODEL 11章）。
+ *
+ * 投稿（C-3）とは別の体系にする。**同じ「失敗」でも、書き込めなかったのか
+ * 読み取れなかったのかで対処が違う。**
+ */
+export const WORDPRESS_SYNC_ERROR_CODES = {
+  /** WordPress へ到達できなかった */
+  unreachable: 'WORDPRESS_SYNC_UNREACHABLE',
+  /** 取り込みに失敗した */
+  syncFailed: 'WORDPRESS_SYNC_FAILED',
+  /** WordPress 側に記事が無い（利用者が削除した） */
+  postGone: 'WORDPRESS_SYNC_POST_GONE',
+  /** 知らない状態が返った（`future` `private` など） */
+  unknownStatus: 'WORDPRESS_SYNC_UNKNOWN_STATUS',
+  /** 本文を取得できなかった（`context=edit` の権限が無い） */
+  contentUnavailable: 'WORDPRESS_SYNC_CONTENT_UNAVAILABLE',
+} as const;
+
+export type WordpressSyncErrorCode =
+  (typeof WORDPRESS_SYNC_ERROR_CODES)[keyof typeof WORDPRESS_SYNC_ERROR_CODES];
+
+/** 取り込みの失敗を表す。到達先や内部の理由をメッセージへ含めない */
+export function syncFailedError(
+  code: WordpressSyncErrorCode,
+  message: string,
+  cause?: unknown,
+): AppError {
+  return new AppError(
+    code,
+    code === WORDPRESS_SYNC_ERROR_CODES.postGone ? 404 : 502,
+    message,
+    cause === undefined ? {} : { cause },
+  );
+}
+
+/**
+ * 利用者が WordPress 側で編集した記事を、承認なしに更新しようとしたことを表す。
+ *
+ * **承認を経ずに上書きしてはならない**（DATA_MODEL 11章）。上書きすると
+ * モニターが自分で書き直した内容が消える。承認を通す経路は F-6。
+ */
+export function userEditedNotOverwritableError(): AppError {
+  return new AppError(
+    WORDPRESS_POST_ERROR_CODES.userEditedNotOverwritable,
+    409,
+    'WordPress側で編集された記事は、承認なしに上書きできません',
+  );
 }
 
 /**
