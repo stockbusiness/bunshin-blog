@@ -76,3 +76,98 @@ export interface UpdateUserPersonaInput {
   values?: PersonaValues | undefined;
   ngExpressions?: string[] | undefined;
 }
+
+/** 読者の知識レベル（DATA_MODEL 3章） */
+export type KnowledgeLevel = 'beginner' | 'intermediate' | 'advanced';
+
+/** 箇条書きの頻度 */
+export type BulletFrequency = 'low' | 'mid' | 'high';
+
+export const KNOWLEDGE_LEVELS: readonly KnowledgeLevel[] = [
+  'beginner',
+  'intermediate',
+  'advanced',
+];
+
+export const BULLET_FREQUENCIES: readonly BulletFrequency[] = [
+  'low',
+  'mid',
+  'high',
+];
+
+export interface TargetReader {
+  ageRange: string;
+  situation: string;
+  knowledgeLevel: KnowledgeLevel;
+}
+
+export interface WritingRules {
+  headingDepth: number;
+  leadLength: number;
+  bulletFrequency: BulletFrequency;
+}
+
+/**
+ * 文体の上書き（DATA_MODEL 3章 `tone_override = Partial<typeof tone>`）。
+ *
+ * **未指定の項目は `user_personas` を継承する。** ここが D-5 の要。
+ */
+export type ToneOverride = Partial<Tone>;
+
+/** ブログ別の人格設定（`blog_persona_settings`・SPEC 5.6） */
+export interface AppBlogPersonaSetting {
+  id: string;
+  blogId: string;
+  /** 記事の署名に使う名前 */
+  penName: string;
+  toneOverride: ToneOverride;
+  targetReader: TargetReader;
+  /**
+   * 使ってよい体験（`persona_facts` のID）。
+   *
+   * **D-5 では設定できない。** 参照先の `persona_facts` は D-6 で作る。
+   * 所有権を確かめられないIDを受け取ると、他人の体験を引き当てられる
+   * （C-6 で見つけたのと同じ形）。**D-6 で入口を足す。**
+   */
+  allowedExperiences: string[];
+  /** 触れない話題 */
+  ngTopics: string[];
+  writingRules: WritingRules;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface SaveBlogPersonaSettingInput {
+  penName: string;
+  toneOverride?: ToneOverride | undefined;
+  targetReader: TargetReader;
+  ngTopics?: string[] | undefined;
+  writingRules: WritingRules;
+}
+
+export interface UpdateBlogPersonaSettingInput {
+  penName?: string | undefined;
+  toneOverride?: ToneOverride | undefined;
+  targetReader?: TargetReader | undefined;
+  ngTopics?: string[] | undefined;
+  writingRules?: WritingRules | undefined;
+}
+
+/**
+ * 記事生成が実際に使う人格（E-8 の入力）。
+ *
+ * **ユーザー共通人格にブログ別の上書きを重ねたもの。** 呼び出し側に
+ * 「どちらを見るか」を判断させない。
+ */
+export interface EffectivePersona {
+  baseProfile: BaseProfile;
+  /** 共通の `tone` に `tone_override` を重ねた結果 */
+  tone: Tone;
+  values: PersonaValues;
+  ngExpressions: string[];
+  /** ブログ別設定が無ければ `null` */
+  penName: string | null;
+  targetReader: TargetReader | null;
+  writingRules: WritingRules | null;
+  ngTopics: string[];
+}

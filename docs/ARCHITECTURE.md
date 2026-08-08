@@ -219,14 +219,14 @@ npm run build
 
 ## 8. 現在の実装状況
 
-**37タスク／75 が完了**（2026-08-08）。**Phase A・B・C は全件。** Phase D は D-5〜D-8 を残す。Phase E はジョブ基盤（E-1）だけ。
+**38タスク／75 が完了**（2026-08-08）。**Phase A・B・C は全件。** Phase D は D-6〜D-8 を残す。Phase E はジョブ基盤（E-1）だけ。
 
 | Phase | 完了 | 残り |
 |---|---|---|
 | A | 9/9 | — |
 | B | 11/11 | — |
 | C | 9/9 | — |
-| D | 7/11 | D-5〜D-8 |
+| D | 8/11 | D-6〜D-8 |
 | E | 1/15 | E-2〜E-15 |
 | F〜H | 0/29 | 全て |
 
@@ -241,7 +241,7 @@ npm run build
 | `jobs` | キュー・再試行・状態管理（E-1）、冪等性キーと中断の検出（C-4）。**ハンドラは未登録** |
 | `affiliate` | 案件CRUD（ブログ別）、リンクの組み立て（`REDIRECT` / `DIRECT` の切り替えとサブID）、LP自動評価 |
 | `banners` | バナーCRUD（表示位置・対象カテゴリ・有効期間） |
-| `personas` | ユーザー共通人格（D-4）。**ブログ別設定（D-5）と facts（D-6）は未実装** |
+| `personas` | ユーザー共通人格（D-4）、ブログ別設定と重ね合わせ（D-5）。**facts（D-6）は未実装** |
 
 `experiments` `content-planning` `content-generation` `approvals` `analytics` `ai-costs` `audit` `line` は未実装（空ディレクトリ）。
 

@@ -417,6 +417,14 @@ describe('他人のブログIDを指定する', () => {
         }),
     ],
     [
+      'ブログ別の人格設定を引く',
+      (): Promise<unknown> =>
+        personas.findBlogPersonaSettingForUser({
+          userId: bob.userId,
+          blogId: alice.blogIds[0],
+        }),
+    ],
+    [
       'バナーを一覧する',
       (): Promise<unknown> =>
         banners.listBannersForUser({
@@ -692,6 +700,10 @@ describe('入口の網羅', () => {
       'requireUserPersonaForUser',
       'saveUserPersonaForUser',
       'updateUserPersonaForUser',
+      'findBlogPersonaSettingForUser',
+      'saveBlogPersonaSettingForUser',
+      'updateBlogPersonaSettingForUser',
+      'resolveEffectivePersonaForUser',
     ],
     blogs: [
       'listBlogsForUser',
