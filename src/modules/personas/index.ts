@@ -12,7 +12,28 @@ export {
   requireUserPersonaForUser,
   saveUserPersonaForUser,
   updateUserPersonaForUser,
+  findBlogPersonaSettingForUser,
+  saveBlogPersonaSettingForUser,
+  updateBlogPersonaSettingForUser,
+  resolveEffectivePersonaForUser,
 } from './repository';
+
+export {
+  resolveEffectivePersona,
+  normalizeSaveBlogPersonaSetting,
+  normalizeUpdateBlogPersonaSetting,
+  normalizeToneOverride,
+  normalizeTargetReader,
+  normalizeWritingRules,
+  isKnowledgeLevel,
+  isBulletFrequency,
+  PEN_NAME_MAX_LENGTH,
+  HEADING_DEPTH_MIN,
+  HEADING_DEPTH_MAX,
+  LEAD_LENGTH_MIN,
+  LEAD_LENGTH_MAX,
+  type NormalizedBlogPersonaSetting,
+} from './blog-settings';
 
 export {
   normalizeCreateUserPersona,
@@ -39,6 +60,17 @@ export {
 export {
   EMOJI_LEVELS,
   LINE_BREAK_STYLES,
+  KNOWLEDGE_LEVELS,
+  BULLET_FREQUENCIES,
+  type AppBlogPersonaSetting,
+  type EffectivePersona,
+  type TargetReader,
+  type WritingRules,
+  type ToneOverride,
+  type KnowledgeLevel,
+  type BulletFrequency,
+  type SaveBlogPersonaSettingInput,
+  type UpdateBlogPersonaSettingInput,
   type AppUserPersona,
   type BaseProfile,
   type Tone,
