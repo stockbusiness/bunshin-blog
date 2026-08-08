@@ -95,7 +95,7 @@ import { verifyIdToken } from '@/modules/auth';
 
 | 区分 | ファイル |
 |---|---|
-| サーバー専用 | `db.ts`（Prisma）、`env.ts`（`process.env` の全件検証）、`mailer/`（APIキーを読む）、`crypto/`（`node:crypto` と暗号化キー）、`src/modules/**` |
+| サーバー専用 | `db.ts`（Prisma）、`env.ts`（`process.env` の全件検証）、`mailer/`（APIキーを読む）、`crypto/`（`node:crypto` と暗号化キー）、`http/`（`node:http` `node:dns`）、`src/modules/**` |
 | ブラウザでも動く | `liff/`、`datetime.ts`、`errors.ts` の型 |
 
 **理由。** `db.ts` は Prisma を、`env.ts` はサーバー専用の環境変数を読む。クライアントコンポーネントから辿れる位置に置くとビルドが壊れるか、最悪の場合サーバー側の設定値がバンドルへ混入する（SPEC 14.2）。
@@ -103,6 +103,8 @@ import { verifyIdToken } from '@/modules/auth';
 **`NEXT_PUBLIC_` が付く変数は `env.ts` の検証対象に入れない。** ビルド時にバンドルへ焼き付く値であり、サーバー起動時に確認しても実際の失敗を防げない。設定漏れはブラウザ側で検出し、画面に出す（B-8 の `src/lib/liff/config.ts`）。
 
 **`process.env` をオブジェクトのまま渡してキーで引かない。** Next.js が値へ置き換えるのは `process.env.NEXT_PUBLIC_XXX` という形の記述だけで、動的なキー参照はブラウザで `undefined` になる。
+
+**利用者が宛先を決められるHTTPリクエストは `src/lib/http` の `safeFetch` を通す**（C-7、SPEC 14.3）。`fetch` を直接呼ばない。名前解決した結果のIPで到達可否を判定し、そのIPを固定して接続する。接続先の固定された外部API（LINE・Resend）は対象外で、通す必要も無い。
 
 ---
 
