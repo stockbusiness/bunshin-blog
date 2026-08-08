@@ -48,7 +48,9 @@ export async function listMonitorsForAdmin(): Promise<AdminMonitorSummary[]> {
       createdAt: true,
       monitorProfile: { select: { onboardingStatus: true } },
     },
-    orderBy: { createdAt: 'asc' },
+    // `created_at` はミリ秒までしか持たない。同じミリ秒に作られると
+    // 前後が決まらないので、`id` を最後の決め手にして並びを固定する
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
   });
 
   return records.map((record) => ({

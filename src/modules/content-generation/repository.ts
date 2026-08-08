@@ -80,7 +80,12 @@ export async function listPromptVersionsForAdmin(
   return prisma.promptVersion.findMany({
     where: key === undefined ? {} : { key: normalizePromptKey(key) },
     // **版の文字列で並べない。** `v10` が `v9` より前に来る
-    orderBy: [{ key: 'asc' }, { createdAt: 'desc' }],
+    //
+    // `created_at` はミリ秒までしか持たない（Prisma が JS の `Date` を送る）。
+    // **同じミリ秒に作られた版の前後は決められない。** せめて呼ぶたびに
+    // 入れ替わらないよう `id` を最後の決め手にする — 作成の順を表さないが、
+    // 一覧が見るたびに違う順で出るのは防げる。
+    orderBy: [{ key: 'asc' }, { createdAt: 'desc' }, { id: 'desc' }],
     select: SELECT,
   });
 }

@@ -143,7 +143,9 @@ export async function listOffersForUser(
       blogId,
       ...(options.status === undefined ? {} : { status: options.status }),
     },
-    orderBy: [{ createdAt: 'asc' }],
+    // `created_at` はミリ秒までしか持たない。同じミリ秒に作られると
+    // 前後が決まらないので、`id` を最後の決め手にして並びを固定する
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     select: SELECT,
   });
 
