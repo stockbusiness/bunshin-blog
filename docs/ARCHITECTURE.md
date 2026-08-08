@@ -44,7 +44,8 @@ LINE ──> LIFF画面 ─┐
 |---|---|
 | ジョブ基盤（Inngest / Trigger.dev / Supabase Edge Functions） | 未選定。E-1 で決める |
 | AIプロバイダー（Anthropic / OpenAI） | 未選定。SPEC 4.1 は「1社利用」とのみ定める。E-3 で決める |
-| 管理者認証（Supabase Auth） | 未実装。B-6 |
+
+管理者認証は決定済み。**Supabase は入れず、メール＋ワンタイムリンク**（Q-012）。実装は B-11。
 
 ---
 
@@ -59,10 +60,10 @@ SPEC 4.2 のツリーに従い、ソースは全て `src/` 配下に置く（OPE
 ├─ docs/                仕様・設計・進捗
 └─ src/
    ├─ app/              画面とRoute Handler
-   │  ├─ admin/         管理者Web画面（未実装）
-   │  ├─ liff/          LIFFユーザー画面（未実装）
-   │  └─ api/           Route Handler（未実装）
-   ├─ modules/          ドメインロジック（16モジュール）
+   │  ├─ admin/         管理者Web画面
+   │  ├─ liff/          LIFFユーザー画面
+   │  └─ api/           Route Handler
+   ├─ modules/          ドメインロジック（16モジュール。実装済みは4つ）
    ├─ lib/              共通基盤
    ├─ tests/            テスト
    └─ instrumentation.ts サーバー起動時の環境変数検証
@@ -90,12 +91,18 @@ SPEC 4.2 のツリーに従い、ソースは全て `src/` 配下に置く（OPE
 | `entitlements.ts` | 権限判定の入口。Phase 0 は常に `true` | A-4 |
 | `datetime.ts` | JST基準の日付・週境界 | A-7 |
 | `db.ts` | Prisma クライアント。`src/modules/` の外から使わない | B-2 |
+| `liff/` | ブラウザ側の LIFF 初期化。**サーバー専用のコードを import しない** | B-8 |
+| `mailer/` | Resend の HTTP API。未設定でも起動する | B-11 |
+| `crypto/` | AES-256-GCM。復号値は `Secret` に包む | C-1 |
+| `http/` | SSRF対策つきの外向きHTTP。**利用者が宛先を決めるリクエストは必ずここを通す** | C-7 |
 
 ### 環境変数
 
 `src/instrumentation.ts` がサーバー起動時に `getServerEnv()` を呼ぶ。欠落があれば**変数名を表示して `exit 1`** する。`next build` では実行されない。
 
-検証対象は `DATABASE_URL` `LINE_LOGIN_CHANNEL_ID` `SESSION_SECRET` `NODE_ENV`。**変数は「それを使うタスク」で追加する。** 未実装機能の変数を先回りして定義しない。
+検証対象は `DATABASE_URL` `LINE_LOGIN_CHANNEL_ID` `SESSION_SECRET` `ENCRYPTION_KEY` `NODE_ENV`。**変数は「それを使うタスク」で追加する。** 未実装機能の変数を先回りして定義しない。
+
+`APP_BASE_URL` `RESEND_API_KEY` `MAIL_FROM`（B-11）は**あえて必須にしていない**。未設定でも LIFF 側は動く必要があり、メールの設定漏れでサービス全体を止めない。`NEXT_PUBLIC_LIFF_ID`（B-8）はビルド時にバンドルへ焼き付くため、起動時検証に含めない。
 
 ### ログ
 
@@ -149,7 +156,7 @@ npm run build
 
 ## 6. データ
 
-`prisma/schema.prisma` に27テーブル・31 enum（A-2 の26テーブル・30 enum に、B-10 で `admin_login_tokens`、D-9 で `LinkMode` を追加）。設計の根拠・`jsonb` の構造・`onDelete` の方針・インデックスの根拠は `docs/DATA_MODEL.md` にある。
+`prisma/schema.prisma` に27テーブル・31 enum。A-2 の26テーブル・30 enum に、B-10 で `admin_login_tokens`、D-9 で `LinkMode` を追加した（D-10 は列のみで enum を増やしていない）。設計の根拠・`jsonb` の構造・`onDelete` の方針・インデックスの根拠は `docs/DATA_MODEL.md` にある。
 
 初期マイグレーションは `prisma/migrations/` にコミットされている（A-8）。CIは `migrate deploy` で適用し、適用後のDBと `schema.prisma` の乖離を検出する。以降のスキーマ変更は単独PRで適用する（DATA_MODEL 9章）。
 
@@ -176,9 +183,59 @@ npm run build
 
 ## 8. 現在の実装状況
 
-Phase A（A-1〜A-9）が完了。Phase B は B-3（ブログCRUD）まで。
+**26タスク／72 が完了**（2026-08-08）。Phase A・B は全件、Phase C は C-4・C-5・C-6 を残す。Phase D は D-9・D-10（どちらもスキーマ）のみ。
 
-実装済みのモジュールは `auth` `users` `blogs`。Route Handler は `POST /api/auth/liff` と `/api/blogs`（GET/POST）、`/api/blogs/:id`（GET/PATCH/DELETE）。WordPress連携・AI呼び出しは未実装。LINE連携はIDトークンの検証のみで、メッセージ送信は未実装。
+| Phase | 完了 | 残り |
+|---|---|---|
+| A | 9/9 | — |
+| B | 11/11 | — |
+| C | 5/7 | C-4 冪等性、C-5 WP同期、C-6 越境テスト |
+| D | 2/10 | D-1〜D-8 |
+| E〜H | 0/44 | 全て |
+
+### 実装済みのモジュール
+
+| モジュール | 内容 |
+|---|---|
+| `users` | 登録・規約同意・データ利用同意・管理者向け一覧 |
+| `auth` | LIFF IDトークン検証、セッション、認可、管理者のワンタイムリンク |
+| `blogs` | CRUD、3スロット制御、記事構成比、管理者向け集計 |
+| `wordpress` | 接続情報の暗号化保存、接続テスト（7項目）、下書き投稿 |
+
+`personas` `affiliate` `banners` `experiments` `content-planning` `content-generation` `approvals` `analytics` `ai-costs` `jobs` `audit` `line` は未実装（空ディレクトリ）。
+
+### 共通基盤（`src/lib/`）
+
+| 追加 | 内容 |
+|---|---|
+| `crypto/` | AES-256-GCM。復号値は `Secret` に包む（C-1） |
+| `http/` | SSRF対策つきの外向きHTTP。`safeFetch`（C-7） |
+| `mailer/` | Resend の HTTP API（B-11） |
+| `liff/` | ブラウザ側の LIFF 初期化（B-8） |
+
+### Route Handler
+
+```
+POST   /api/auth/liff
+GET    /api/blogs                       POST /api/blogs
+GET    /api/blogs/:id                   PATCH /api/blogs/:id     DELETE /api/blogs/:id
+POST   /api/blogs/:id/wordpress/connect
+POST   /api/blogs/:id/wordpress/test
+DELETE /api/blogs/:id/wordpress/disconnect
+POST   /api/admin/login                 POST /api/admin/login/verify
+```
+
+### 画面
+
+`/liff`、`/liff/blogs`、`/liff/blogs/:blogId/settings`、`/admin`、`/admin/users`、`/admin/login`、`/admin/login/verify`
+
+### まだ動かないもの
+
+**AI呼び出し・記事生成・LINE通知・ジョブ実行・計測は未実装。** Phase 0 の中核である「提案 → LINE承認 → 下書き投稿」のうち、**下書き投稿の部品だけができている**状態で、呼び出す側（承認とジョブ）が無い。
+
+**実WordPressでの動作確認をしていない**（C-2・C-3）。偽サーバーに対しては通しで確認済み。H-2 のオンボーディング前に1サイトで確かめる必要がある。
+
+**実際のメール送信を確認していない**（B-11）。Resend のAPIキーと送信元ドメインの認証が要る。
 
 ### 認証と同意
 
