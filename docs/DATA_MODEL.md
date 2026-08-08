@@ -76,6 +76,21 @@ writing_rules = { headingDepth: number; leadLength: number; bulletFrequency: "lo
 }
 ```
 
+### `affiliate_offers.link_mode`
+
+TASKS D-9。記事本文へ埋めるアフィリエイトリンクの出し方（OPEN_QUESTIONS Q-001）。
+
+| 値 | 本文に埋めるURL | クリック計測 |
+|---|---|---|
+| `REDIRECT` | 自前の `/go/<code>` | `link_clicks` に記録 |
+| `DIRECT`（既定） | `affiliate_url` をそのまま | サブID（成果）のみ |
+
+**既定は `DIRECT`（安全側）。** ASPによって別ドメインのリダイレクタ経由の掲載を許すところと許さないところがあるため、方式を1つに決めず案件ごとに持つ。判断がつかないものを許可側へ倒すと、成果が無効になったときに取り返しがつかない。
+
+- **設定するのは ADMIN。** モニターに規約の判断をさせない。Phase 0 は SQL で設定する（SPEC 10.3 の `experiment_groups` と同じ扱い）
+- **リンクの組み立ては `src/modules/affiliate/` の1関数に集約する**（D-1）。ここに閉じておけば、後からASPの規約が変わっても影響するのは以後に生成される記事だけ
+- **`REDIRECT` と `DIRECT` のクリック数を混ぜて集計しない。** `link_clicks` に行があるのは `REDIRECT` の案件だけなので、この表から数えるかぎり混ざらない
+
 ### `affiliate_offers.score_breakdown`
 
 ```ts
@@ -180,7 +195,7 @@ SPEC 6.2の `/admin/prompts`（バージョン・有効化・ロールバック�
 
 ### `affiliate_links` / `link_clicks`
 
-TASKS D-8の自前リダイレクタ。**OPEN_QUESTIONS Q-001 で方式が確定した**（2026-08-07）。案件ごとに `REDIRECT` / `DIRECT` を切り替え、**この2テーブルは `REDIRECT` の案件でのみ使う**。`DIRECT` の案件では行が作られない。
+TASKS D-8の自前リダイレクタ。**OPEN_QUESTIONS Q-001 で方式が確定した**（2026-08-07）。案件ごとに `REDIRECT` / `DIRECT` を切り替え、**この2テーブルは `REDIRECT` の案件でのみ使う**。`DIRECT` の案件では行が作られない。切り替えの列は `affiliate_offers.link_mode`（D-9 で追加）。
 
 ### `search_console_connections`
 
@@ -230,6 +245,7 @@ A-5 で CI に組み込み、A-8 でマイグレーション運用に切り替�
 | `prisma validate` | ✅ 通過 |
 | 初期マイグレーションのコミット（A-8） | ✅ `prisma/migrations/`。26テーブル・30 enum |
 | 追加マイグレーション（B-10） | ✅ `admin_login_tokens`。**27テーブル**になった |
+| 追加マイグレーション（D-9） | ✅ `affiliate_offers.link_mode` と `LinkMode`。**31 enum** になった |
 | 実PostgreSQLへの適用（`prisma migrate deploy`） | ✅ CIのサービスコンテナで実行 |
 | スキーマとマイグレーションの乖離検出 | ✅ CIで実行 |
 

@@ -33,7 +33,7 @@ LINE ──> LIFF画面 ─┐
 | UI | React 19 / Tailwind CSS 4 | |
 | バリデーション | zod 4 | 環境変数、jsonb の検証（DATA_MODEL 3章） |
 | ORM | Prisma **6系** | 7系は `datasource` の `url` を廃止しており非対応。Phase 0 は6系で進める（Q-004 解決済み） |
-| DB | PostgreSQL | 26テーブル・30 enum |
+| DB | PostgreSQL | 27テーブル・31 enum |
 | テスト | Vitest 4 + v8 カバレッジ | しきい値80% |
 | Lint / 整形 | ESLint 9（flat config）/ Prettier 3 | |
 | CI | GitHub Actions | 5章 |
@@ -149,7 +149,7 @@ npm run build
 
 ## 6. データ
 
-`prisma/schema.prisma` に26テーブル・30 enum。設計の根拠・`jsonb` の構造・`onDelete` の方針・インデックスの根拠は `docs/DATA_MODEL.md` にある。
+`prisma/schema.prisma` に27テーブル・31 enum（A-2 の26テーブル・30 enum に、B-10 で `admin_login_tokens`、D-9 で `LinkMode` を追加）。設計の根拠・`jsonb` の構造・`onDelete` の方針・インデックスの根拠は `docs/DATA_MODEL.md` にある。
 
 初期マイグレーションは `prisma/migrations/` にコミットされている（A-8）。CIは `migrate deploy` で適用し、適用後のDBと `schema.prisma` の乖離を検出する。以降のスキーマ変更は単独PRで適用する（DATA_MODEL 9章）。
 
@@ -197,6 +197,7 @@ APIの入口は `requireUser`（同意を見ない。オンボーディング用
 | ID | 論点 | 期限 |
 |---|---|---|
 | Q-005 | Search Console の日次データをJSTの暦日へどう対応づけるか | G-2 着手前 |
+| Q-014 | サブIDをアフィリエイトURLへどう付けるか | D-1 着手前 |
 
 SPEC 20.1 が挙げていた2件（Q-001 リダイレクト方式・Q-002 費用負担）は 2026-08-07 に決着した。
 
