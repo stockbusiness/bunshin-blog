@@ -219,7 +219,7 @@ npm run build
 
 ## 8. 現在の実装状況
 
-**43タスク／75 が完了**（2026-08-08）。**Phase A・B・C は全件。** Phase D は **D-7 のみ**（Q-015 の決定待ち）。Phase E はジョブ基盤（E-1）・プロンプト管理（E-2）・AI抽象化（E-3）・費用ログ（E-14）。Phase E はジョブ基盤（E-1）だけ。
+**44タスク／75 が完了**（2026-08-08）。**Phase A・B・C は全件。** Phase D は **D-7 のみ**（Q-015 の決定待ち）。Phase E は基盤（E-1〜E-3）と費用（E-14・E-15）。**残る E-4〜E-13 は実際にAIを呼ぶため、`ANTHROPIC_API_KEY` が要る。**Phase E はジョブ基盤（E-1）だけ。
 
 | Phase | 完了 | 残り |
 |---|---|---|
@@ -227,7 +227,7 @@ npm run build
 | B | 11/11 | — |
 | C | 9/9 | — |
 | D | 10/11 | D-7 LINE返信（**Q-015 の決定待ち**） |
-| E | 4/15 | E-4〜E-13、E-15 |
+| E | 5/15 | E-4〜E-13（**APIキー待ち**） |
 | F〜H | 0/29 | 全て |
 
 ### 実装済みのモジュール
@@ -244,7 +244,7 @@ npm run build
 | `personas` | ユーザー共通人格（D-4）、ブログ別設定と重ね合わせ（D-5）、本人の事実（D-6） |
 | `analytics` | クリック記録（D-8）。**`metrics_daily` は G-2、Search Console は G-1** |
 | `content-generation` | プロンプトの版管理（E-2）。**記事生成本体は E-10** |
-| `ai-costs` | AI費用の記録と集計（E-14）。**予算通知は E-15** |
+| `ai-costs` | AI費用の記録と集計（E-14）、予算通知（E-15）。**Phase 0 は超過しても生成を止めない** |
 
 `experiments` `content-planning` `approvals` `audit` `line` は未実装（空ディレクトリ）。
 

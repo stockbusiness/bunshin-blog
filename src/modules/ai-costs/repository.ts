@@ -15,7 +15,15 @@
 
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
+import { logger, type Logger } from '@/lib/logger';
+import { getMailer, type Mailer } from '@/lib/mailer';
 import { notFoundError, requireBlogForUser } from '@/modules/blogs';
+import {
+  buildBudgetAlert,
+  crossedThresholds,
+  readBudgetLimits,
+  type BudgetCrossing,
+} from './budget';
 import { invalidUsageError } from './errors';
 import type {
   AiCostSummary,
@@ -320,4 +328,139 @@ export async function findAiUsageForAdmin(id: string): Promise<AppAiUsageLog> {
   }
 
   return toAppLog(row);
+}
+
+/**
+ * 予算の境目を跨いだかを見て、跨いでいれば ADMIN へ通知する（E-15）。
+ *
+ * **記録の直後に呼ぶ。** `costBeforeUsd` は記録する前の合計。
+ *
+ * **通知の失敗で生成を止めない。** 予算の通知は運用の助けであって、
+ * 記事が出るかどうかとは関係が無い。失敗はログに残す。
+ *
+ * **生成の可否は返さない**（SPEC 12.2「予算超過時も生成を停止しない」）。
+ * 止める仕組みは `shouldStopGeneration` にあり、既定では常に `false`。
+ */
+export async function notifyBudgetCrossings(params: {
+  crossings: readonly BudgetCrossing[];
+  deps?: {
+    mailer?: Mailer | undefined;
+    env?: Readonly<Record<string, string | undefined>> | undefined;
+    logger?: Logger | undefined;
+  };
+}): Promise<number> {
+  if (params.crossings.length === 0) {
+    return 0;
+  }
+
+  const env = params.deps?.env ?? process.env;
+  const log = params.deps?.logger ?? logger;
+  const to = (env['ADMIN_ALERT_EMAIL'] ?? '').trim();
+
+  if (to === '') {
+    // **宛先が無いだけで落とさない。** 通知は運用の助けで、記事の生成とは別
+    log.warn('ADMIN_ALERT_EMAIL が未設定のため予算通知を送れない', {
+      count: params.crossings.length,
+    });
+
+    return 0;
+  }
+
+  const mailer = params.deps?.mailer ?? getMailer();
+  let sent = 0;
+
+  for (const crossing of params.crossings) {
+    const message = buildBudgetAlert(crossing);
+
+    try {
+      await mailer.send({ to, ...message });
+      sent += 1;
+    } catch (error) {
+      log.error('予算通知を送れなかった', {
+        scope: crossing.scope,
+        threshold: crossing.threshold,
+        cause: error,
+      });
+    }
+  }
+
+  return sent;
+}
+
+/**
+ * 記録して、予算の境目を跨いでいれば通知する（E-14 + E-15 の入口）。
+ *
+ * 記事生成（E-10）はこれを呼ぶ。**合計を先に読むのは、跨いだかを
+ * 判定するため。**
+ */
+export async function recordAiUsageAndNotify(
+  input: RecordAiUsageInput,
+  deps?: {
+    mailer?: Mailer | undefined;
+    env?: Readonly<Record<string, string | undefined>> | undefined;
+    logger?: Logger | undefined;
+    period?: CostPeriod | undefined;
+  },
+): Promise<{ log: AppAiUsageLog; crossings: BudgetCrossing[] }> {
+  const limits = readBudgetLimits(deps?.env ?? process.env);
+  const period = deps?.period;
+
+  const userBefore = await totalCostForUser(input.userId, period);
+  const blogBefore =
+    input.blogId === undefined || input.blogId === null
+      ? null
+      : await rawBlogCost(input.blogId, period);
+
+  const log = await recordAiUsage(input);
+
+  const userAfter = await totalCostForUser(input.userId, period);
+  const crossings = crossedThresholds({
+    scope: 'USER',
+    limitUsd: limits.userMonthlyUsd,
+    costBeforeUsd: userBefore,
+    costAfterUsd: userAfter,
+  });
+
+  if (
+    blogBefore !== null &&
+    input.blogId !== undefined &&
+    input.blogId !== null
+  ) {
+    const blogAfter = await rawBlogCost(input.blogId, period);
+
+    crossings.push(
+      ...crossedThresholds({
+        scope: 'BLOG',
+        limitUsd: limits.blogMonthlyUsd,
+        costBeforeUsd: blogBefore,
+        costAfterUsd: blogAfter,
+      }),
+    );
+  }
+
+  await notifyBudgetCrossings({
+    crossings,
+    ...(deps === undefined ? {} : { deps }),
+  });
+
+  return { log, crossings };
+}
+
+/**
+ * 所有権を確かめずにブログの費用を合計する。
+ *
+ * **記録を書く側からしか呼ばない。** 呼び出し元は既にそのブログのために
+ * AIを動かしており、所有権は上流で確かめられている。外へは公開しない
+ * （`index.ts` に出さない）。
+ */
+async function rawBlogCost(
+  blogId: string,
+  period?: CostPeriod,
+): Promise<number> {
+  const result = await prisma.aiUsageLog.aggregate({
+    where: { blogId, ...periodWhere(period) },
+    _sum: { costUsd: true },
+  });
+
+  return result._sum.costUsd?.toNumber() ?? 0;
 }

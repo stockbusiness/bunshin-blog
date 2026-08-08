@@ -4,6 +4,7 @@ import {
   AI_COST_ERROR_CODES,
   listAiUsageForUser,
   recordAiUsage,
+  recordAiUsageAndNotify,
   summarizeByUserForAdmin,
   summarizeCostForUser,
   totalBlogCostForUser,
@@ -363,5 +364,140 @@ describe('期間の絞り込み', () => {
         to: new Date('2026-08-01T00:00:00Z'),
       }),
     ).toBe(0);
+  });
+});
+
+/**
+ * 予算通知（TASKS E-15、SPEC 12.2）。
+ *
+ * 完了条件は「**超過しても生成が停止しない。ADMINへ通知される**」。
+ * 境目を跨いだかの判定は合計額に依存するので、**実DBで積み上げて確かめる**。
+ */
+describe('予算通知', () => {
+  interface SentMail {
+    to: string;
+    subject: string;
+    text: string;
+  }
+
+  let sent: SentMail[];
+
+  function deps(env: Record<string, string | undefined> = {}) {
+    return {
+      mailer: {
+        send: async (message: SentMail) => {
+          sent.push(message);
+        },
+      },
+      env: {
+        ADMIN_ALERT_EMAIL: 'admin@example.com',
+        AI_BUDGET_USER_MONTHLY_USD: '1',
+        ...env,
+      },
+    };
+  }
+
+  beforeEach(() => {
+    sent = [];
+  });
+
+  it('境目を跨いだら ADMIN へ送る', async () => {
+    // 0 → 0.85（85%）。80%を跨ぐ
+    const { crossings } = await recordAiUsageAndNotify(
+      usage({ costUsd: 0.85 }),
+      deps(),
+    );
+
+    expect(crossings.map((entry) => entry.threshold)).toEqual([0.8]);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.to).toBe('admin@example.com');
+    expect(sent[0]?.subject).toContain('80%');
+  });
+
+  /** 超えている間ずっと鳴らすと、AI呼び出しのたびにメールが飛ぶ */
+  it('跨いでいなければ送らない', async () => {
+    await recordAiUsageAndNotify(usage({ costUsd: 0.85 }), deps());
+    sent = [];
+
+    await recordAiUsageAndNotify(usage({ costUsd: 0.02 }), deps());
+
+    expect(sent).toHaveLength(0);
+  });
+
+  it('一度に複数の境目を跨いだら全て送る', async () => {
+    const { crossings } = await recordAiUsageAndNotify(
+      usage({ costUsd: 1.6 }),
+      deps(),
+    );
+
+    expect(crossings.map((entry) => entry.threshold)).toEqual([0.8, 1.0, 1.5]);
+    expect(sent).toHaveLength(3);
+  });
+
+  it('ブログの予算も見る', async () => {
+    const { crossings } = await recordAiUsageAndNotify(
+      usage({ blogId: blog1, costUsd: 0.5 }),
+      deps({
+        AI_BUDGET_USER_MONTHLY_USD: '10',
+        AI_BUDGET_BLOG_MONTHLY_USD: '0.5',
+      }),
+    );
+
+    expect(crossings.map((entry) => entry.scope)).toContain('BLOG');
+  });
+
+  it('上限が未設定なら送らない', async () => {
+    await recordAiUsageAndNotify(
+      usage({ costUsd: 100 }),
+      deps({ AI_BUDGET_USER_MONTHLY_USD: undefined }),
+    );
+
+    expect(sent).toHaveLength(0);
+  });
+
+  /** **宛先が無いだけで落とさない。** 通知は運用の助けで、記事の生成とは別 */
+  it('宛先が未設定でも記録は残る', async () => {
+    const { log } = await recordAiUsageAndNotify(
+      usage({ costUsd: 0.85 }),
+      deps({ ADMIN_ALERT_EMAIL: undefined }),
+    );
+
+    expect(sent).toHaveLength(0);
+    expect(await prisma.aiUsageLog.count({ where: { id: log.id } })).toBe(1);
+  });
+
+  /** **通知の失敗で生成を止めない。** 記事が出るかどうかとは関係が無い */
+  it('送信に失敗しても記録は残る', async () => {
+    const failing = {
+      mailer: {
+        send: async () => {
+          throw new Error('送信できません');
+        },
+      },
+      env: {
+        ADMIN_ALERT_EMAIL: 'admin@example.com',
+        AI_BUDGET_USER_MONTHLY_USD: '1',
+      },
+    };
+
+    const { log } = await recordAiUsageAndNotify(
+      usage({ costUsd: 0.85 }),
+      failing,
+    );
+
+    expect(await prisma.aiUsageLog.count({ where: { id: log.id } })).toBe(1);
+  });
+
+  /**
+   * **完了条件の半分。** Phase 0 で止めるとデータが欠落する（SPEC 12.2）。
+   * 予算を大きく超えても記録は積み上がり続ける。
+   */
+  it('予算を超えても記録は積み上がる', async () => {
+    for (let index = 0; index < 5; index += 1) {
+      await recordAiUsageAndNotify(usage({ costUsd: 1 }), deps());
+    }
+
+    expect(await totalCostForUser(owner.id)).toBeCloseTo(5);
+    expect(await prisma.aiUsageLog.count()).toBe(5);
   });
 });
