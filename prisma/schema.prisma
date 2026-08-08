@@ -471,6 +471,12 @@ model AffiliateOffer {
   denyConditions String[]       @map("deny_conditions")
   lpFormFields   Int?           @map("lp_form_fields")
   lpMobileReady  Boolean?       @map("lp_mobile_ready")
+  /// LPのページ長（取得したHTMLのバイト数・D-2）。
+  ///
+  /// SPEC 9.2.3 が「ページ長を機械判定する」と定めているが、スコアにも
+  /// 足切りにも使われない。**判定した値を残さないと、後から
+  /// 「なぜこの案件が落ちたのか」を確かめられない。**
+  lpContentLength Int?          @map("lp_content_length")
   lpEvaluatedAt  DateTime?      @map("lp_evaluated_at") @db.Timestamptz(6)
   selectionScore Int?           @map("selection_score")
   scoreBreakdown Json?          @map("score_breakdown")

@@ -193,6 +193,18 @@ ALTER TABLE wordpress_posts
 
 参照先の `content_items(id, blog_id)` と、Prisma が1対1関係の定義側に要求する `wordpress_posts(content_item_id, blog_id)` の unique は、いずれも**制約としては冗長**（`id` と `content_item_id` は単独で一意）。複合外部キーの要件で置いている。
 
+### LP評価の保存先（D-2）
+
+SPEC 9.2.3 は「`landing_page_url` をHTMLで取得し、**input要素数・ページ長・viewport指定の有無**を機械判定する」と定めている。このうち **ページ長だけ保存先が無かった**ため、`affiliate_offers.lp_content_length`（integer・NULL可）を追加した。
+
+| 列 | 判定内容 | 使い道 |
+|---|---|---|
+| `lp_form_fields` | 利用者が入力する項目の数 | スコア「LPの質」20点（SPEC 9.2.3） |
+| `lp_mobile_ready` | viewport 指定の有無 | 足切り「LPがスマートフォン非対応」 |
+| `lp_content_length` | 取得したHTMLのバイト数 | **スコアにも足切りにも使わない。** 判定結果を後から確かめるため |
+
+**`lp_form_fields` は「input要素数」ではなく「利用者が入力する項目の数」を入れる。** `hidden` はCSRFトークンなどで数個〜十数個入ることがあり、そのまま数えると3項目のフォームが「11以上＝0点」になる。スコアの区分がそもそも「フォーム項目」と書かれており、そちらに合わせている。
+
 ---
 
 ## 5. インデックスの根拠
