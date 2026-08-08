@@ -16,7 +16,31 @@ export {
   disconnectWordpressForUser,
   findWordpressConnectionForUser,
   readWordpressCredentialsForUser,
+  testWordpressConnectionForUser,
 } from './repository';
+
+export {
+  runConnectionTest,
+  CONNECTION_CHECK_IDS,
+  TEST_POST_TITLE,
+  type ConnectionCheck,
+  type ConnectionCheckId,
+  type ConnectionCheckStatus,
+  type ConnectionTestResult,
+} from './connection-test';
+
+export {
+  createWordpressClient,
+  readWordpressError,
+  allowsMethod,
+  WORDPRESS_TIMEOUT_MS,
+  WORDPRESS_MAX_BYTES,
+  type WordpressClient,
+  type WordpressClientOptions,
+  type WordpressApiResponse,
+  type WordpressRequest,
+  type WordpressErrorBody,
+} from './client';
 
 export {
   normalizeSiteUrl,
@@ -56,7 +80,9 @@ export {
   siteUrlImmutableError,
   notConnectedError,
   credentialsUnreadableError,
+  WORDPRESS_TEST_ERROR_CODES,
   type WordpressErrorCode,
+  type WordpressTestErrorCode,
 } from './errors';
 
 export type {
