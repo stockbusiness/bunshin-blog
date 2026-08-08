@@ -219,14 +219,14 @@ npm run build
 
 ## 8. 現在の実装状況
 
-**34タスク／75 が完了**（2026-08-08）。**Phase A・B・C は全件。** Phase D は D-1・D-9・D-10とスキーマ。Phase E はジョブ基盤（E-1）だけ。
+**35タスク／75 が完了**（2026-08-08）。**Phase A・B・C は全件。** Phase D は D-1・D-2・D-9・D-10とスキーマ。Phase E はジョブ基盤（E-1）だけ。
 
 | Phase | 完了 | 残り |
 |---|---|---|
 | A | 9/9 | — |
 | B | 11/11 | — |
 | C | 9/9 | — |
-| D | 4/11 | D-2〜D-8 |
+| D | 5/11 | D-3〜D-8 |
 | E | 1/15 | E-2〜E-15 |
 | F〜H | 0/29 | 全て |
 
@@ -239,7 +239,7 @@ npm run build
 | `blogs` | CRUD、3スロット制御、記事構成比、管理者向け集計 |
 | `wordpress` | 接続情報の暗号化保存、接続テスト（7項目）、下書き投稿、WP側の状態の取り込みと編集検出 |
 | `jobs` | キュー・再試行・状態管理（E-1）、冪等性キーと中断の検出（C-4）。**ハンドラは未登録** |
-| `affiliate` | 案件CRUD（ブログ別）、リンクの組み立て（`REDIRECT` / `DIRECT` の切り替えとサブID） |
+| `affiliate` | 案件CRUD（ブログ別）、リンクの組み立て（`REDIRECT` / `DIRECT` の切り替えとサブID）、LP自動評価 |
 
 `personas` `banners` `experiments` `content-planning` `content-generation` `approvals` `analytics` `ai-costs` `audit` `line` は未実装（空ディレクトリ）。
 

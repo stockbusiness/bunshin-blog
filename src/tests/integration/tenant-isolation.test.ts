@@ -654,6 +654,7 @@ describe('入口の網羅', () => {
       'updateOfferForUser',
       'endOfferForUser',
       'readLinkableOfferForUser',
+      'evaluateLandingPageForUser',
     ],
     blogs: [
       'listBlogsForUser',
