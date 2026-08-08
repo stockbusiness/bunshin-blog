@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
+import * as aiCosts from '@/modules/ai-costs';
 import * as affiliate from '@/modules/affiliate';
 import * as banners from '@/modules/banners';
 import * as blogs from '@/modules/blogs';
@@ -417,6 +418,14 @@ describe('他人のブログIDを指定する', () => {
         }),
     ],
     [
+      'ブログのAI費用を見る',
+      (): Promise<unknown> =>
+        aiCosts.totalBlogCostForUser({
+          userId: bob.userId,
+          blogId: alice.blogIds[0],
+        }),
+    ],
+    [
       'リダイレクタのリンクを発行する',
       (): Promise<unknown> =>
         affiliate.ensureRedirectLinkForUser({
@@ -688,6 +697,13 @@ describe('認証情報が越境しない（SPEC 14.2）', () => {
  */
 describe('入口の網羅', () => {
   const covered = {
+    'ai-costs': [
+      'summarizeCostForUser',
+      'totalCostForUser',
+      'totalBlogCostForUser',
+      'totalContentItemCostForUser',
+      'listAiUsageForUser',
+    ],
     affiliate: [
       'listOffersForUser',
       'findOfferForUser',
@@ -746,6 +762,7 @@ describe('入口の網羅', () => {
   } as const;
 
   it.each([
+    ['ai-costs', aiCosts, covered['ai-costs']],
     ['affiliate', affiliate, covered.affiliate],
     ['banners', banners, covered.banners],
     ['blogs', blogs, covered.blogs],
