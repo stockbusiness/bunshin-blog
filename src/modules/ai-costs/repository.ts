@@ -279,7 +279,10 @@ export async function listAiUsageForUser(
 ): Promise<AppAiUsageLog[]> {
   const rows = await prisma.aiUsageLog.findMany({
     where: { userId, ...periodWhere(options.period) },
-    orderBy: [{ createdAt: 'desc' }],
+    // **`created_at` はミリ秒までしか持たない。** 同じミリ秒の記録が並ぶと
+    // 前後が決まらず、`take` の切れ目でどちらが落ちるかが呼ぶたびに変わる。
+    // `id` を最後の決め手にして、少なくとも同じ結果が返るようにする
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     take: options.limit ?? 200,
     select: SELECT,
   });

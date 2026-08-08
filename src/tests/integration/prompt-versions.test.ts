@@ -39,6 +39,19 @@ async function create(
   });
 }
 
+/**
+ * `created_at` を明示的に置く。
+ *
+ * **並び順の確認を「作った速さ」に依存させないため。** `created_at` は
+ * ミリ秒までしか持たないので、続けて作ると同じ値になることがある。
+ */
+async function stampCreatedAt(version: string, iso: string): Promise<void> {
+  await prisma.promptVersion.updateMany({
+    where: { key: 'article.body', version },
+    data: { createdAt: new Date(iso) },
+  });
+}
+
 async function activeVersion(key = 'article.body'): Promise<string | null> {
   return (await findActivePrompt(key))?.version ?? null;
 }
@@ -104,9 +117,40 @@ describe('版の作成', () => {
     await create('v2');
     await create('v3');
 
+    // **作った間隔に頼らない。** `created_at` はミリ秒までしか持たず、
+    // 続けて作ると同じ値になりうる（CIで実際に落ちた）。並び順を
+    // 確かめたいので、確かめる対象の時刻を明示的に離す
+    await stampCreatedAt('v1', '2026-08-01T00:00:00.000Z');
+    await stampCreatedAt('v2', '2026-08-02T00:00:00.000Z');
+    await stampCreatedAt('v3', '2026-08-03T00:00:00.000Z');
+
     const list = await listPromptVersionsForAdmin('article.body');
 
     expect(list.map((prompt) => prompt.version)).toEqual(['v3', 'v2', 'v1']);
+  });
+
+  /**
+   * **同じミリ秒に作られた版の前後は決められない。** それでも一覧が
+   * 呼ぶたびに入れ替わってはいけない（`/admin/prompts` を開き直すたびに
+   * 並びが変わる）。`id` を最後の決め手にしてある。
+   */
+  it('時刻が同じ版でも並びは毎回同じ', async () => {
+    await create('v1');
+    await create('v2');
+    await create('v3');
+
+    await prisma.promptVersion.updateMany({
+      where: { key: 'article.body' },
+      data: { createdAt: new Date('2026-08-01T00:00:00.000Z') },
+    });
+
+    const first = await listPromptVersionsForAdmin('article.body');
+    const second = await listPromptVersionsForAdmin('article.body');
+
+    expect(first).toHaveLength(3);
+    expect(second.map((prompt) => prompt.version)).toEqual(
+      first.map((prompt) => prompt.version),
+    );
   });
 });
 
