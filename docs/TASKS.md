@@ -174,7 +174,8 @@ B-1 が実装したのは**サーバー側のIDトークン検証**であり、�
 | C-4 | 冪等性（idempotency_key） | C-3 | 同一ジョブ再実行で二重投稿されない | `src/modules/jobs/` |
 | C-5-schema | `wordpress_posts.user_edited_at` の追加 | C-4 | マイグレーションのみ。DATA_MODEL 11章 | `prisma/` |
 | C-5 | 投稿更新とWP同期 | C-5-schema | content hash が同一なら更新しない。公開状態を取り込む。未編集判定の実装（DATA_MODEL 11章） | `src/modules/wordpress/` |
-| C-6 | テナント越境の統合テスト | C-5 | 2ユーザー×2ブログで越境投稿が発生しない | `src/tests/integration/` |
+| C-6-schema | `wordpress_posts` と `content_items` のブログ一致を複合外部キーで強制 | C-5 | マイグレーションのみ。DATA_MODEL 4章 | `prisma/` |
+| C-6 | テナント越境の統合テスト | C-6-schema | 2ユーザー×2ブログで越境投稿が発生しない | `src/tests/integration/` |
 | C-7 | 外向きHTTPの共通クライアント（SSRF対策） | A-4 | private・loopback・link-local へ到達しない。リダイレクト先を再検証する。タイムアウト・最大サイズ・Content-Type を強制する（SPEC 14.3） | `src/lib/http/` |
 
 ### WordPress接続先は後から変えられない（Q-007）
@@ -361,13 +362,13 @@ B-1 が実装したのは**サーバー側のIDトークン検証**であり、�
 ID / 状態（未着手・実装中・レビュー中・完了）/ PR番号 / 完了日 / 残課題
 ```
 
-**タスク総数：73**
+**タスク総数：74**
 
 | Phase | 件数 |
 |---|---|
 | A | 9 |
 | B | 11 |
-| C | 8 |
+| C | 9 |
 | D | 10 |
 | E | 15 |
 | F | 7 |
