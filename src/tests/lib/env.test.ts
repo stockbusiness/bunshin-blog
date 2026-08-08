@@ -9,6 +9,8 @@ import {
 const VALID_DATABASE_URL = 'postgresql://user:s3cr3t-pw@localhost:5432/bunshin';
 const VALID_CHANNEL_ID = '1234567890';
 const VALID_SESSION_SECRET = 'x'.repeat(48);
+/** base64 の32バイト。AES-256-GCM の鍵（C-1） */
+const VALID_ENCRYPTION_KEY = Buffer.alloc(32, 9).toString('base64');
 
 /** 必須の環境変数が全て揃った状態 */
 function validEnv(overrides: Record<string, string | undefined> = {}) {
@@ -16,6 +18,7 @@ function validEnv(overrides: Record<string, string | undefined> = {}) {
     DATABASE_URL: VALID_DATABASE_URL,
     LINE_LOGIN_CHANNEL_ID: VALID_CHANNEL_ID,
     SESSION_SECRET: VALID_SESSION_SECRET,
+    ENCRYPTION_KEY: VALID_ENCRYPTION_KEY,
     ...overrides,
   };
 }
@@ -59,6 +62,7 @@ describe('parseServerEnv', () => {
     expect(env.DATABASE_URL).toBe(VALID_DATABASE_URL);
     expect(env.LINE_LOGIN_CHANNEL_ID).toBe(VALID_CHANNEL_ID);
     expect(env.SESSION_SECRET).toBe(VALID_SESSION_SECRET);
+    expect(env.ENCRYPTION_KEY).toBe(VALID_ENCRYPTION_KEY);
   });
 
   it('NODE_ENV が未設定なら development を既定値にする', () => {
@@ -78,6 +82,7 @@ describe('parseServerEnv', () => {
       const envError = error as EnvValidationError;
       expect(envError.missing).toEqual([
         'DATABASE_URL',
+        'ENCRYPTION_KEY',
         'LINE_LOGIN_CHANNEL_ID',
         'SESSION_SECRET',
       ]);
@@ -122,6 +127,31 @@ describe('parseServerEnv', () => {
     }
   });
 
+  // C-1。鍵を取り違えると保存済みの認証情報を復号できなくなる
+  it.each([
+    ['短い', Buffer.alloc(16).toString('base64')],
+    ['長い', Buffer.alloc(64).toString('base64')],
+    ['base64 でない', '*'.repeat(44)],
+  ])('不正な ENCRYPTION_KEY を拒否する（%s）', (_label, value) => {
+    try {
+      parseServerEnv(validEnv({ ENCRYPTION_KEY: value }));
+      expect.unreachable('例外が投げられていない');
+    } catch (error) {
+      expect((error as EnvValidationError).invalid).toEqual(['ENCRYPTION_KEY']);
+    }
+  });
+
+  it('ENCRYPTION_KEY が不正でも値をメッセージへ出さない', () => {
+    const value = Buffer.alloc(16, 3).toString('base64');
+
+    try {
+      parseServerEnv(validEnv({ ENCRYPTION_KEY: value }));
+      expect.unreachable('例外が投げられていない');
+    } catch (error) {
+      expect((error as EnvValidationError).message).not.toContain(value);
+    }
+  });
+
   it('数字以外のチャネルIDを拒否する', () => {
     try {
       parseServerEnv(validEnv({ LINE_LOGIN_CHANNEL_ID: 'not-a-number' }));
@@ -141,6 +171,7 @@ describe('parseServerEnv', () => {
       const envError = error as EnvValidationError;
       expect(envError.missing).toEqual([
         'DATABASE_URL',
+        'ENCRYPTION_KEY',
         'LINE_LOGIN_CHANNEL_ID',
         'SESSION_SECRET',
       ]);

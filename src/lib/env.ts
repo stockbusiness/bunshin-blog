@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isValidEncryptionKey } from '@/lib/crypto/key-format';
 
 /**
  * サーバー側の環境変数を検証する。
@@ -47,6 +48,18 @@ const serverEnvSchema = z.object({
   SESSION_SECRET: z
     .string()
     .min(32, { message: '32文字以上である必要があります' }),
+
+  /**
+   * 保存データの暗号化キー（C-1、SPEC 5.4・14.2）。
+   *
+   * AES-256-GCM の鍵。base64 の32バイト。生成例: `openssl rand -base64 32`
+   *
+   * WordPress の認証情報と Google の refresh token を暗号化する
+   * （DATA_MODEL 7章）。**鍵を変えると保存済みの値を復号できなくなる。**
+   */
+  ENCRYPTION_KEY: z.string().refine(isValidEncryptionKey, {
+    message: 'base64 で32バイト（openssl rand -base64 32）である必要があります',
+  }),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
