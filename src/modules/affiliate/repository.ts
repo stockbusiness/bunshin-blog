@@ -10,6 +10,9 @@
 
 import { prisma } from '@/lib/db';
 import { notFoundError, requireBlogForUser } from '@/modules/blogs';
+import { appendSubId, buildSubId } from './link';
+import { invalidOfferError } from './errors';
+import { generateRedirectCode, isRedirectCode } from './redirect-link';
 import type {
   AppAffiliateOffer,
   ConversionType,
@@ -343,4 +346,124 @@ export async function evaluateLandingPageForUser(
   });
 
   return { offer: toAppOffer(row), evaluation };
+}
+
+/**
+ * `affiliate_links` テーブルへのアクセス（TASKS D-8、Q-001）。
+ *
+ * **このモジュールだけが `affiliate_links` を触る**（MODULE_RULES 1）。
+ */
+
+const REDIRECT_LINK_SELECT = {
+  id: true,
+  code: true,
+  affiliateOfferId: true,
+  contentItemId: true,
+  destinationUrl: true,
+  createdAt: true,
+} as const;
+
+export interface AppAffiliateLink {
+  id: string;
+  code: string;
+  affiliateOfferId: string;
+  contentItemId: string | null;
+  destinationUrl: string;
+  createdAt: Date;
+}
+
+/**
+ * 記事に埋めるリンクを用意する（`REDIRECT` の案件のみ）。
+ *
+ * **同じ案件×記事の組では作り直さない。** 記事を再生成するたびに新しい
+ * コードを発行すると、**公開済み記事に埋まった古いコードが宙に浮く**
+ * （消せば404、残せばクリック数が分散する）。
+ *
+ * **`DIRECT` の案件では発行しない。** 直リンクのまま出すので、行を作る
+ * 意味が無い（Q-001）。
+ *
+ * **`content_item_id` が同じブログのものかは確かめていない。**
+ * `content_items` は `content-planning` の所有で、そのモジュールは
+ * まだ無い（MODULE_RULES 1 により直接読めない）。C-6 のときと同じ状況だが、
+ * **`affiliate_links` に `blog_id` が無いため複合外部キーでも表せない**。
+ * 影響は成果の紐付けが別ブログの記事IDになることまでで、他人を止めたり
+ * 情報を漏らしたりはしない。`content-planning`（E-2）ができた時点で塞ぐ。
+ *
+ * @throws {AppError} 他ブログの案件（404）・`DIRECT` の案件
+ */
+export async function ensureRedirectLinkForUser(params: {
+  userId: string;
+  blogId: string;
+  offerId: string;
+  contentItemId: string;
+  slotNumber: number;
+}): Promise<AppAffiliateLink> {
+  const offer = await readLinkableOfferForUser(params);
+
+  if (offer.linkMode !== 'REDIRECT') {
+    throw invalidOfferError(
+      'この案件は直リンクで掲載する設定です（リダイレクタを使いません）',
+    );
+  }
+
+  const existing = await prisma.affiliateLink.findFirst({
+    where: {
+      affiliateOfferId: offer.id,
+      contentItemId: params.contentItemId,
+    },
+    select: REDIRECT_LINK_SELECT,
+  });
+
+  if (existing !== null) {
+    return existing;
+  }
+
+  // **飛び先だけを作る。** `buildAffiliateLink` は `href`（`/go/<code>`）も
+  // 作るため `APP_BASE_URL` が要るが、保存するのは飛び先だけで、
+  // `href` は記事生成が発行済みのコードから組み立てる
+  const { url: destinationUrl } = appendSubId(
+    offer.affiliateUrl,
+    offer.subIdParam,
+    buildSubId({
+      slotNumber: params.slotNumber,
+      contentItemId: params.contentItemId,
+    }),
+  );
+
+  return prisma.affiliateLink.create({
+    data: {
+      code: generateRedirectCode(),
+      affiliateOfferId: offer.id,
+      contentItemId: params.contentItemId,
+      destinationUrl,
+    },
+    select: REDIRECT_LINK_SELECT,
+  });
+}
+
+/**
+ * コードから飛び先を引く（`/go/<code>` が使う）。
+ *
+ * **認証が無い入口。** 読者はログインしていない。**`userId` を取らない**
+ * 代わりに、返すのは飛び先とリンクIDだけで、案件や記事の内容は返さない。
+ *
+ * @returns 見つからなければ `null`
+ */
+export async function findRedirectTargetByCode(code: string): Promise<{
+  linkId: string;
+  destinationUrl: string;
+} | null> {
+  // DBを引く前に形で弾く（総当たりの負荷を落とす）
+  if (!isRedirectCode(code)) {
+    return null;
+  }
+
+  const row = await prisma.affiliateLink.findUnique({
+    where: { code },
+    select: { id: true, destinationUrl: true },
+  });
+
+  return row === null
+    ? null
+    : { linkId: row.id, destinationUrl: row.destinationUrl };
 }

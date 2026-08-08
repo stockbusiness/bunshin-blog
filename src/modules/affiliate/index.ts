@@ -21,7 +21,16 @@ export {
   endOfferForUser,
   readLinkableOfferForUser,
   evaluateLandingPageForUser,
+  ensureRedirectLinkForUser,
+  findRedirectTargetByCode,
+  type AppAffiliateLink,
 } from './repository';
+
+export {
+  generateRedirectCode,
+  isRedirectCode,
+  REDIRECT_CODE_LENGTH,
+} from './redirect-link';
 
 export {
   evaluateLandingPage,
