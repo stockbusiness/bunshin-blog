@@ -209,7 +209,8 @@ B-1 が実装したのは**サーバー側のIDトークン検証**であり、�
 | ID | タスク | 依存 | 完了条件 | 主な変更先 |
 |---|---|---|---|---|
 | D-1 | 案件CRUD | B-4, D-9, D-10 | ブログ別に分離。他ブログの案件が見えない。リンクの組み立てが1関数に集約され、`REDIRECT` / `DIRECT` を切り替えられる。全案件にサブIDが付く（OPEN_QUESTIONS Q-001） | `src/modules/affiliate/` |
-| D-2 | LP自動評価 | D-1, A-4 | SSRF対策を満たし、フォーム項目数・ページ長・viewportを判定 | `src/modules/affiliate/` |
+| D-2-schema | `affiliate_offers.lp_content_length` の追加 | D-1 | マイグレーションのみ。SPEC 9.2.3 の「ページ長」の保存先 | `prisma/` |
+| D-2 | LP自動評価 | D-2-schema, C-7 | SSRF対策を満たし、フォーム項目数・ページ長・viewportを判定 | `src/modules/affiliate/` |
 | D-3 | バナーCRUD | B-4 | 表示位置・対象カテゴリ・有効期間が保存される | `src/modules/banners/` |
 | D-4 | `user_personas` | B-2 | ユーザー共通人格を編集できる | `src/modules/personas/` |
 | D-5 | `blog_persona_settings` | D-4, B-4 | ブログ別の上書き設定が保存される | `src/modules/personas/` |
@@ -362,14 +363,14 @@ B-1 が実装したのは**サーバー側のIDトークン検証**であり、�
 ID / 状態（未着手・実装中・レビュー中・完了）/ PR番号 / 完了日 / 残課題
 ```
 
-**タスク総数：74**
+**タスク総数：75**
 
 | Phase | 件数 |
 |---|---|
 | A | 9 |
 | B | 11 |
 | C | 9 |
-| D | 10 |
+| D | 11 |
 | E | 15 |
 | F | 7 |
 | G | 7 |
