@@ -16,7 +16,26 @@ export {
   saveBlogPersonaSettingForUser,
   updateBlogPersonaSettingForUser,
   resolveEffectivePersonaForUser,
+  listPersonaFactsForUser,
+  findPersonaFactForUser,
+  requirePersonaFactForUser,
+  createPersonaFactForUser,
+  updatePersonaFactForUser,
+  deletePersonaFactForUser,
+  setAllowedExperiencesForUser,
 } from './repository';
+
+export {
+  canUseFirstPerson,
+  isFirstPersonBlocked,
+  normalizeCreatePersonaFact,
+  normalizeUpdatePersonaFact,
+  isFactType,
+  isFactSource,
+  isFactVerification,
+  FACT_CONTENT_MAX_LENGTH,
+  type NormalizedPersonaFact,
+} from './facts';
 
 export {
   resolveEffectivePersona,
@@ -62,6 +81,15 @@ export {
   LINE_BREAK_STYLES,
   KNOWLEDGE_LEVELS,
   BULLET_FREQUENCIES,
+  FACT_TYPES,
+  FACT_SOURCES,
+  FACT_VERIFICATIONS,
+  type AppPersonaFact,
+  type FactType,
+  type FactSource,
+  type FactVerification,
+  type CreatePersonaFactInput,
+  type UpdatePersonaFactInput,
   type AppBlogPersonaSetting,
   type EffectivePersona,
   type TargetReader,

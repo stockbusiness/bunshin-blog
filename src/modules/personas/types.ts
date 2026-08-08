@@ -171,3 +171,74 @@ export interface EffectivePersona {
   writingRules: WritingRules | null;
   ngTopics: string[];
 }
+
+/** 事実の種類（SPEC 5.7） */
+export type FactType =
+  'EXPERIENCE' | 'OPINION' | 'PROFILE' | 'FAILURE' | 'PRODUCT_REVIEW';
+
+/** 事実の出どころ */
+export type FactSource =
+  'USER_INPUT' | 'ADMIN_INTERVIEW' | 'EXISTING_CONTENT' | 'AI_INFERENCE';
+
+/** 裏取りの状態 */
+export type FactVerification = 'VERIFIED' | 'UNVERIFIED' | 'REJECTED';
+
+export const FACT_TYPES: readonly FactType[] = [
+  'EXPERIENCE',
+  'OPINION',
+  'PROFILE',
+  'FAILURE',
+  'PRODUCT_REVIEW',
+];
+
+export const FACT_SOURCES: readonly FactSource[] = [
+  'USER_INPUT',
+  'ADMIN_INTERVIEW',
+  'EXISTING_CONTENT',
+  'AI_INFERENCE',
+];
+
+export const FACT_VERIFICATIONS: readonly FactVerification[] = [
+  'VERIFIED',
+  'UNVERIFIED',
+  'REJECTED',
+];
+
+/** 本人の経験や意見（`persona_facts`・SPEC 5.7） */
+export interface AppPersonaFact {
+  id: string;
+  userId: string;
+  /** ブログ固有の事実なら設定。`null` は全ブログ共通 */
+  blogId: string | null;
+  factType: FactType;
+  content: string;
+  source: FactSource;
+  verification: FactVerification;
+  /**
+   * 一人称体験として記事に使ってよいか。
+   *
+   * **`AI_INFERENCE` かつ `UNVERIFIED` では必ず `false`**（SPEC 5.7）。
+   * 書き込みのたびに `canUseFirstPerson` を通すので、この組み合わせで
+   * `true` になることはない。
+   */
+  usableFirstPerson: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CreatePersonaFactInput {
+  factType: FactType;
+  content: string;
+  source: FactSource;
+  blogId?: string | undefined;
+  verification?: FactVerification | undefined;
+  usableFirstPerson?: boolean | undefined;
+}
+
+export interface UpdatePersonaFactInput {
+  factType?: FactType | undefined;
+  content?: string | undefined;
+  source?: FactSource | undefined;
+  verification?: FactVerification | undefined;
+  usableFirstPerson?: boolean | undefined;
+}

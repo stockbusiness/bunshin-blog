@@ -704,6 +704,13 @@ describe('入口の網羅', () => {
       'saveBlogPersonaSettingForUser',
       'updateBlogPersonaSettingForUser',
       'resolveEffectivePersonaForUser',
+      'listPersonaFactsForUser',
+      'findPersonaFactForUser',
+      'requirePersonaFactForUser',
+      'createPersonaFactForUser',
+      'updatePersonaFactForUser',
+      'deletePersonaFactForUser',
+      'setAllowedExperiencesForUser',
     ],
     blogs: [
       'listBlogsForUser',

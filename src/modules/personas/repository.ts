@@ -19,8 +19,18 @@ import {
   resolveEffectivePersona,
 } from './blog-settings';
 import { personaNotFoundError } from './errors';
+import {
+  normalizeCreatePersonaFact,
+  normalizeUpdatePersonaFact,
+} from './facts';
 import type {
   AppBlogPersonaSetting,
+  AppPersonaFact,
+  CreatePersonaFactInput,
+  FactSource,
+  FactType,
+  FactVerification,
+  UpdatePersonaFactInput,
   AppUserPersona,
   BaseProfile,
   CreateUserPersonaInput,
@@ -350,4 +360,241 @@ export async function resolveEffectivePersonaForUser(params: {
   const setting = await findBlogPersonaSettingForUser(params);
 
   return resolveEffectivePersona(persona, setting);
+}
+
+/**
+ * `persona_facts` テーブルへのアクセス（TASKS D-6、SPEC 5.7）。
+ *
+ * **`user_id` で絞る。** 事実は人に紐づく（ブログではない）。ブログ固有の
+ * 事実は `blog_id` を持つが、所有者は常に `user_id`。
+ */
+
+interface FactRow {
+  id: string;
+  userId: string;
+  blogId: string | null;
+  factType: string;
+  content: string;
+  source: string;
+  verification: string;
+  usableFirstPerson: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const FACT_SELECT = {
+  id: true,
+  userId: true,
+  blogId: true,
+  factType: true,
+  content: true,
+  source: true,
+  verification: true,
+  usableFirstPerson: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
+function toAppFact(row: FactRow): AppPersonaFact {
+  return {
+    id: row.id,
+    userId: row.userId,
+    blogId: row.blogId,
+    factType: row.factType as FactType,
+    content: row.content,
+    source: row.source as FactSource,
+    verification: row.verification as FactVerification,
+    usableFirstPerson: row.usableFirstPerson,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+/**
+ * 事実を一覧する。
+ *
+ * `blogId` を渡すと、**そのブログ固有の事実と全ブログ共通の事実**を返す。
+ * 記事生成（E-8）が使う形。
+ */
+export async function listPersonaFactsForUser(
+  userId: string,
+  options: {
+    blogId?: string | undefined;
+    usableFirstPersonOnly?: boolean | undefined;
+  } = {},
+): Promise<AppPersonaFact[]> {
+  const rows = await prisma.personaFact.findMany({
+    where: {
+      userId,
+      ...(options.blogId === undefined
+        ? {}
+        : { OR: [{ blogId: options.blogId }, { blogId: null }] }),
+      ...(options.usableFirstPersonOnly === true
+        ? { usableFirstPerson: true }
+        : {}),
+    },
+    orderBy: [{ createdAt: 'asc' }],
+    select: FACT_SELECT,
+  });
+
+  return rows.map(toAppFact);
+}
+
+/** 事実を1件引く。他人のものは `null` */
+export async function findPersonaFactForUser(params: {
+  userId: string;
+  factId: string;
+}): Promise<AppPersonaFact | null> {
+  const row = await prisma.personaFact.findFirst({
+    where: { id: params.factId, userId: params.userId },
+    select: FACT_SELECT,
+  });
+
+  return row === null ? null : toAppFact(row);
+}
+
+/** 事実を1件引く。無ければ404（他人のものも404） */
+export async function requirePersonaFactForUser(params: {
+  userId: string;
+  factId: string;
+}): Promise<AppPersonaFact> {
+  const fact = await findPersonaFactForUser(params);
+
+  if (fact === null) {
+    throw notFoundError('事実');
+  }
+
+  return fact;
+}
+
+/**
+ * 事実を登録する。
+ *
+ * **`blogId` を渡す場合は所有権を確かめる。** 他人のブログに紐づく事実を
+ * 作られると、そのブログの記事生成へ混ざる。
+ */
+export async function createPersonaFactForUser(
+  userId: string,
+  input: CreatePersonaFactInput,
+): Promise<AppPersonaFact> {
+  const data = normalizeCreatePersonaFact(input);
+
+  const blogId =
+    input.blogId === undefined
+      ? null
+      : await requireOpenBlogId({ userId, blogId: input.blogId });
+
+  const row = await prisma.personaFact.create({
+    data: { userId, blogId, ...data },
+    select: FACT_SELECT,
+  });
+
+  return toAppFact(row);
+}
+
+/**
+ * 事実を編集する（完了条件の中心）。
+ *
+ * **`source` と `verification` を現在の値と重ねてから判定する。**
+ * 片方だけ更新したときに、禁じられる組み合わせを見落とさないため。
+ */
+export async function updatePersonaFactForUser(
+  params: { userId: string; factId: string },
+  input: UpdatePersonaFactInput,
+): Promise<AppPersonaFact> {
+  const current = await requirePersonaFactForUser(params);
+  const data = normalizeUpdatePersonaFact(input, current);
+
+  if (Object.keys(data).length === 0) {
+    return current;
+  }
+
+  const result = await prisma.personaFact.updateMany({
+    where: { id: params.factId, userId: params.userId },
+    data,
+  });
+
+  if (result.count === 0) {
+    throw notFoundError('事実');
+  }
+
+  return requirePersonaFactForUser(params);
+}
+
+/**
+ * 事実を消す。
+ *
+ * **物理削除する。** 本人の経験の記録で、間違って入れたものを残す理由が
+ * 無い（投稿や案件と違い、外部に痕跡が残らない）。**参照している
+ * `allowed_experiences` からも外す。**
+ */
+export async function deletePersonaFactForUser(params: {
+  userId: string;
+  factId: string;
+}): Promise<void> {
+  await requirePersonaFactForUser(params);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.personaFact.deleteMany({
+      where: { id: params.factId, userId: params.userId },
+    });
+
+    // 消した事実へのIDが残ると、記事生成が引けない参照を掴む
+    const settings = await tx.blogPersonaSetting.findMany({
+      where: { allowedExperiences: { has: params.factId } },
+      select: { id: true, allowedExperiences: true },
+    });
+
+    for (const setting of settings) {
+      await tx.blogPersonaSetting.update({
+        where: { id: setting.id },
+        data: {
+          allowedExperiences: setting.allowedExperiences.filter(
+            (value) => value !== params.factId,
+          ),
+        },
+      });
+    }
+  });
+}
+
+/**
+ * ブログ別設定の「使ってよい体験」を設定する（D-5 で保留した入口）。
+ *
+ * **渡されたIDが自分の事実か確かめる。** 確かめずに保存すると、他人の
+ * 体験を引き当てられる（C-6 で見つけたのと同じ形）。D-5 の時点では
+ * `persona_facts` が無かったため入口を出さなかった。
+ *
+ * @throws {AppError} 他人のブログ・自分のものでない事実（404）
+ */
+export async function setAllowedExperiencesForUser(
+  params: { userId: string; blogId: string },
+  factIds: readonly string[],
+): Promise<AppBlogPersonaSetting> {
+  const setting = await findBlogPersonaSettingForUser(params);
+
+  if (setting === null) {
+    throw personaNotFoundError();
+  }
+
+  const unique = [...new Set(factIds)];
+
+  if (unique.length > 0) {
+    const owned = await prisma.personaFact.findMany({
+      where: { id: { in: unique }, userId: params.userId },
+      select: { id: true },
+    });
+
+    if (owned.length !== unique.length) {
+      throw notFoundError('事実');
+    }
+  }
+
+  const row = await prisma.blogPersonaSetting.update({
+    where: { blogId: setting.blogId },
+    data: { allowedExperiences: unique },
+    select: BLOG_SETTING_SELECT,
+  });
+
+  return toAppBlogSetting(row);
 }
