@@ -13,6 +13,7 @@ import {
   type PublishDraftResult,
 } from './draft';
 import { notConnectedError } from './errors';
+import { syncPost } from './sync';
 import {
   connectWordpress,
   disconnectWordpress,
@@ -44,6 +45,7 @@ interface WordpressPostRow {
   postedAt: Date;
   publishedAt: Date | null;
   lastSyncedAt: Date | null;
+  userEditedAt: Date | null;
 }
 
 function toAppPost(row: WordpressPostRow): AppWordpressPost {
@@ -59,6 +61,7 @@ function toAppPost(row: WordpressPostRow): AppWordpressPost {
     postedAt: row.postedAt,
     publishedAt: row.publishedAt,
     lastSyncedAt: row.lastSyncedAt,
+    userEditedAt: row.userEditedAt,
   };
 }
 
@@ -258,6 +261,7 @@ const POST_SELECT = {
   postedAt: true,
   publishedAt: true,
   lastSyncedAt: true,
+  userEditedAt: true,
 } as const;
 
 /**
@@ -269,12 +273,17 @@ const POST_SELECT = {
  * **接続テスト（C-2）を通っていない接続では投稿しない。** 権限を
  * 確かめずに投稿すると、権限不足のエラーが記事生成のたびに出る。
  *
- * 冪等性キーによる二重実行の防止は C-4、content hash が同一なら
- * 更新しない判定は C-5。ここでは**同一 `content_item_id` に対して
- * 投稿が1件だけになる**ことまでを保証する。
+ * **content hash が同一なら WordPress を呼ばない**（C-5）。この場合は
+ * 記録も変えない。冪等性キーによる二重実行の防止は C-4。
  */
 export async function publishDraftForUser(
-  params: { userId: string; blogId: string; contentItemId: string },
+  params: {
+    userId: string;
+    blogId: string;
+    contentItemId: string;
+    /** 利用者の編集を上書きしてよいか（F-6 の承認を経た場合のみ、C-5） */
+    approvedOverwrite?: boolean;
+  },
   input: PublishDraftInput,
   clientFactory?: (arg: {
     apiBaseUrl: string;
@@ -304,6 +313,8 @@ export async function publishDraftForUser(
       : {
           wpPostId: existingRow.wpPostId,
           wpStatus: existingRow.wpStatus as ExistingPost['wpStatus'],
+          lastContentHash: existingRow.lastContentHash,
+          userEditedAt: existingRow.userEditedAt,
         };
 
   const credentials = await readWordpressCredentials({ blogId }, deps);
@@ -319,7 +330,16 @@ export async function publishDraftForUser(
     existing,
     canCreatePosts: connection.canCreatePosts,
     canEditPosts: connection.canEditPosts,
+    ...(params.approvedOverwrite === undefined
+      ? {}
+      : { approvedOverwrite: params.approvedOverwrite }),
   });
+
+  // **内容が同じなら記録も変えない**（C-5）。`posted_at` を進めると、
+  // 何もしていないのに投稿し直したように見える
+  if (result.skipped) {
+    return toAppPost(existingRow as NonNullable<typeof existingRow>);
+  }
 
   const now = new Date();
   const saved = result.created
@@ -343,9 +363,85 @@ export async function publishDraftForUser(
           wpStatus: result.wpStatus,
           lastContentHash: result.contentHash,
           postedAt: now,
+          // **上書きし終えたら編集の印を消す**（C-5）。ここまで来るのは
+          // 承認を経た場合だけで、こちらの本文が新しい正本になる
+          userEditedAt: null,
         },
         select: POST_SELECT,
       });
+
+  return toAppPost(saved);
+}
+
+/**
+ * WordPress 側の状態を取り込む（C-5、DATA_MODEL 11章）。
+ *
+ * - **公開状態を取り込む。** Phase 0 の公開はモニターが WordPress 上で
+ *   行うため、取り込まないと公開に気づけない
+ * - **利用者の編集を検出する。** `last_content_hash` と一致しなければ
+ *   `user_edited_at` に検出時刻を残す
+ *
+ * **`last_content_hash` を書き換えない。** 書き換えると、次の同期で
+ * 「未編集」に戻り、利用者の編集を見失う。ハッシュが指すのは常に
+ * **前回こちらが書き込んだ本文**である。
+ *
+ * @throws {AppError} 他人のブログ（404）・未接続・到達不可・記事が消えている
+ */
+export async function syncWordpressPostForUser(
+  params: { userId: string; blogId: string; contentItemId: string },
+  clientFactory?: (arg: {
+    apiBaseUrl: string;
+    credentials: WordpressCredentials;
+  }) => WordpressClient,
+): Promise<AppWordpressPost> {
+  const blogId = await requireOpenBlogId(params);
+
+  const connection = await db.findByBlogId(blogId);
+  if (connection === null || connection.connectionStatus !== 'CONNECTED') {
+    throw notConnectedError();
+  }
+
+  const row = await prisma.wordpressPost.findUnique({
+    where: { contentItemId: params.contentItemId },
+    select: POST_SELECT,
+  });
+
+  if (row === null || row.blogId !== blogId) {
+    throw notFoundError('記事');
+  }
+
+  const credentials = await readWordpressCredentials({ blogId }, deps);
+
+  const client = (clientFactory ?? createWordpressClient)({
+    apiBaseUrl: connection.apiBaseUrl,
+    credentials,
+  });
+
+  const result = await syncPost({
+    client,
+    wpPostId: row.wpPostId,
+    lastContentHash: row.lastContentHash,
+  });
+
+  const now = new Date();
+  const saved = await prisma.wordpressPost.update({
+    where: { contentItemId: params.contentItemId },
+    data: {
+      wpStatus: result.wpStatus,
+      ...(result.wpPostUrl === null ? {} : { wpPostUrl: result.wpPostUrl }),
+      // 公開日時は WordPress 側が持つ。**一度入った値を消さない**
+      ...(result.publishedAt === null
+        ? {}
+        : { publishedAt: result.publishedAt }),
+      lastSyncedAt: now,
+      // **初めて検出した時刻を残す。** 毎回の同期で進めると、
+      // 「いつから WordPress 側が正なのか」が分からなくなる
+      ...(result.userEdited && row.userEditedAt === null
+        ? { userEditedAt: now }
+        : {}),
+    },
+    select: POST_SELECT,
+  });
 
   return toAppPost(saved);
 }

@@ -4,13 +4,15 @@
  * **`status: draft` 以外で投稿しない**（完了条件）。Phase 0 の公開は
  * モニターが WordPress 上で行う（SPEC 7.4）。こちらから公開しない。
  *
- * SPEC 7.3 の必須制御のうち、本タスクで扱うのは次の2つ。
+ * SPEC 7.3 の必須制御のうち、ここで扱うのは次の4つ。
  *
  * - `blog_id` を経由して接続情報を取得する（リクエストに接続情報を渡させない）
  * - **`wp_post_id` が存在する場合は新規投稿しない。** 再実行は既存の下書きを更新する
+ * - **content hash が同一なら更新しない**（C-5）
+ * - **利用者が編集した記事を承認なしに上書きしない**（C-5、DATA_MODEL 11章）
  *
- * 冪等性キー（`content_item_id` ごと）は C-4、content hash による
- * 更新の抑止と WordPress 側の編集検出は C-5。
+ * 冪等性キー（`content_item_id` ごと）は C-4。WordPress 側の状態の
+ * 取り込みは `sync.ts`。
  *
  * DBを触らない。保存は `repository.ts` の担当。
  */
@@ -22,6 +24,7 @@ import {
   WORDPRESS_POST_ERROR_CODES,
   postFailedError,
   publishedPostNotEditableError,
+  userEditedNotOverwritableError,
   notConnectedError,
 } from './errors';
 import type { WordpressPostStatus } from './types';
@@ -44,12 +47,23 @@ export interface PublishDraftResult {
   contentHash: string;
   /** 新規作成なら `true`、既存の更新なら `false` */
   created: boolean;
+  /**
+   * 内容が同じだったため WordPress を呼ばずに済ませたか（C-5）。
+   *
+   * `true` のとき `wpPostUrl` などは既存の値のままで、
+   * WordPress からの応答ではない。
+   */
+  skipped: boolean;
 }
 
 /** すでに投稿済みの記事の情報。無ければ `null` */
 export interface ExistingPost {
   wpPostId: number;
   wpStatus: WordpressPostStatus;
+  /** 前回こちらが書き込んだ本文のハッシュ（C-5） */
+  lastContentHash: string;
+  /** 利用者の編集を検出した時刻。`null` なら未検出（C-5、DATA_MODEL 11章） */
+  userEditedAt: Date | null;
 }
 
 /**
@@ -177,13 +191,16 @@ function toPostError(error: unknown, fallback: string): never {
  * 下書きを投稿する。
  *
  * - **既に投稿済みなら新規作成しない。** 既存の投稿を更新する（SPEC 7.3）
+ * - **content hash が同一なら更新しない**（C-5、SPEC 7.3）。WordPress を
+ *   呼ばずに終える
  * - **更新では `status` を送らない。** Phase 0 の公開はモニターが
  *   WordPress 上で行う（SPEC 7.4）。`draft` を送ると公開済みの記事を
  *   下書きへ戻してしまう
  * - **下書き以外の投稿は更新しない。** 公開済み記事の更新は承認を必須と
- *   定めている（DATA_MODEL 11章）。承認を経る経路は C-5・F-6 で作る
+ *   定めている（DATA_MODEL 11章）。承認を経る経路は F-6 で作る
+ * - **利用者が編集した記事は承認なしに上書きしない**（C-5、DATA_MODEL 11章）
  *
- * @throws {AppError} 入力不正・権限不足・到達不可・公開済みの更新
+ * @throws {AppError} 入力不正・権限不足・到達不可・公開済みの更新・利用者の編集
  */
 export async function publishDraft(params: {
   client: WordpressClient;
@@ -192,6 +209,13 @@ export async function publishDraft(params: {
   /** 接続テスト（C-2）で作成権限が確認できているか */
   canCreatePosts: boolean;
   canEditPosts: boolean;
+  /**
+   * 利用者の編集を上書きしてよいか（F-6 の承認を経た場合のみ `true`）。
+   *
+   * **既定は `false`。** 承認の経路がまだ無い以上、上書きしないのが
+   * 唯一の安全な既定である。
+   */
+  approvedOverwrite?: boolean;
 }): Promise<PublishDraftResult> {
   const { client, input, existing } = params;
 
@@ -207,6 +231,25 @@ export async function publishDraft(params: {
 
   if (existing.wpStatus !== 'DRAFT') {
     throw publishedPostNotEditableError(existing.wpStatus);
+  }
+
+  // **利用者の編集より先に判定しない。** 内容が同じなら何も起きないため、
+  // 上書きの心配が無い。ここで弾くと、同じ内容の再実行が失敗になる
+  if (contentHash(input.content) === existing.lastContentHash) {
+    return {
+      wpPostId: existing.wpPostId,
+      wpPostUrl: null,
+      wpEditUrl: null,
+      wpStatus: existing.wpStatus,
+      contentHash: existing.lastContentHash,
+      created: false,
+      skipped: true,
+    };
+  }
+
+  // **WordPress 側を正とする**（DATA_MODEL 11章）
+  if (existing.userEditedAt !== null && params.approvedOverwrite !== true) {
+    throw userEditedNotOverwritableError();
   }
 
   if (!params.canEditPosts) {
@@ -276,6 +319,7 @@ async function createDraft(
     wpStatus: 'DRAFT',
     contentHash: contentHash(readRawContent(response.json) ?? input.content),
     created: true,
+    skipped: false,
   };
 }
 
@@ -315,5 +359,6 @@ async function updateDraft(
     wpStatus: status,
     contentHash: contentHash(readRawContent(response.json) ?? input.content),
     created: false,
+    skipped: false,
   };
 }

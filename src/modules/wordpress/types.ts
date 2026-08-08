@@ -76,4 +76,11 @@ export interface AppWordpressPost {
   postedAt: Date;
   publishedAt: Date | null;
   lastSyncedAt: Date | null;
+  /**
+   * 利用者が WordPress 側で編集したことを検出した時刻（C-5）。
+   *
+   * `null` は未検出。**設定されている間は WordPress 側が正**で、
+   * 承認なしに上書きしない（DATA_MODEL 11章）。
+   */
+  userEditedAt: Date | null;
 }
