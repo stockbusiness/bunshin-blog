@@ -177,6 +177,22 @@ ALTER TABLE admin_login_tokens ADD CONSTRAINT admin_login_tokens_used_after_crea
 
 `blogs` の3件上限（`UNIQUE(user_id, slot_number)` ＋ 上記CHECK）で、4件目は構造的に登録できない。
 
+### 投稿とその記事は同じブログに属する（C-6）
+
+```sql
+ALTER TABLE wordpress_posts
+  ADD CONSTRAINT wordpress_posts_content_item_id_blog_id_fkey
+  FOREIGN KEY (content_item_id, blog_id) REFERENCES content_items (id, blog_id) ON DELETE CASCADE;
+```
+
+**C-6 のテナント越境テストで見つかった穴を塞ぐもの。** `wordpress_posts` は `content_item_id` と `blog_id` を別々の外部キーで持っており、**両者が同じブログを指す保証が無かった**。
+
+そのため、他人の（まだ投稿されていない）`content_item_id` を自分のブログの投稿として登録できた。`content_item_id` は unique なので、一度登録されると**本来の持ち主はその記事を二度と投稿できない**（所有権の判定は「既存行の `blog_id` が違う」で404になる）。
+
+**この制約だけはアプリ層に置けない。** 確かめるには `wordpress` モジュールが `content_items` を直接読むことになり、MODULE_RULES 1（他モジュールのテーブルに直接アクセスしない）に反する。DBに置けばどのモジュールから書いても迂回できない。
+
+参照先の `content_items(id, blog_id)` と、Prisma が1対1関係の定義側に要求する `wordpress_posts(content_item_id, blog_id)` の unique は、いずれも**制約としては冗長**（`id` と `content_item_id` は単独で一意）。複合外部キーの要件で置いている。
+
 ---
 
 ## 5. インデックスの根拠

@@ -597,6 +597,9 @@ model ContentItem {
   aiUsageLogs     AiUsageLog[]
 
   @@unique([contentPlanId, sequenceNo])
+  // `wordpress_posts` が `(content_item_id, blog_id)` の組で参照するために要る（C-6）。
+  // `id` は単独でも一意なので、制約としては冗長。参照先の要件で置く
+  @@unique([id, blogId])
   @@index([blogId, contentType])
   @@index([blogId, primaryKeyword])
   @@map("content_items")
@@ -698,9 +701,16 @@ model WordpressPost {
   updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   blog        Blog        @relation(fields: [blogId], references: [id], onDelete: Cascade)
-  contentItem ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  // **`blog_id` と `content_item_id` の組で参照する**（C-6）。
+  // 単独の参照では、他人の `content_item_id` を自分のブログの投稿に
+  // 結び付けられる（`content_item_id` は unique なので、相手はその記事を
+  // 二度と投稿できなくなる）
+  contentItem ContentItem @relation(fields: [contentItemId, blogId], references: [id, blogId], onDelete: Cascade)
 
   @@unique([blogId, wpPostId])
+  // 1対1関係の定義側として要る。`content_item_id` 単独の unique があるため
+  // 制約としては冗長だが、複合参照を1対1のまま保つのに必要
+  @@unique([contentItemId, blogId])
   @@map("wordpress_posts")
 }
 
