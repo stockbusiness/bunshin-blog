@@ -4,12 +4,16 @@
  * **JSONだけを返させ、必ず検証する**（CONTENT_PLANNING 1.2）。失敗したら
  * 1回だけやり直し、それでも駄目ならジョブを失敗させる。
  *
- * **プロンプトに書いた制約を信じない。** 受信後の検査は `article.ts`。
- * ここは「送って受け取る」ところまで。
+ * **プロンプトに書いた制約を信じない。** 検査そのものは `article.ts` に
+ * 置き、ここからは**やり直しで直りうるもの**（アンサーカプセルの文字数、
+ * FAQ の形）だけをループの中で呼ぶ。構成表と突き合わせる検査は
+ * `generate.ts` — 作り直しても結果が変わらないため。
  */
 
 import { z } from 'zod';
 import type { AiOperation, AiProvider } from '@/lib/ai';
+import { AppError } from '@/lib/errors';
+import { assertAnswerCapsule, assertFaq } from './article';
 import { invalidArticleError } from './errors';
 
 /** プロンプトのキー（CONTENT_PLANNING 1.4 で固定） */
@@ -70,13 +74,16 @@ export interface ArticleGenerationInput {
   existingTitles: readonly string[];
 }
 
-export interface GenerateArticleResult {
-  article: GeneratedArticle;
+export interface ArticleGenerationAttempt {
   provider: string;
   model: string;
   inputTokens: number;
   outputTokens: number;
   costUsd: number | null;
+}
+
+export interface GenerateArticleResult extends ArticleGenerationAttempt {
+  article: GeneratedArticle;
 }
 
 const JSON_ONLY =
@@ -118,16 +125,33 @@ export function operationForContentType(contentType: string): AiOperation {
  *
  * **1回だけやり直す**（CONTENT_PLANNING 1.2）。壊れた出力を繰り返し
  * 引かせても直らず、費用だけが増える。
+ *
+ * ## やり直しの対象
+ *
+ * JSONとして読めない場合に加えて、**アンサーカプセルの文字数と FAQ の形**
+ * が範囲外なら作り直す（CONTENT_PLANNING 7.2「コードで文字数を検査。
+ * 範囲外なら再生成」）。長さの違反は次の試行で直りうるので、
+ * 1回目で落とさない。
+ *
+ * ## 失敗した試行にも費用がかかる
+ *
+ * `onAttempt` は**検証の前に**、試行ごとに呼ぶ。
+ * 「再生成ループの各試行も個別に記録する」（CONTENT_PLANNING 9）ため、
+ * 最終的に失敗した試行の費用も記録から漏らさない。
  */
 export async function generateArticle(params: {
   provider: AiProvider;
   input: ArticleGenerationInput;
   systemPrompt: string;
   maxOutputTokens?: number | undefined;
+  onAttempt?:
+    ((attempt: ArticleGenerationAttempt) => Promise<void>) | undefined;
 }): Promise<GenerateArticleResult> {
   const operation = operationForContentType(
     params.input.contentItem.contentType,
   );
+
+  let lastCheckFailure: AppError | null = null;
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const result = await params.provider.complete({
@@ -138,19 +162,38 @@ export async function generateArticle(params: {
       temperature: 0.7,
     });
 
+    // **検証より先に記録する。** 落ちる応答にも費用は発生している
+    await params.onAttempt?.({
+      provider: result.provider,
+      model: result.model,
+      inputTokens: result.inputTokens,
+      outputTokens: result.outputTokens,
+      costUsd: result.costUsd,
+    });
+
     try {
+      const article = articleSchema.parse(JSON.parse(stripFence(result.text)));
+
+      // **形の検査はここで行う**（CONTENT_PLANNING 7.2）。範囲外なら再生成
+      assertAnswerCapsule(article.answerCapsule);
+      assertFaq(article.faq);
+
       return {
-        article: articleSchema.parse(JSON.parse(stripFence(result.text))),
+        article,
         provider: result.provider,
         model: result.model,
         inputTokens: result.inputTokens,
         outputTokens: result.outputTokens,
         costUsd: result.costUsd,
       };
-    } catch {
-      // **元の例外を持ち回らない。** 応答本文が混ざりうる（SPEC 14.2）
+    } catch (error) {
+      // **応答本文を持ち回らない**（SPEC 14.2）。自分で投げた検査の
+      // 結果だけは残す — 何度作り直しても直らないときの手がかりになる
+      if (error instanceof AppError) {
+        lastCheckFailure = error;
+      }
     }
   }
 
-  throw invalidArticleError('AIの応答を読めませんでした');
+  throw lastCheckFailure ?? invalidArticleError('AIの応答を読めませんでした');
 }

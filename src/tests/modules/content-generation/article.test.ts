@@ -1,10 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ANSWER_CAPSULE_MAX_LENGTH,
+  ANSWER_CAPSULE_MIN_LENGTH,
+  FAQ_MAX_COUNT,
+  FAQ_MIN_COUNT,
   PROMPT_ERROR_CODES,
   articleContentHash,
   assertAllowedLinks,
+  assertAnswerCapsule,
+  assertFaq,
+  assertNoH1,
   assertPrDisclosure,
   assertUsedFacts,
+  composeBodyWithCapsule,
+  countCharacters,
   extractHrefs,
   operationForContentType,
 } from '@/modules/content-generation';
@@ -175,6 +184,137 @@ describe('本文のハッシュ', () => {
     expect(articleContentHash({ title: 'A', bodyHtml: '<p>x</p>' })).not.toBe(
       articleContentHash({ title: 'B', bodyHtml: '<p>x</p>' }),
     );
+  });
+});
+
+/** 87字。80〜120字の範囲に入る（SPEC 9.5） */
+const CAPSULE =
+  'この記事では、月額500円から使える格安SIMの選び方を、通信速度・料金・サポート体制の3つの観点から比較し、初めて乗り換える方が失敗しないための手順まで具体的に説明します。';
+
+describe('アンサーカプセルの文字数（CONTENT_PLANNING 7.2）', () => {
+  it('80〜120字なら通る', () => {
+    expect(() => assertAnswerCapsule(CAPSULE)).not.toThrow();
+  });
+
+  it('短すぎれば落とす', () => {
+    expect(() => assertAnswerCapsule('結論です。')).toThrowError(
+      expect.objectContaining({ code: PROMPT_ERROR_CODES.invalidArticle }),
+    );
+  });
+
+  it('長すぎれば落とす', () => {
+    expect(() => assertAnswerCapsule(CAPSULE + CAPSULE)).toThrowError(
+      expect.objectContaining({ code: PROMPT_ERROR_CODES.invalidArticle }),
+    );
+  });
+
+  it.each([
+    [ANSWER_CAPSULE_MIN_LENGTH, true],
+    [ANSWER_CAPSULE_MIN_LENGTH - 1, false],
+    [ANSWER_CAPSULE_MAX_LENGTH, true],
+    [ANSWER_CAPSULE_MAX_LENGTH + 1, false],
+  ])('%d字は %s', (length, allowed) => {
+    const text = 'あ'.repeat(length);
+
+    if (allowed) {
+      expect(() => assertAnswerCapsule(text)).not.toThrow();
+    } else {
+      expect(() => assertAnswerCapsule(text)).toThrow();
+    }
+  });
+
+  /**
+   * **`String.length` で数えない。** サロゲートペアを2文字と数えると、
+   * 範囲に収まっている結論を「長すぎる」と落としてしまう
+   */
+  it('サロゲートペアを1文字と数える', () => {
+    const text = '𠮷'.repeat(ANSWER_CAPSULE_MAX_LENGTH);
+
+    expect(countCharacters(text)).toBe(ANSWER_CAPSULE_MAX_LENGTH);
+    expect(text.length).toBe(ANSWER_CAPSULE_MAX_LENGTH * 2);
+    expect(() => assertAnswerCapsule(text)).not.toThrow();
+  });
+});
+
+describe('FAQ（SPEC 9.5）', () => {
+  const entries = [
+    { question: '料金は？', answer: '月額500円です' },
+    { question: '解約できますか？', answer: 'できます' },
+    { question: '対応端末は?', answer: '主要機種です' },
+  ];
+
+  it('3〜5件で疑問形なら通る', () => {
+    expect(() => assertFaq(entries)).not.toThrow();
+  });
+
+  it.each([[FAQ_MIN_COUNT - 1], [FAQ_MAX_COUNT + 1]])(
+    '%d件は落とす',
+    (count) => {
+      const many = Array.from({ length: count }, (_, index) => ({
+        question: `質問${index}は？`,
+        answer: '回答',
+      }));
+
+      expect(() => assertFaq(many)).toThrowError(
+        expect.objectContaining({ code: PROMPT_ERROR_CODES.invalidArticle }),
+      );
+    },
+  );
+
+  /** JSON-LD の `Question` になるため、疑問形でないとそのまま検索結果に出る */
+  it('疑問形でない見出しは落とす', () => {
+    expect(() =>
+      assertFaq([
+        ...entries.slice(1),
+        { question: '料金について', answer: '月額500円です' },
+      ]),
+    ).toThrowError(
+      expect.objectContaining({ code: PROMPT_ERROR_CODES.invalidArticle }),
+    );
+  });
+});
+
+describe('結論をH1直後に置く（E-11 の完了条件）', () => {
+  /** **H1は記事タイトルが担う。** 本文の先頭＝H1直後 */
+  it('本文に h1 があれば落とす', () => {
+    expect(() => assertNoH1('<h1>見出し</h1><p>本文</p>')).toThrowError(
+      expect.objectContaining({ code: PROMPT_ERROR_CODES.invalidArticle }),
+    );
+  });
+
+  it('h2 以下は通す', () => {
+    expect(() => assertNoH1('<h2>見出し</h2><p>本文</p>')).not.toThrow();
+  });
+
+  it('カプセルを本文の先頭に置く', () => {
+    const body = composeBodyWithCapsule({
+      answerCapsule: CAPSULE,
+      bodyHtml: '<h2>見出し</h2>',
+    });
+
+    expect(body).toBe(
+      `<p class="answer-capsule">${CAPSULE}</p><h2>見出し</h2>`,
+    );
+  });
+
+  /** 同じ結論が二度並ぶ記事にしない */
+  it('本文に既に含まれていれば足さない', () => {
+    const bodyHtml = `<p>${CAPSULE}</p><h2>見出し</h2>`;
+
+    expect(composeBodyWithCapsule({ answerCapsule: CAPSULE, bodyHtml })).toBe(
+      bodyHtml,
+    );
+  });
+
+  /** **カプセルもAIの出力。** タグとして解釈させない */
+  it('カプセルのHTMLを打ち消す', () => {
+    const body = composeBodyWithCapsule({
+      answerCapsule: '<script>alert(1)</script>',
+      bodyHtml: '<p>本文</p>',
+    });
+
+    expect(body).toContain('&lt;script&gt;');
+    expect(body).not.toContain('<script>');
   });
 });
 

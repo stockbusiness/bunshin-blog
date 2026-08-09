@@ -14,6 +14,8 @@ export const PROMPT_ERROR_CODES = {
   invalidArticle: 'ARTICLE_INVALID',
   /** 構成表に無い記事を生成しようとした */
   itemNotInPlan: 'ARTICLE_ITEM_NOT_IN_PLAN',
+  /** JSON-LD を組み立てられない、または構文が妥当でない */
+  invalidStructuredData: 'ARTICLE_STRUCTURED_DATA_INVALID',
 } as const;
 
 export type PromptErrorCode =
@@ -89,5 +91,22 @@ export function itemNotInPlanError(): AppError {
     PROMPT_ERROR_CODES.itemNotInPlan,
     404,
     '構成表にある記事を指定してください',
+  );
+}
+
+/**
+ * JSON-LD を組み立てられなかったことを表す。
+ *
+ * **記事を `READY_FOR_REVIEW` にせず、ジョブを失敗させる**
+ * （CONTENT_PLANNING 7.3）。構造化データは検索エンジンへの申告なので、
+ * 壊れたまま公開すると本文と食い違ったことを申告することになる。
+ *
+ * 500 なのは**利用者の入力ではなくこちらの組み立てが原因**だから。
+ */
+export function invalidStructuredDataError(reason: string): AppError {
+  return new AppError(
+    PROMPT_ERROR_CODES.invalidStructuredData,
+    500,
+    `構造化データを組み立てられませんでした：${reason}`,
   );
 }

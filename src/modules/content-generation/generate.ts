@@ -35,9 +35,12 @@ import { generateArticle, type ArticleGenerationInput } from './ai';
 import {
   articleContentHash,
   assertAllowedLinks,
+  assertNoH1,
   assertPrDisclosure,
   assertUsedFacts,
+  composeBodyWithCapsule,
 } from './article';
+import { buildStructuredData } from './structured-data';
 import {
   listSiblingItemsForUser,
   requirePlannedItemForUser,
@@ -158,8 +161,10 @@ export async function generateArticleForUser(
       offer === null
         ? null
         : {
-            name: item.title,
-            facts: {},
+            name: offer.name,
+            // **書いてよい事実の範囲**（SPEC 9.6「offer.facts に無い
+            // 価格・条件・機能を書かない」）。照合は E-12
+            facts: offer.facts,
             affiliateUrl: affiliateHref ?? offer.affiliateUrl,
           },
     internalLinks,
@@ -170,6 +175,22 @@ export async function generateArticleForUser(
     provider: deps.provider ?? (await createConfiguredAiProvider()),
     input: generationInput,
     systemPrompt: prompt.body,
+    // **費用は試行ごとに記録する**（CONTENT_PLANNING 9、E-14）。
+    // 作り直しが何回起きているかがプロンプト改善の指標になる。
+    // 予算の通知もここで判定される（E-15）
+    onAttempt: async (attempt) => {
+      await recordAiUsageAndNotify({
+        userId: input.userId,
+        blogId: input.blogId,
+        contentItemId: item.id,
+        provider: attempt.provider,
+        model: attempt.model,
+        operation: GENERATION_PROMPT_KEYS.article,
+        inputTokens: attempt.inputTokens,
+        outputTokens: attempt.outputTokens,
+        ...(attempt.costUsd === null ? {} : { costUsd: attempt.costUsd }),
+      });
+    },
   });
 
   // **プロンプトに書いた制約を受信後に確かめる**（CONTENT_PLANNING 7.2）
@@ -191,18 +212,38 @@ export async function generateArticleForUser(
     availableFactIds: facts.map((fact) => fact.id),
   });
 
-  const saved = await saveArticleVersion({
+  // **H1は記事タイトルが担う**（E-11）。本文の先頭＝H1直後になる
+  assertNoH1(generated.article.bodyHtml);
+
+  // **結論を置く位置をAIに任せない**（E-11 の完了条件）
+  const bodyHtml = composeBodyWithCapsule({
+    answerCapsule: generated.article.answerCapsule,
+    bodyHtml: generated.article.bodyHtml,
+  });
+
+  // **JSON-LD はコードで組み立てる**（CONTENT_PLANNING 7.3）。
+  // 組み立てに失敗したらここで落ち、記事は保存されない
+  const structuredData = buildStructuredData({
+    contentType: item.contentType,
+    faq: generated.article.faq,
+    answerCapsule: generated.article.answerCapsule,
+    offerName: offer?.name ?? null,
+    authorName: persona.penName,
+  });
+
+  return saveArticleVersion({
     contentItemId: item.id,
     title: generated.article.title,
     excerpt: generated.article.excerpt,
     answerCapsule: generated.article.answerCapsule,
-    bodyHtml: generated.article.bodyHtml,
+    bodyHtml,
     faq: generated.article.faq,
+    structuredData,
     usedFactIds: generated.article.usedFactIds,
     claims: generated.article.claims,
     contentHash: articleContentHash({
       title: generated.article.title,
-      bodyHtml: generated.article.bodyHtml,
+      bodyHtml,
     }),
     modelProvider: generated.provider,
     modelName: generated.model,
@@ -211,19 +252,4 @@ export async function generateArticleForUser(
     outputTokens: generated.outputTokens,
     costUsd: generated.costUsd,
   });
-
-  // **費用は必ず記録する**（E-14）。予算の通知もここで判定される（E-15）
-  await recordAiUsageAndNotify({
-    userId: input.userId,
-    blogId: input.blogId,
-    contentItemId: item.id,
-    provider: generated.provider,
-    model: generated.model,
-    operation: GENERATION_PROMPT_KEYS.article,
-    inputTokens: generated.inputTokens,
-    outputTokens: generated.outputTokens,
-    ...(generated.costUsd === null ? {} : { costUsd: generated.costUsd }),
-  });
-
-  return saved;
 }
