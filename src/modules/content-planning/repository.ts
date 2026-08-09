@@ -122,3 +122,38 @@ export async function listPlanningRunsForUser(
 
   return rows.map(toAppRun);
 }
+
+/**
+ * 構成表の試行を残す（TASKS E-8）。
+ *
+ * **通っても通らなくても残す。** 再生成が何回起きているかが、
+ * プロンプト改善の主要な指標になる（CONTENT_PLANNING 9章）。
+ *
+ * STEP 1 の記録（`recordStep1Run`）とは別の行。こちらは
+ * `step1_status` に**その時点の審査結果を持たない**ため、
+ * 通過を表す `PASSED` を入れる（STEP 2 以降まで来ている＝STEP 1 は通っている）。
+ */
+export async function recordPlanRun(params: {
+  userId: string;
+  blogId: string;
+  contentPlanId: string;
+  retryCount: number;
+  constraintResult: Prisma.InputJsonValue;
+  selectedOffers: readonly string[];
+  succeeded: boolean;
+}): Promise<void> {
+  const blog = await requireBlogForUser(params);
+
+  await prisma.planningRun.create({
+    data: {
+      blogId: blog.id,
+      contentPlanId: params.contentPlanId,
+      step1Status: 'PASSED',
+      step1Reasons: [],
+      retryCount: params.retryCount,
+      constraintResult: params.constraintResult,
+      selectedOffers: [...params.selectedOffers],
+      succeeded: params.succeeded,
+    },
+  });
+}

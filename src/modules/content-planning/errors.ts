@@ -16,6 +16,8 @@ export const PLANNING_ERROR_CODES = {
   invalidStep4Input: 'PLANNING_INVALID_STEP4_INPUT',
   /** 指定した構成表が無い（他人のものも同じ扱い） */
   planNotFound: 'PLANNING_PLAN_NOT_FOUND',
+  /** 再生成を繰り返しても制約を満たせなかった */
+  notConverged: 'PLANNING_NOT_CONVERGED',
 } as const;
 
 export type PlanningErrorCode =
@@ -110,5 +112,20 @@ export function planNotFoundError(): AppError {
     PLANNING_ERROR_CODES.planNotFound,
     404,
     '構成表が見つかりません',
+  );
+}
+
+/**
+ * 3回やり直しても制約を満たせなかったことを表す。
+ *
+ * **暫定的な構成表を返さない**（SPEC 9.2.6）。「だいたい通った」ものを
+ * 承認依頼へ送ると、制約チェックの意味が無くなる。ジョブを `FAILED` にし、
+ * ADMINへ通知する。
+ */
+export function planningNotConvergedError(codes: readonly string[]): AppError {
+  return new AppError(
+    PLANNING_ERROR_CODES.notConverged,
+    500,
+    `構成表が制約を満たしませんでした（${codes.join('、')}）`,
   );
 }

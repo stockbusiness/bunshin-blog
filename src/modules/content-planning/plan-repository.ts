@@ -304,3 +304,45 @@ export async function saveLinksForUser(params: {
 
   return updated;
 }
+
+/**
+ * 制約チェックに要る形で記事を引く（TASKS E-8）。
+ *
+ * `listContentItemsForUser` はリンクと公開週を返さない（画面向け）。
+ * **判定は実際に保存された値で行う** — 組み立ての途中の値ではなく、
+ * DBに入ったものを見る。
+ */
+export async function listPlanItemsWithLinksForUser(params: {
+  userId: string;
+  blogId: string;
+  contentPlanId: string;
+}): Promise<
+  {
+    id: string;
+    contentType: ContentType;
+    primaryKeyword: string | null;
+    outboundLinkItemIds: string[];
+    inboundLinkItemIds: string[];
+    plannedPublishWeek: number | null;
+  }[]
+> {
+  const blog = await requireBlogForUser(params);
+
+  const rows = await prisma.contentItem.findMany({
+    where: { blogId: blog.id, contentPlanId: params.contentPlanId },
+    orderBy: [{ sequenceNo: 'asc' }],
+    select: {
+      id: true,
+      contentType: true,
+      primaryKeyword: true,
+      outboundLinkItemIds: true,
+      inboundLinkItemIds: true,
+      plannedPublishWeek: true,
+    },
+  });
+
+  return rows.map((row) => ({
+    ...row,
+    contentType: row.contentType as ContentType,
+  }));
+}
