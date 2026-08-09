@@ -19,6 +19,8 @@ export {
 
 export { getRuntimeEnv } from './resolve';
 
+export { createConfiguredAiProvider } from './provider';
+
 export {
   testConnectionForAdmin,
   CONNECTION_TARGETS,
