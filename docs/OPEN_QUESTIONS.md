@@ -832,3 +832,48 @@ CONTENT_PLANNING 1.3 が「ジャンル審査の所見」に `MODEL_HIGH` を指
 **`WARNING` は承認依頼を止めない**（SPEC 9.7）ので、実害は「すべての収益記事に
 リスク表示が付く」こと。**黙って新しい扱いにするよりは、鳴りっぱなしのほうが安全側**
 と判断してこの形で実装した。
+
+---
+
+### Q-023 `unverified_claims` の形が DATA_MODEL と違う
+
+- 発生タスク：E-12（実装後に判明。E-13 の着手時に気づいた）
+- 状況：DATA_MODEL 132 は次の形を定めている。
+
+  ```ts
+  unverified_claims = { claim: string; expectedSource: "offer_facts"|"persona_facts"; matched: boolean }[]
+  ```
+
+  E-12 が保存しているのは次の形。
+
+  ```ts
+  { text: string; type: ClaimType; excerpt: string; reason: UnverifiedReason }[]
+  ```
+
+  **私の確認漏れ。** E-12 の `参照` は CONTENT_PLANNING 8 と SPEC 9.7 で、
+  DATA_MODEL の当該行を読んでいなかった。
+
+  そのうえで、**定められた形では表せないものが2つある。**
+
+  1. **`type`。** SPEC 9.7 の `WARNING`（`GENERAL` のみ未確認）と `FAILED`
+     （`PRICE`/`CONDITION`/`FEATURE`/`EXPERIENCE` に未確認あり）の区別は
+     主張の種別で決まる。承認画面（F-5）で「どれが重いのか」を出せない
+  2. **`reason`。** 「照合先が空だった」と「facts に無い数値が入っている」では、
+     人が確かめるときに見るところが違う
+
+  また `matched: boolean` は、**未確認の一覧に入っている時点で常に `false`** になり、
+  情報を持たない。
+
+- 選択肢：
+
+  | | 案 | 内容 |
+  |---|---|---|
+  | (a) | **DATA_MODEL を実装に合わせる** | 判定に必要な情報が仕様の形に無い。ドキュメントを直す |
+  | (b) | 実装を DATA_MODEL に合わせる | `type` と `reason` を捨てる。F-5 でリスクの軽重を出せない |
+  | (c) | 両方の項目を持つ | 同じことを2通りで持ち、書き分けを間違える |
+
+- 影響範囲：`src/modules/content-generation/fact-check.ts`、F-5、`docs/DATA_MODEL.md`
+- 状態：未解決
+
+**まだ誰も読んでいない**（F-5 が最初の読み手）ため、今なら (b) も費用ゼロで選べる。
+`docs/` の書き換えは判断を仰いでから行う決まりなので、実装は現状のまま置いた。
