@@ -4,6 +4,7 @@ import * as aiCosts from '@/modules/ai-costs';
 import * as affiliate from '@/modules/affiliate';
 import * as banners from '@/modules/banners';
 import * as contentPlanning from '@/modules/content-planning';
+import * as contentGeneration from '@/modules/content-generation';
 import * as blogs from '@/modules/blogs';
 import * as personas from '@/modules/personas';
 import * as settings from '@/modules/settings';
@@ -509,6 +510,33 @@ describe('他人のブログIDを指定する', () => {
         }),
     ],
     [
+      '記事を生成する（E-10）',
+      (): Promise<unknown> =>
+        contentGeneration.generateArticleForUser({
+          userId: bob.userId,
+          blogId: alice.blogIds[0],
+          contentItemId: alice.contentItemIds[0],
+        }),
+    ],
+    [
+      '記事の版を一覧する（E-10）',
+      (): Promise<unknown> =>
+        contentGeneration.listArticleVersionsForUser({
+          userId: bob.userId,
+          blogId: alice.blogIds[0],
+          contentItemId: alice.contentItemIds[0],
+        }),
+    ],
+    [
+      '構成表の記事を要求する（E-10）',
+      (): Promise<unknown> =>
+        contentGeneration.requirePlannedItemForUser({
+          userId: bob.userId,
+          blogId: alice.blogIds[0],
+          contentItemId: alice.contentItemIds[0],
+        }),
+    ],
+    [
       '公開順序を保存する（E-9）',
       (): Promise<unknown> =>
         contentPlanning.savePublishOrderForUser({
@@ -901,6 +929,12 @@ describe('入口の網羅', () => {
      * 気づける。
      */
     settings: [],
+    'content-generation': [
+      'generateArticleForUser',
+      'listArticleVersionsForUser',
+      'listSiblingItemsForUser',
+      'requirePlannedItemForUser',
+    ],
     'content-planning': [
       'reviewGenreForUser',
       'overrideGenreBlockForUser',
@@ -925,6 +959,7 @@ describe('入口の網羅', () => {
     ['blogs', blogs, covered.blogs],
     ['personas', personas, covered.personas],
     ['settings', settings, covered.settings],
+    ['content-generation', contentGeneration, covered['content-generation']],
     ['content-planning', contentPlanning, covered['content-planning']],
     ['wordpress', wordpress, covered.wordpress],
   ])(
