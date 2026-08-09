@@ -72,7 +72,7 @@ export default defineConfig({
         // | content-planning/step2-service.ts | step2.ts | offer-scoring.test.ts |
         // | content-planning/step3-service.ts | step3.ts | revenue-articles.test.ts |
         // | content-planning/step4-service.ts | step4.ts | traffic-articles.test.ts |
-        // | content-planning/plan-builder.ts | constraints.ts | plan-builder.test.ts |
+        // | content-planning/plan-builder.ts | constraints.ts / publish-order.ts | plan-builder.test.ts |
         // | content-planning/plan-repository.ts | — | revenue-articles.test.ts |
         // | affiliate/scoring.ts | step2.ts | offer-scoring.test.ts |
         // | content-planning/ai.ts | step1.ts の filterAlternatives | genre-review.test.ts |

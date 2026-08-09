@@ -509,6 +509,15 @@ describe('他人のブログIDを指定する', () => {
         }),
     ],
     [
+      '公開順序を保存する（E-9）',
+      (): Promise<unknown> =>
+        contentPlanning.savePublishOrderForUser({
+          userId: bob.userId,
+          blogId: alice.blogIds[0],
+          slots: [],
+        }),
+    ],
+    [
       '構成表を組み立てる（E-8）',
       (): Promise<unknown> =>
         contentPlanning.buildPlanForUser({
@@ -905,6 +914,7 @@ describe('入口の網羅', () => {
       'saveLinksForUser',
       'buildPlanForUser',
       'listPlanItemsWithLinksForUser',
+      'savePublishOrderForUser',
     ],
   } as const;
 

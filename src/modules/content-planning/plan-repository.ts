@@ -320,6 +320,8 @@ export async function listPlanItemsWithLinksForUser(params: {
   {
     id: string;
     contentType: ContentType;
+    /** 構成表の並び。公開順序（E-9）が使う */
+    sequenceNo: number;
     primaryKeyword: string | null;
     outboundLinkItemIds: string[];
     inboundLinkItemIds: string[];
@@ -334,6 +336,7 @@ export async function listPlanItemsWithLinksForUser(params: {
     select: {
       id: true,
       contentType: true,
+      sequenceNo: true,
       primaryKeyword: true,
       outboundLinkItemIds: true,
       inboundLinkItemIds: true,
@@ -345,4 +348,37 @@ export async function listPlanItemsWithLinksForUser(params: {
     ...row,
     contentType: row.contentType as ContentType,
   }));
+}
+
+/**
+ * 公開順序を保存する（TASKS E-9）。
+ *
+ * **`blog_id` を条件に含める。** 記事IDは呼び出し側から渡ってくる
+ * （C-6 と同じ形の穴を作らない）。
+ */
+export async function savePublishOrderForUser(params: {
+  userId: string;
+  blogId: string;
+  slots: readonly {
+    itemId: string;
+    publishPriority: number;
+    plannedPublishWeek: number;
+  }[];
+}): Promise<number> {
+  const blog = await requireBlogForUser(params);
+  let updated = 0;
+
+  for (const slot of params.slots) {
+    const result = await prisma.contentItem.updateMany({
+      where: { id: slot.itemId, blogId: blog.id },
+      data: {
+        publishPriority: slot.publishPriority,
+        plannedPublishWeek: slot.plannedPublishWeek,
+      },
+    });
+
+    updated += result.count;
+  }
+
+  return updated;
 }

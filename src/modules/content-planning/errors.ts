@@ -18,6 +18,8 @@ export const PLANNING_ERROR_CODES = {
   planNotFound: 'PLANNING_PLAN_NOT_FOUND',
   /** 再生成を繰り返しても制約を満たせなかった */
   notConverged: 'PLANNING_NOT_CONVERGED',
+  /** 公開順序を割り当てられない */
+  invalidPublishOrder: 'PLANNING_INVALID_PUBLISH_ORDER',
 } as const;
 
 export type PlanningErrorCode =
@@ -127,5 +129,14 @@ export function planningNotConvergedError(codes: readonly string[]): AppError {
     PLANNING_ERROR_CODES.notConverged,
     500,
     `構成表が制約を満たしませんでした（${codes.join('、')}）`,
+  );
+}
+
+/** 公開順序を割り当てられないことを表す */
+export function invalidPublishOrderError(reason: string): AppError {
+  return new AppError(
+    PLANNING_ERROR_CODES.invalidPublishOrder,
+    422,
+    `公開順序を決められません：${reason}`,
   );
 }
