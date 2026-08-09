@@ -20,6 +20,18 @@ export {
 export { getRuntimeEnv } from './resolve';
 
 export {
+  testConnectionForAdmin,
+  CONNECTION_TARGETS,
+  CONNECTION_TARGET_LABELS,
+  CONNECTION_TEST_CODES,
+  CONNECTION_TEST_TIMEOUT_MS,
+  type ConnectionTarget,
+  type ConnectionTestCode,
+  type ConnectionTestResult,
+  type ConnectionTestOptions,
+} from './connection-test';
+
+export {
   SETTING_DEFINITIONS,
   SETTING_GROUP_LABELS,
   findSettingDefinition,
