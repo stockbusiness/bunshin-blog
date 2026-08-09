@@ -74,6 +74,7 @@ function toView(
     label: definition.label,
     description: definition.description,
     secret: definition.secret,
+    choices: definition.choices ?? null,
     source,
     display: raw === null ? null : definition.secret ? maskSecret(raw) : raw,
     updatedAt: source === 'DB' ? (stored?.updatedAt ?? null) : null,

@@ -327,7 +327,15 @@ async function testAi(
     }
   }
 
-  return succeed('AI', '接続できました', detail);
+  // **何を確かめたのかを書く。** 「接続できました」だけだと、モデル名まで
+  // 見たのかが分からず、結局あとで生成して確かめることになる
+  return succeed(
+    'AI',
+    complete
+      ? '鍵が通り、設定したモデルも見つかりました'
+      : '鍵が通りました（モデルの一覧が多いため、モデル名の照合は省きました）',
+    detail,
+  );
 }
 
 /**
@@ -412,7 +420,7 @@ async function testMail(
     );
   }
 
-  return succeed('MAIL', '接続できました', detail);
+  return succeed('MAIL', '鍵が通り、送信元のドメインも認証済みです', detail);
 }
 
 /**
