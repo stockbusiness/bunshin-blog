@@ -73,6 +73,9 @@ export default defineConfig({
         // | content-planning/step3-service.ts | step3.ts | revenue-articles.test.ts |
         // | content-planning/step4-service.ts | step4.ts | traffic-articles.test.ts |
         // | content-planning/plan-builder.ts | constraints.ts / publish-order.ts | plan-builder.test.ts |
+        // | content-generation/generate.ts | article.ts | article-generation.test.ts |
+        // | content-generation/article-repository.ts | — | article-generation.test.ts |
+        // | content-generation/ai.ts | article.ts | article-generation.test.ts |
         // | content-planning/plan-repository.ts | — | revenue-articles.test.ts |
         // | affiliate/scoring.ts | step2.ts | offer-scoring.test.ts |
         // | content-planning/ai.ts | step1.ts の filterAlternatives | genre-review.test.ts |
@@ -85,6 +88,9 @@ export default defineConfig({
         'src/modules/content-planning/step3-service.ts',
         'src/modules/content-planning/step4-service.ts',
         'src/modules/content-planning/plan-builder.ts',
+        'src/modules/content-generation/generate.ts',
+        'src/modules/content-generation/article-repository.ts',
+        'src/modules/content-generation/ai.ts',
         'src/modules/content-planning/plan-repository.ts',
         'src/modules/affiliate/scoring.ts',
         'src/modules/content-planning/ai.ts',

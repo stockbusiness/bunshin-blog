@@ -10,6 +10,10 @@ export const PROMPT_ERROR_CODES = {
   notFound: 'PROMPT_NOT_FOUND',
   /** 有効な版が無い */
   noActiveVersion: 'PROMPT_NO_ACTIVE_VERSION',
+  /** 生成された記事が検査を通らない */
+  invalidArticle: 'ARTICLE_INVALID',
+  /** 構成表に無い記事を生成しようとした */
+  itemNotInPlan: 'ARTICLE_ITEM_NOT_IN_PLAN',
 } as const;
 
 export type PromptErrorCode =
@@ -57,5 +61,33 @@ export function noActiveVersionError(key: string): AppError {
     PROMPT_ERROR_CODES.noActiveVersion,
     500,
     `${key} に有効なプロンプトがありません`,
+  );
+}
+
+/**
+ * 生成された記事が検査を通らないことを表す。
+ *
+ * **プロンプトに書いただけでは守られない**（CONTENT_PLANNING 7.2）。
+ * 受信後の検査で落とす。
+ */
+export function invalidArticleError(reason: string): AppError {
+  return new AppError(
+    PROMPT_ERROR_CODES.invalidArticle,
+    422,
+    `生成された記事を確認してください：${reason}`,
+  );
+}
+
+/**
+ * 構成表に無い記事を生成しようとしたことを表す。
+ *
+ * **単体生成モードを作らない**（TASKS E-10 の完了条件）。構成表を
+ * 経由しない生成は、内部リンクも公開順序も持たない孤立した記事になる。
+ */
+export function itemNotInPlanError(): AppError {
+  return new AppError(
+    PROMPT_ERROR_CODES.itemNotInPlan,
+    404,
+    '構成表にある記事を指定してください',
   );
 }

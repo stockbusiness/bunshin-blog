@@ -19,6 +19,39 @@ export {
 } from './repository';
 
 export {
+  generateArticleForUser,
+  type GenerateArticleForUserInput,
+  type GenerateArticleDeps,
+} from './generate';
+
+export {
+  requirePlannedItemForUser,
+  listArticleVersionsForUser,
+  listSiblingItemsForUser,
+  saveArticleVersion,
+  type AppArticleVersion,
+  type SaveArticleVersionInput,
+} from './article-repository';
+
+export {
+  extractHrefs,
+  assertAllowedLinks,
+  assertPrDisclosure,
+  assertUsedFacts,
+  articleContentHash,
+  PR_DISCLOSURE_PATTERNS,
+} from './article';
+
+export {
+  generateArticle,
+  operationForContentType,
+  GENERATION_PROMPT_KEYS,
+  type GeneratedArticle,
+  type ArticleGenerationInput,
+  type GenerateArticleResult,
+} from './ai';
+
+export {
   normalizeCreatePromptVersion,
   normalizePromptKey,
   normalizePromptVersion,
@@ -35,6 +68,8 @@ export {
   duplicateVersionError,
   promptNotFoundError,
   noActiveVersionError,
+  invalidArticleError,
+  itemNotInPlanError,
   type PromptErrorCode,
 } from './errors';
 
