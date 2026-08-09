@@ -507,6 +507,9 @@ model AffiliateOffer {
   contentItems   ContentItem[]
   affiliateLinks AffiliateLink[]
 
+  // `affiliate_links` が `(affiliate_offer_id, blog_id)` の組で参照するために要る（D-11）。
+  // `id` は単独でも一意なので、制約としては冗長。参照先の要件で置く
+  @@unique([id, blogId])
   @@index([blogId, status])
   @@map("affiliate_offers")
 }
@@ -877,14 +880,20 @@ model AffiliateLink {
   code             String   @unique
   affiliateOfferId String   @map("affiliate_offer_id") @db.Uuid
   contentItemId    String?  @map("content_item_id") @db.Uuid
+  /// 案件と記事が同じブログであることを強制するために持つ（D-11・Q-020）。
+  ///
+  /// `affiliate` から記事の持ち主を確かめると依存が循環するため
+  /// （`content-planning → affiliate` が正）、**制約をDBへ置く**。C-6 と同じ形。
+  blogId           String   @map("blog_id") @db.Uuid
   destinationUrl   String   @map("destination_url")
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  affiliateOffer AffiliateOffer @relation(fields: [affiliateOfferId], references: [id], onDelete: Cascade)
-  contentItem    ContentItem?   @relation(fields: [contentItemId], references: [id], onDelete: SetNull)
+  affiliateOffer AffiliateOffer @relation(fields: [affiliateOfferId, blogId], references: [id, blogId], onDelete: Cascade)
+  contentItem    ContentItem?   @relation(fields: [contentItemId, blogId], references: [id, blogId], onDelete: Cascade)
   clicks         LinkClick[]
 
   @@index([affiliateOfferId])
+  @@index([blogId])
   @@map("affiliate_links")
 }
 

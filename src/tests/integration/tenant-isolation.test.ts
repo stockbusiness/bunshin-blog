@@ -931,6 +931,81 @@ describe('入口の網羅', () => {
  * 確かめていなかった。`content_item_id` は unique なので、一度
  * 登録されると**持ち主はその記事を二度と投稿できない**。
  */
+/**
+ * **リンクの案件と記事が同じブログに属することを、DBが強制する**（D-11・Q-020）。
+ *
+ * D-8 の時点では塞げていなかった。`affiliate` から記事の持ち主を確かめると
+ * 依存が循環するため（`content-planning → affiliate` が正）、C-6 と同じく
+ * **制約をDBへ置いた。**
+ */
+describe('自分の案件 + 他人の記事でリンクを作る', () => {
+  it('他人の記事IDを紐づけたリンクを作れない', async () => {
+    const alicesItem = await createContentItem(alice.blogIds[0]);
+
+    const offer = await affiliate.createOfferForUser(
+      { userId: bob.userId, blogId: bob.blogIds[0] },
+      {
+        name: '自分の案件',
+        aspName: 'ASP',
+        landingPageUrl: 'https://example.com/lp',
+        affiliateUrl: 'https://asp.example/click?a=x',
+        conversionType: 'FREE_SIGNUP',
+        facts: {},
+      },
+    );
+
+    await prisma.affiliateOffer.update({
+      where: { id: offer.id },
+      data: { linkMode: 'REDIRECT' },
+    });
+
+    await expect(
+      affiliate.ensureRedirectLinkForUser({
+        userId: bob.userId,
+        blogId: bob.blogIds[0],
+        offerId: offer.id,
+        contentItemId: alicesItem,
+        slotNumber: 1,
+      }),
+    ).rejects.toThrow();
+
+    expect(
+      await prisma.affiliateLink.count({
+        where: { contentItemId: alicesItem },
+      }),
+    ).toBe(0);
+  });
+
+  it('自分の記事なら作れる', async () => {
+    const offer = await affiliate.createOfferForUser(
+      { userId: bob.userId, blogId: bob.blogIds[0] },
+      {
+        name: '自分の案件2',
+        aspName: 'ASP',
+        landingPageUrl: 'https://example.com/lp',
+        affiliateUrl: 'https://asp.example/click?a=y',
+        conversionType: 'FREE_SIGNUP',
+        facts: {},
+      },
+    );
+
+    await prisma.affiliateOffer.update({
+      where: { id: offer.id },
+      data: { linkMode: 'REDIRECT' },
+    });
+
+    const link = await affiliate.ensureRedirectLinkForUser({
+      userId: bob.userId,
+      blogId: bob.blogIds[0],
+      offerId: offer.id,
+      contentItemId: bob.contentItemIds[0],
+      slotNumber: 1,
+    });
+
+    expect(link.contentItemId).toBe(bob.contentItemIds[0]);
+  });
+});
+
 describe('自分のブログID + 他人の未投稿の記事ID', () => {
   let untouched: string;
 

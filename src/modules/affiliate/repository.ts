@@ -310,6 +310,8 @@ export async function readLinkableOfferForUser(params: {
   offerId: string;
 }): Promise<{
   id: string;
+  /** 案件が属するブログ。**確認済みの値**（D-11 がリンクへ写す） */
+  blogId: string;
   affiliateUrl: string;
   linkMode: LinkMode;
   subIdParam: string | null;
@@ -327,6 +329,7 @@ export async function readLinkableOfferForUser(params: {
 
   return {
     id: row.id,
+    blogId,
     affiliateUrl: row.affiliateUrl,
     linkMode: row.linkMode as LinkMode,
     subIdParam: row.subIdParam,
@@ -433,6 +436,7 @@ export async function ensureRedirectLinkForUser(params: {
     where: {
       affiliateOfferId: offer.id,
       contentItemId: params.contentItemId,
+      blogId: offer.blogId,
     },
     select: REDIRECT_LINK_SELECT,
   });
@@ -458,6 +462,10 @@ export async function ensureRedirectLinkForUser(params: {
       code: generateRedirectCode(),
       affiliateOfferId: offer.id,
       contentItemId: params.contentItemId,
+      // **案件のブログを入れる。** 記事が同じブログのものかは、この列を
+      // 使った複合外部キーがDB側で確かめる（D-11・Q-020）。渡された
+      // `contentItemId` が他人の記事なら、ここで外部キー違反になる
+      blogId: offer.blogId,
       destinationUrl,
     },
     select: REDIRECT_LINK_SELECT,

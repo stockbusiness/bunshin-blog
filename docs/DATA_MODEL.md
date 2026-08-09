@@ -194,6 +194,18 @@ ALTER TABLE app_settings ADD CONSTRAINT app_settings_key_format CHECK (key ~ '^[
 
 `blogs` の3件上限（`UNIQUE(user_id, slot_number)` ＋ 上記CHECK）で、4件目は構造的に登録できない。
 
+### リンクの案件と記事は同じブログに属する（D-11）
+
+```sql
+ALTER TABLE affiliate_links ADD COLUMN blog_id UUID NOT NULL;
+-- (affiliate_offer_id, blog_id) → affiliate_offers(id, blog_id)
+-- (content_item_id, blog_id)    → content_items(id, blog_id)
+```
+
+**アプリ層では塞げない**（OPEN_QUESTIONS Q-020）。`affiliate` から記事の持ち主を確かめると `affiliate → content-planning` になり、依存が循環する（正しい向きは `content-planning → affiliate`）。C-6 と同じく**制約をDBへ置く**。
+
+記事側の `ON DELETE` は `CASCADE`。複合外部キーの `SET NULL` は参照列を全て NULL にするため、NOT NULL の `blog_id` と両立しない。**実際の挙動は変わらない** — `content_items` が単独で消えることは無い。
+
 ### 投稿とその記事は同じブログに属する（C-6）
 
 ```sql
