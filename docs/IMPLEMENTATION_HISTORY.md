@@ -279,3 +279,5 @@
 | 2026-08-09 | **候補の除外はコードで行う（E-4）。** プロンプトに「HIGH を除いてください」と書いて信じない。除外は判定であり、判定はコードの仕事（CONTENT_PLANNING 1.1） |
 | 2026-08-09 | **SPEC 9.8 の場面の一覧に「ジャンル審査」が無かった。** CONTENT_PLANNING 1.3 は MODEL_HIGH を指定している。既存の場面へ寄せると `ai_usage_logs` の内訳が用途とずれるため、`GENRE_REVIEW`（HIGH）と `GENRE_SUGGESTION`（STANDARD）を足した。**SPEC.md は変更していない** |
 | 2026-08-09 | **`audit_logs` を書くタスクが無かった**（Q-018）。SPEC は2か所で記録を求めているのに、`audit` モジュールを作るタスクが TASKS に存在しない。H-11 として登録した。E-4 は `planning_runs.overridden_at` に選択を残すので止めない |
+| 2026-08-09 | **SPEC 9.2.3 の足切り「ブログ掲載禁止」を判定する列が無かった**（Q-019）。`deny_conditions` の文言から機械判定すると、**黙って通す**（規約違反）のも**黙って落とす**（機会損失）のも起きる。ADMIN が設定する列を足した（`link_mode`・`sub_id_param` と同じ形） |
+| 2026-08-09 | **`blog_posting_prohibited` の既定は `false`。ここだけは安全側に倒さない。** `true` にすると、設定されるまで全案件が足切りされ、STEP 2 が常に0件になって STEP 1 へ差し戻され続ける |
