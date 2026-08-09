@@ -22,18 +22,24 @@ function codeOf(fn: () => unknown): string {
 }
 
 describe('normalizePromptKey', () => {
-  it.each([['article'], ['article.body'], ['article.faq.v2'], ['plan1.step2']])(
-    '%s を通す',
-    (key) => {
-      expect(normalizePromptKey(key)).toBe(key);
-    },
-  );
+  it.each([
+    ['article'],
+    ['article.body'],
+    ['article.faq.v2'],
+    ['plan1.step2'],
+    // **CONTENT_PLANNING 1.4 が固定したキー。** 9個中7個が
+    // アンダースコアを含む。許さないと仕様どおりに登録できない
+    ['generation.claim_extraction'],
+    ['planning.step1.genre_review'],
+  ])('%s を通す', (key) => {
+    expect(normalizePromptKey(key)).toBe(key);
+  });
 
   /** コード側が文字列で引くため、揺れる形を許さない */
   it.each([
     ['Article.body'],
     ['article body'],
-    ['article_body'],
+    ['_article'],
     ['.article'],
     ['article.'],
     ['1article'],
@@ -55,7 +61,9 @@ describe('normalizePromptKey', () => {
     try {
       normalizePromptKey('Article Body');
     } catch (error) {
-      expect((error as AppError).message).toContain('article.body');
+      expect((error as AppError).message).toContain(
+        'generation.claim_extraction',
+      );
     }
   });
 });

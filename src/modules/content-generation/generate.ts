@@ -41,6 +41,7 @@ import {
   composeBodyWithCapsule,
 } from './article';
 import { buildStructuredData } from './structured-data';
+import { factCheckArticleForUser } from './fact-check-service';
 import {
   listSiblingItemsForUser,
   requirePlannedItemForUser,
@@ -231,7 +232,7 @@ export async function generateArticleForUser(
     authorName: persona.penName,
   });
 
-  return saveArticleVersion({
+  const saved = await saveArticleVersion({
     contentItemId: item.id,
     title: generated.article.title,
     excerpt: generated.article.excerpt,
@@ -252,4 +253,19 @@ export async function generateArticleForUser(
     outputTokens: generated.outputTokens,
     costUsd: generated.costUsd,
   });
+
+  // **事実チェックを飛ばす経路を作らない**（E-12）。別の入口にすると
+  // 「呼び忘れた記事」が `NOT_CHECKED` のまま残り、承認画面で
+  // 「問題なし」に見える
+  const checked = await factCheckArticleForUser(
+    {
+      userId: input.userId,
+      blogId: input.blogId,
+      contentItemId: item.id,
+      articleVersionId: saved.id,
+    },
+    deps.provider === undefined ? {} : { provider: deps.provider },
+  );
+
+  return checked.version;
 }

@@ -15,10 +15,14 @@ export const PROMPT_NOTES_MAX_LENGTH = 500;
 /**
  * `key` に使える文字。
  *
- * **`article.body` のような区切り付きの名前を想定する。** 空白や記号を
- * 許すと、コード側が文字列で引くときに揺れる。
+ * **`generation.claim_extraction` のような区切り付きの名前を想定する。**
+ * 空白や記号を許すと、コード側が文字列で引くときに揺れる。
+ *
+ * **アンダースコアを許す。** CONTENT_PLANNING 1.4 が固定した9個のキーのうち
+ * 7個が `planning.step1.genre_review` のような形で、許さないと**仕様どおりの
+ * キーを管理画面から登録できない**（E-2 の見落とし。E-12 で判明した）。
  */
-const KEY_PATTERN = /^[a-z][a-z0-9]*(\.[a-z0-9]+)*$/;
+const KEY_PATTERN = /^[a-z][a-z0-9_]*(\.[a-z0-9_]+)*$/;
 
 /**
  * `version` に使える文字。
@@ -52,7 +56,7 @@ export function normalizePromptKey(value: string): string {
 
   if (!KEY_PATTERN.test(key)) {
     throw invalidPromptError(
-      'プロンプトの種類は英小文字・数字・ドットで指定してください（例: article.body）',
+      'プロンプトの種類は英小文字・数字・ドット・アンダースコアで指定してください（例: generation.claim_extraction）',
     );
   }
 

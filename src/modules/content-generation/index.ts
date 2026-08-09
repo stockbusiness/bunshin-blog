@@ -25,10 +25,40 @@ export {
 } from './generate';
 
 export {
+  factCheckArticleForUser,
+  type FactCheckArticleInput,
+  type FactCheckArticleDeps,
+  type FactCheckArticleResult,
+} from './fact-check-service';
+
+export {
+  verifyClaims,
+  judgeFactCheck,
+  isApprovable,
+  areFactsStale,
+  checkAgainstFacts,
+  flattenFactStrings,
+  extractNumbers,
+  normalizeForMatch,
+  CLAIM_TYPES,
+  FACTS_STALE_DAYS,
+  type ClaimType,
+  type ExtractedClaim,
+  type UnverifiedClaim,
+  type UnverifiedReason,
+  type FactCheckStatus,
+  type VerifyClaimsInput,
+} from './fact-check';
+
+export { extractClaims, type ExtractClaimsResult } from './claim-extraction';
+
+export {
   requirePlannedItemForUser,
   listArticleVersionsForUser,
   listSiblingItemsForUser,
+  findLatestArticleVersion,
   saveArticleVersion,
+  saveFactCheckResult,
   type AppArticleVersion,
   type SaveArticleVersionInput,
 } from './article-repository';

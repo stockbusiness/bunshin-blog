@@ -930,6 +930,7 @@ describe('入口の網羅', () => {
      */
     settings: [],
     'content-generation': [
+      'factCheckArticleForUser',
       'generateArticleForUser',
       'listArticleVersionsForUser',
       'listSiblingItemsForUser',
