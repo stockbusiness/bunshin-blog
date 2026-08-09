@@ -1,6 +1,7 @@
 import { AppError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 import { getMailer, type Mailer } from '@/lib/mailer';
+import { getRuntimeEnv } from '@/modules/settings';
 import { findAdminByEmail, isActiveUser, type AppUser } from '@/modules/users';
 import { AUTH_ERROR_CODES } from '../errors';
 import { createSessionToken } from '../session';
@@ -105,7 +106,8 @@ export async function requestAdminLoginLink(
   });
 
   const mail = buildLoginMail(buildLoginUrl(baseUrl, token));
-  const mailer = deps.mailer ?? getMailer();
+  // **`process.env` を直接見ない**（H-10）。管理画面で設定した鍵を使う
+  const mailer = deps.mailer ?? getMailer({ ...(await getRuntimeEnv()) });
 
   try {
     await mailer.send({ to: email.trim(), ...mail });

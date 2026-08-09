@@ -222,6 +222,14 @@ export const SETTING_DEFINITIONS: readonly SettingDefinition[] = [
     secret: false,
     schema: mailAddress,
   },
+  {
+    key: 'ADMIN_ALERT_EMAIL',
+    group: 'MAIL',
+    label: '通知の宛先',
+    description: '予算が80% / 100% / 150%に達したときの送り先（E-15）',
+    secret: false,
+    schema: mailAddress,
+  },
 ];
 
 const BY_KEY = new Map(

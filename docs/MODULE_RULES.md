@@ -52,6 +52,7 @@ const blog = await requireBlogForUser({ blogId, userId });
 | `ai-costs` | `ai_usage_logs` |
 | `jobs` | `jobs` |
 | `audit` | `audit_logs` |
+| `settings` | `app_settings`（H-7-schema） |
 | `auth` | `admin_login_tokens`（B-10）。`users` は `users` モジュール経由で参照する |
 | `line` | なし（外部APIとの入出力のみ） |
 
@@ -143,6 +144,7 @@ graph TD
     jobs
     audit
     auth
+    settings
   end
 
   subgraph L2["ユーザー・ブログ"]
@@ -194,6 +196,8 @@ graph TD
   analytics --> affiliate
   line --> users
   line --> personas
+  auth --> settings
+  costs --> settings
 ```
 
 箇条書きでの同じ内容。
@@ -201,15 +205,16 @@ graph TD
 - **`src/lib`** — 誰にも依存しない。全モジュールが依存してよい。ただし `src/lib/liff` はブラウザ側で、`src/lib` 内のサーバー専用ファイルにも依存しない（本ルール4）
 - **`jobs`** — ドメインモジュールを import しない。ジョブハンドラの登録は **`src/app/api/jobs/run/handlers.ts`** で行う（E-1）。これを守らないと `jobs → wordpress → jobs` の循環になる。**`user_id` で絞らない**のもこのモジュールだけで、ワーカーが全ユーザーのジョブを横断して実行する（ルール5と同じ趣旨で、名前と場所で用途を固定する）
 - **`audit`** — 誰にも依存しない。全モジュールから呼ばれる
+- **`settings`** — `src/lib` のみ。全モジュールから呼ばれてよい（H-7）。**外部を呼ぶ処理は `process.env` ではなく `getRuntimeEnv()` を通す** — 直接読むと、管理画面で設定した値が効かない（H-10）。AIプロバイダーは `createConfiguredAiProvider()` を使う（`createAiProvider()` を引数なしで呼ぶと `process.env` を見る）
 - **`users`** — `src/lib` のみ。`users` テーブルを所有し、他モジュールへ `AppUser` として渡す
-- **`auth`** — `users`。IDトークンを検証し、`line_user_id` から内部ユーザーを解決してセッションを発行する（B-1・B-2）
+- **`auth`** — `users` `settings`。IDトークンを検証し、`line_user_id` から内部ユーザーを解決してセッションを発行する（B-1・B-2）
 - **`blogs`** — `users`
 - **`wordpress` `personas` `affiliate` `banners` `experiments`** — `blogs`（＋ `wordpress` は `jobs`、`personas` は `users` も）
 - **`content-planning`** — `blogs` `affiliate` `personas` `jobs`
 - **`content-generation`** — `content-planning` `personas` `ai-costs` `jobs`
 - **`approvals`** — `content-generation` `blogs` `line`
 - **`analytics`** — `blogs` `affiliate`
-- **`ai-costs`** — `src/lib` のみ。呼ばれる側に徹する
+- **`ai-costs`** — `src/lib` と `settings`。ほかは呼ばれる側に徹する
 - **`line`** — 送信は `approvals` から呼ばれる。受信（LINE返信）は `users` `personas` を呼ぶ
 
 ### `approvals` と `line` の向き

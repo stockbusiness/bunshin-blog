@@ -14,27 +14,25 @@ import type { Mailer } from './types';
  * 設定不足として扱う。
  */
 
-let cached: Mailer | null = null;
-
+/**
+ * 設定から送信手段を組み立てる。
+ *
+ * **キャッシュしない**（H-10）。以前は最初の1回を覚えていたが、
+ * **管理画面で鍵を差し替えても古い設定のまま送り続ける**ことになる
+ * （インスタンスが入れ替わるまで直らず、しかもサーバーレスでは
+ * 入れ替わる時期が読めない）。組み立ては設定を包むだけで、費用は無い。
+ *
+ * 渡す `source` は `getRuntimeEnv()`（H-7）の戻り値にする。
+ * `process.env` を直接渡すと、DBに保存した設定が効かない。
+ */
 export function getMailer(
   source: Record<string, string | undefined> = process.env,
 ): Mailer {
-  if (cached !== null) {
-    return cached;
-  }
-
   const result = readResendConfig(source);
-  cached =
-    result.ok === true
-      ? createResendMailer(result.config)
-      : createUnconfiguredMailer(result.missing);
 
-  return cached;
-}
-
-/** テストから状態を戻す */
-export function resetMailerCache(): void {
-  cached = null;
+  return result.ok === true
+    ? createResendMailer(result.config)
+    : createUnconfiguredMailer(result.missing);
 }
 
 export {

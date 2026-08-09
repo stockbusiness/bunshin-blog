@@ -17,6 +17,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { logger, type Logger } from '@/lib/logger';
 import { getMailer, type Mailer } from '@/lib/mailer';
+import { getRuntimeEnv } from '@/modules/settings';
 import { notFoundError, requireBlogForUser } from '@/modules/blogs';
 import {
   buildBudgetAlert,
@@ -356,7 +357,9 @@ export async function notifyBudgetCrossings(params: {
     return 0;
   }
 
-  const env = params.deps?.env ?? process.env;
+  // **`process.env` を直接見ない**（H-10）。管理画面で設定した
+  // 宛先と鍵を使う
+  const env = params.deps?.env ?? (await getRuntimeEnv());
   const log = params.deps?.logger ?? logger;
   const to = (env['ADMIN_ALERT_EMAIL'] ?? '').trim();
 
@@ -369,7 +372,7 @@ export async function notifyBudgetCrossings(params: {
     return 0;
   }
 
-  const mailer = params.deps?.mailer ?? getMailer();
+  const mailer = params.deps?.mailer ?? getMailer({ ...env });
   let sent = 0;
 
   for (const crossing of params.crossings) {
@@ -405,7 +408,9 @@ export async function recordAiUsageAndNotify(
     period?: CostPeriod | undefined;
   },
 ): Promise<{ log: AppAiUsageLog; crossings: BudgetCrossing[] }> {
-  const limits = readBudgetLimits(deps?.env ?? process.env);
+  // **`process.env` を直接見ない**（H-10）。管理画面で設定した予算を使う
+  const env = deps?.env ?? (await getRuntimeEnv());
+  const limits = readBudgetLimits(env);
   const period = deps?.period;
 
   const userBefore = await totalCostForUser(input.userId, period);
@@ -441,10 +446,9 @@ export async function recordAiUsageAndNotify(
     );
   }
 
-  await notifyBudgetCrossings({
-    crossings,
-    ...(deps === undefined ? {} : { deps }),
-  });
+  // **解決済みの設定をそのまま渡す。** 通知側でもう一度読むと、
+  // その間に設定が変わったときに予算の判定と宛先がずれる
+  await notifyBudgetCrossings({ crossings, deps: { ...deps, env } });
 
   return { log, crossings };
 }
