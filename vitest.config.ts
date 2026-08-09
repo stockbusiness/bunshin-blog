@@ -71,6 +71,7 @@ export default defineConfig({
         // | content-planning/service.ts | step1.ts | genre-review.test.ts |
         // | content-planning/step2-service.ts | step2.ts | offer-scoring.test.ts |
         // | content-planning/step3-service.ts | step3.ts | revenue-articles.test.ts |
+        // | content-planning/step4-service.ts | step4.ts | traffic-articles.test.ts |
         // | content-planning/plan-repository.ts | — | revenue-articles.test.ts |
         // | affiliate/scoring.ts | step2.ts | offer-scoring.test.ts |
         // | content-planning/ai.ts | step1.ts の filterAlternatives | genre-review.test.ts |
@@ -81,6 +82,7 @@ export default defineConfig({
         'src/modules/content-planning/service.ts',
         'src/modules/content-planning/step2-service.ts',
         'src/modules/content-planning/step3-service.ts',
+        'src/modules/content-planning/step4-service.ts',
         'src/modules/content-planning/plan-repository.ts',
         'src/modules/affiliate/scoring.ts',
         'src/modules/content-planning/ai.ts',

@@ -12,6 +12,10 @@ export const PLANNING_ERROR_CODES = {
   invalidAiResponse: 'PLANNING_INVALID_AI_RESPONSE',
   /** STEP 3 の入力または受け取った記事が組み立てられない */
   invalidStep3Input: 'PLANNING_INVALID_STEP3_INPUT',
+  /** STEP 4 のリンク設計が成り立たない */
+  invalidStep4Input: 'PLANNING_INVALID_STEP4_INPUT',
+  /** 指定した構成表が無い（他人のものも同じ扱い） */
+  planNotFound: 'PLANNING_PLAN_NOT_FOUND',
 } as const;
 
 export type PlanningErrorCode =
@@ -78,5 +82,33 @@ export function invalidStep3InputError(reason: string): AppError {
     PLANNING_ERROR_CODES.invalidStep3Input,
     422,
     `収益記事の設計を確認してください：${reason}`,
+  );
+}
+
+/**
+ * リンク設計が成り立たないことを表す。
+ *
+ * **リンク先が `AFFILIATE` 以外だったときにも使う**（E-7 の完了条件）。
+ * 手作業での検証では30本中9本でこの誤りが起きた（CONTENT_PLANNING 5.5）。
+ */
+export function invalidStep4InputError(reason: string): AppError {
+  return new AppError(
+    PLANNING_ERROR_CODES.invalidStep4Input,
+    422,
+    `集客記事とリンクの設計を確認してください：${reason}`,
+  );
+}
+
+/**
+ * 構成表が見つからないことを表す。
+ *
+ * **他人の構成表も「無い」として返す**（SPEC 14.1）。区別すると、
+ * IDの総当たりで他人の構成表の有無を調べられる。
+ */
+export function planNotFoundError(): AppError {
+  return new AppError(
+    PLANNING_ERROR_CODES.planNotFound,
+    404,
+    '構成表が見つかりません',
   );
 }

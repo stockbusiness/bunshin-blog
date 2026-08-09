@@ -509,6 +509,36 @@ describe('他人のブログIDを指定する', () => {
         }),
     ],
     [
+      '集客記事とリンクを設計する（E-7）',
+      (): Promise<unknown> =>
+        contentPlanning.designTrafficArticlesForUser({
+          userId: bob.userId,
+          blogId: alice.blogIds[0],
+          contentPlanId: '00000000-0000-4000-8000-000000000000',
+          genreName: '節約',
+        }),
+    ],
+    [
+      '構成表へ記事を足す（E-7）',
+      (): Promise<unknown> =>
+        contentPlanning.appendItemsToPlanForUser({
+          userId: bob.userId,
+          blogId: alice.blogIds[0],
+          contentPlanId: '00000000-0000-4000-8000-000000000000',
+          items: [],
+        }),
+    ],
+    [
+      'リンクを保存する（E-7）',
+      (): Promise<unknown> =>
+        contentPlanning.saveLinksForUser({
+          userId: bob.userId,
+          blogId: alice.blogIds[0],
+          outbound: new Map(),
+          inbound: new Map(),
+        }),
+    ],
+    [
       '収益記事を設計する（E-6）',
       (): Promise<unknown> =>
         contentPlanning.designRevenueArticlesForUser({
@@ -851,6 +881,9 @@ describe('入口の網羅', () => {
       'designRevenueArticlesForUser',
       'listContentItemsForUser',
       'findLatestPlanForUser',
+      'designTrafficArticlesForUser',
+      'appendItemsToPlanForUser',
+      'saveLinksForUser',
     ],
   } as const;
 

@@ -88,9 +88,34 @@ export {
 } from './plan-repository';
 
 export {
+  designTrafficArticlesForUser,
+  type DesignTrafficArticlesInput,
+  type DesignTrafficArticlesDeps,
+  type DesignTrafficArticlesResult,
+} from './step4-service';
+
+export {
+  normalizeKeyword,
+  findKeywordConflicts,
+  applyKeywordRepairs,
+  assertOutboundAreAffiliate,
+  assignLinks,
+  countInboundPerRevenue,
+  OUTBOUND_LINK_MAX,
+  INBOUND_LINK_MIN,
+  type KeywordCandidate,
+  type KeywordConflict,
+  type LinkableItem,
+  type TrafficItemDraft,
+} from './step4';
+
+export { appendItemsToPlanForUser, saveLinksForUser } from './plan-repository';
+
+export {
   STEP1_PROMPT_KEYS,
   STEP2_PROMPT_KEYS,
   STEP3_PROMPT_KEYS,
+  STEP4_PROMPT_KEYS,
   ALTERNATIVE_GENRE_COUNT,
   type AlternativeGenre,
   type GenreReviewText,
@@ -103,6 +128,8 @@ export {
   overrideNotAllowedError,
   invalidAiResponseError,
   invalidStep3InputError,
+  invalidStep4InputError,
+  planNotFoundError,
   type PlanningErrorCode,
 } from './errors';
 

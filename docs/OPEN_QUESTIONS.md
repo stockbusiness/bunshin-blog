@@ -721,3 +721,39 @@ CONTENT_PLANNING 1.3 が「ジャンル審査の所見」に `MODEL_HIGH` を指
 
 **既定は `false`。ここだけは安全側に倒さない。** `true` にすると、設定される
 まで全案件が足切りされ、STEP 2 が常に0件になって STEP 1 へ差し戻され続ける。
+
+---
+
+### Q-020 `affiliate_links.content_item_id` が同じブログかを確かめられない
+
+- 発生タスク：D-8（記録）→ E-7（塞げるか確かめた）
+- 状況：
+
+  D-8 の時点で「`affiliate_links.content_item_id` が案件と同じブログの記事か
+  確かめられない」と記録し、**`content-planning` ができる E-4 の時点で塞ぐ**
+  としていた。E-7 で `content_items` を引く経路（`listContentItemsForUser`）が
+  できたので確かめたところ、**アプリ層では塞げない**ことが分かった。
+
+  `affiliate.ensureRedirectLinkForUser` から記事の持ち主を確かめるには
+  `affiliate → content-planning` の import が要る。ところが依存の向きは
+  **`content-planning → affiliate`**（MODULE_RULES）で、**循環する。**
+
+  C-6 とまったく同じ形の問題で、そのときの答えは「**制約はDBに置く**」だった。
+  ただし `affiliate_links` には `blog_id` が無いため、複合外部キーを張れない。
+
+- 選択肢：
+
+  | | 案 | 内容 |
+  |---|---|---|
+  | (a) | **`affiliate_links` に `blog_id` を足し、複合外部キーで強制する** | C-6 と同じ形。どのモジュールから書いても迂回できない |
+  | (b) | 呼び出し側の規律に任せる | `content-generation`（E-10）が確認済みのIDしか渡さない前提。**迂回できる** |
+  | (c) | 依存の向きを変える | `affiliate → content-planning` にすると、既存の4本の依存が逆流する |
+
+- 影響範囲：`prisma/schema.prisma`、`src/modules/affiliate/`、D-8
+- 状態：**解決（2026-08-09）。(a) を採用。D-11-schema と D-11 として登録した**
+
+**E-7 では塞いでいない。** 実装の中で分かった制約なので、単独のタスクにする
+（DATA_MODEL 9章「機能実装のPRにマイグレーションを混ぜない」）。
+
+影響は**成果の帰属**に限られる（他人の記事IDを紐づけても、飛び先は自分の
+案件のURL）。E-10 が記事にリンクを埋める前に塞ぐ。
