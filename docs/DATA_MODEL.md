@@ -173,6 +173,15 @@ ALTER TABLE content_items ADD CONSTRAINT content_items_outbound_max CHECK (array
 -- 分からず、原因の切り分けが難しい
 ALTER TABLE admin_login_tokens ADD CONSTRAINT admin_login_tokens_expiry_after_creation CHECK (expires_at > created_at);
 ALTER TABLE admin_login_tokens ADD CONSTRAINT admin_login_tokens_used_after_creation CHECK (used_at IS NULL OR used_at >= created_at);
+
+-- H-7-schema。**秘密が平文の列に入らないことをDBで保証する。** アプリ側の
+-- 書き方に任せると、入口が増えたときに漏れて「APIキーが平文で保存された
+-- まま誰も気づかない」が起きる
+ALTER TABLE app_settings ADD CONSTRAINT app_settings_secret_column CHECK (
+  (is_secret AND value IS NULL AND value_encrypted IS NOT NULL)
+  OR (NOT is_secret AND value IS NOT NULL AND value_encrypted IS NULL)
+);
+ALTER TABLE app_settings ADD CONSTRAINT app_settings_key_format CHECK (key ~ '^[A-Z][A-Z0-9_]*$');
 ```
 
 `blogs` の3件上限（`UNIQUE(user_id, slot_number)` ＋ 上記CHECK）で、4件目は構造的に登録できない。
@@ -248,6 +257,14 @@ TASKS G-1。ブログ単位のOAuthトークンを暗号化保存する。SPEC 1
 
 TASKS B-10。管理者のワンタイムログインリンク（OPEN_QUESTIONS Q-012）。
 
+### `app_settings`
+
+TASKS H-7-schema。**管理画面から変更できる設定**（OPEN_QUESTIONS Q-017 で承認）。
+
+**必要な理由：** APIキーやモデル名を環境変数だけで持つと、値を1つ変えるたびに再デプロイが要る。Phase 0 の ADMIN は、鍵の発行・差し替え・疎通確認をデプロイと切り離して行う。
+
+解決順は **DB → 環境変数 → コード既定**。`DATABASE_URL` `ENCRYPTION_KEY` `SESSION_SECRET` `APP_BASE_URL` `NEXT_PUBLIC_*` は**この表に置けない**（設定を読む前に要る、またはビルド時に埋め込まれる）。
+
 **必要な理由：** SPEC 3.2 は管理者の認証を「Supabase Auth／メール＋ワンタイムリンク／ADMINロール制御のいずれか」としており、Q-012 で2つ目を選んだ。**リンクを1回だけ使えるようにするには、使用済みかどうかを保存する場所が要る。** 署名だけの自己完結トークンでは、期限内に何度でも使えてしまい、メールの転送や端末の紛失でそのまま入られる。
 
 | 列 | 用途 |
@@ -268,6 +285,7 @@ TASKS B-10。管理者のワンタイムログインリンク（OPEN_QUESTIONS Q
 - `wordpress_connections.wp_username_encrypted`
 - `wordpress_connections.app_password_encrypted`
 - `search_console_connections.refresh_token_encrypted`
+- `app_settings.value_encrypted`（H-7-schema。`is_secret = true` の行だけが持つ）
 
 **`wordpress_connections.site_url` はモニターからは変更できない**（OPEN_QUESTIONS Q-007）。同一 `site_url` のままの認証情報の入れ替えは許可する。`disconnect` で `connection_status` を `REVOKED` にしても `site_url` は保持し、再接続時に一致を確認する。
 
