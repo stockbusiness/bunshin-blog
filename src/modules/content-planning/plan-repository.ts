@@ -19,6 +19,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { requireBlogForUser } from '@/modules/blogs';
+import { planNotFoundError } from './errors';
 
 export type ContentType =
   'INFORMATIONAL' | 'EXPERIENCE' | 'FAQ' | 'COMPARISON' | 'AFFILIATE';
@@ -202,4 +203,104 @@ export async function findLatestPlanForUser(params: {
   });
 
   return plan === null ? null : { planId: plan.id, version: plan.version };
+}
+
+/**
+ * 既にある構成表へ記事を足す（TASKS E-7）。
+ *
+ * **新しい版を作らない。** STEP 4 は STEP 3 と同じ構成表の続きで、
+ * 版を分けると「収益記事だけの版」と「集客記事だけの版」に割れる。
+ *
+ * `sequence_no` は既存の続きから振る（`(content_plan_id, sequence_no)` が
+ * 一意）。
+ */
+export async function appendItemsToPlanForUser(params: {
+  userId: string;
+  blogId: string;
+  contentPlanId: string;
+  items: readonly Omit<NewContentItem, 'sequenceNo'>[];
+}): Promise<AppContentItem[]> {
+  const blog = await requireBlogForUser(params);
+
+  return prisma.$transaction(async (tx) => {
+    // **このブログの構成表であることを確かめる。** `contentPlanId` は
+    // 呼び出し側から渡ってくる（C-6 と同じ形の穴を作らない）
+    const plan = await tx.contentPlan.findFirst({
+      where: { id: params.contentPlanId, blogId: blog.id },
+      select: { id: true },
+    });
+
+    if (plan === null) {
+      throw planNotFoundError();
+    }
+
+    const last = await tx.contentItem.findFirst({
+      where: { contentPlanId: plan.id },
+      orderBy: { sequenceNo: 'desc' },
+      select: { sequenceNo: true },
+    });
+
+    let sequenceNo = last?.sequenceNo ?? 0;
+    const created: AppContentItem[] = [];
+
+    for (const item of params.items) {
+      sequenceNo += 1;
+
+      const row = await tx.contentItem.create({
+        data: {
+          contentPlanId: plan.id,
+          blogId: blog.id,
+          sequenceNo,
+          contentType: item.contentType,
+          title: item.title,
+          primaryKeyword: item.primaryKeyword,
+          searchIntent: item.searchIntent,
+          objective: item.objective,
+          affiliateOfferId: item.affiliateOfferId,
+          publishPriority: item.publishPriority,
+          inboundLinkItemIds: [],
+          outboundLinkItemIds: [],
+        },
+        select: ITEM_SELECT,
+      });
+
+      created.push(toAppItem(row));
+    }
+
+    return created;
+  });
+}
+
+/**
+ * リンクを保存する（TASKS E-7）。
+ *
+ * **`blog_id` を条件に含める。** 記事IDは呼び出し側から渡ってくるため、
+ * 含めないと他人の記事のリンクを書き換えられる（C-6 と同じ形）。
+ */
+export async function saveLinksForUser(params: {
+  userId: string;
+  blogId: string;
+  outbound: ReadonlyMap<string, readonly string[]>;
+  inbound: ReadonlyMap<string, readonly string[]>;
+}): Promise<number> {
+  const blog = await requireBlogForUser(params);
+  let updated = 0;
+
+  for (const [itemId, ids] of params.outbound) {
+    const result = await prisma.contentItem.updateMany({
+      where: { id: itemId, blogId: blog.id },
+      data: { outboundLinkItemIds: [...ids] },
+    });
+    updated += result.count;
+  }
+
+  for (const [itemId, ids] of params.inbound) {
+    const result = await prisma.contentItem.updateMany({
+      where: { id: itemId, blogId: blog.id },
+      data: { inboundLinkItemIds: [...ids] },
+    });
+    updated += result.count;
+  }
+
+  return updated;
 }
