@@ -34,7 +34,7 @@ export {
 export {
   verifyClaims,
   judgeFactCheck,
-  isApprovable,
+  factCheckAllowsApproval,
   areFactsStale,
   checkAgainstFacts,
   flattenFactStrings,
@@ -53,12 +53,32 @@ export {
 export { extractClaims, type ExtractClaimsResult } from './claim-extraction';
 
 export {
+  scanRiskFlagsForUser,
+  type ScanRiskFlagsInput,
+  type ScanRiskFlagsResult,
+} from './risk-flag-service';
+
+export {
+  detectRiskFlags,
+  detectProhibitedExpressions,
+  detectNgExpressions,
+  detectPrDisclosureMissing,
+  hasBlockingRiskFlag,
+  canSendToApproval,
+  stripTags,
+  type RiskFlag,
+  type RiskFlagCode,
+  type RiskSeverity,
+} from './risk-flags';
+
+export {
   requirePlannedItemForUser,
   listArticleVersionsForUser,
   listSiblingItemsForUser,
   findLatestArticleVersion,
   saveArticleVersion,
   saveFactCheckResult,
+  saveRiskFlags,
   type AppArticleVersion,
   type SaveArticleVersionInput,
 } from './article-repository';

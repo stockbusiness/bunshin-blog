@@ -935,6 +935,7 @@ describe('入口の網羅', () => {
       'listArticleVersionsForUser',
       'listSiblingItemsForUser',
       'requirePlannedItemForUser',
+      'scanRiskFlagsForUser',
     ],
     'content-planning': [
       'reviewGenreForUser',

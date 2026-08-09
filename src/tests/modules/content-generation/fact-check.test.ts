@@ -5,7 +5,7 @@ import {
   checkAgainstFacts,
   extractNumbers,
   flattenFactStrings,
-  isApprovable,
+  factCheckAllowsApproval,
   judgeFactCheck,
   normalizeForMatch,
   verifyClaims,
@@ -283,13 +283,14 @@ describe('判定（SPEC 9.7）', () => {
   });
 });
 
-describe('承認依頼へ送ってよいか（完了条件）', () => {
+describe('事実チェックとして承認へ送れるか（完了条件）', () => {
+  /** **これは判定の半分。** 最終判定は `canSendToApproval`（E-13） */
   it.each([
     ['PASSED', true],
     ['WARNING', true],
     ['FAILED', false],
     ['NOT_CHECKED', false],
   ] as const)('%s → %s', (status, expected) => {
-    expect(isApprovable(status)).toBe(expected);
+    expect(factCheckAllowsApproval(status)).toBe(expected);
   });
 });

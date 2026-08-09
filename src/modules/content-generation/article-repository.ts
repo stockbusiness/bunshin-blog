@@ -197,6 +197,33 @@ export async function saveFactCheckResult(params: {
 }
 
 /**
+ * リスクフラグを書く（E-13）。
+ *
+ * **記事IDと版IDの両方を条件に入れる**（`saveFactCheckResult` と同じ）。
+ *
+ * @throws {AppError} その記事の版ではない
+ */
+export async function saveRiskFlags(params: {
+  contentItemId: string;
+  articleVersionId: string;
+  riskFlags: Prisma.InputJsonValue;
+}): Promise<AppArticleVersion> {
+  const updated = await prisma.articleVersion.updateMany({
+    where: { id: params.articleVersionId, contentItemId: params.contentItemId },
+    data: { riskFlags: params.riskFlags },
+  });
+
+  if (updated.count === 0) {
+    throw itemNotInPlanError();
+  }
+
+  return prisma.articleVersion.findUniqueOrThrow({
+    where: { id: params.articleVersionId },
+    select: SELECT,
+  });
+}
+
+/**
  * 記事の最新の版を引く。
  *
  * **所有権は呼び出し側が `requirePlannedItemForUser` で確かめる。**
