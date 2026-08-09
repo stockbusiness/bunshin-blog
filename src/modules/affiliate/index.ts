@@ -26,6 +26,8 @@ export {
   type AppAffiliateLink,
 } from './repository';
 
+export { saveOfferScoresForUser, type OfferScoreInput } from './scoring';
+
 export {
   generateRedirectCode,
   isRedirectCode,

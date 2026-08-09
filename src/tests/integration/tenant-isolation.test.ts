@@ -509,6 +509,18 @@ describe('他人のブログIDを指定する', () => {
         }),
     ],
     [
+      '案件を採点する（E-5）',
+      (): Promise<unknown> =>
+        contentPlanning.scoreOffersForUser(
+          {
+            userId: bob.userId,
+            blogId: alice.blogIds[0],
+            genreName: '節約',
+          },
+          { skipAi: true },
+        ),
+    ],
+    [
       '案件を登録する',
       (): Promise<unknown> =>
         affiliate.createOfferForUser(
@@ -749,6 +761,7 @@ describe('入口の網羅', () => {
       'readLinkableOfferForUser',
       'evaluateLandingPageForUser',
       'ensureRedirectLinkForUser',
+      'saveOfferScoresForUser',
     ],
     banners: [
       'listBannersForUser',
@@ -808,6 +821,7 @@ describe('入口の網羅', () => {
       'reviewGenreForUser',
       'overrideGenreBlockForUser',
       'listPlanningRunsForUser',
+      'scoreOffersForUser',
     ],
   } as const;
 

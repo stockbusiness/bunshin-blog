@@ -55,6 +55,18 @@ export interface AppAffiliateOffer {
   userExperience: UserExperience;
   userRating: number | null;
   denyConditions: string[];
+  /** LPのフォーム項目数（D-2 の自動評価）。未評価なら `null` */
+  lpFormFields: number | null;
+  /** LPがスマートフォン対応か（D-2）。未評価なら `null` */
+  lpMobileReady: boolean | null;
+  /** LPを評価した時刻。`null` なら未評価で、**スコアリングの対象外**（E-5） */
+  lpEvaluatedAt: Date | null;
+  /** ブログへの掲載が禁じられているか（Q-019）。ADMIN が設定する */
+  blogPostingProhibited: boolean;
+  /** STEP 2 の得点（E-5）。未採点なら `null` */
+  selectionScore: number | null;
+  /** 得点の内訳（DATA_MODEL 3章）。未採点なら `null` */
+  scoreBreakdown: unknown;
   status: OfferStatus;
   linkMode: LinkMode;
   startsAt: Date | null;

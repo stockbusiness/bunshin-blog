@@ -44,6 +44,12 @@ interface OfferRow {
   userExperience: string;
   userRating: number | null;
   denyConditions: string[];
+  lpFormFields: number | null;
+  lpMobileReady: boolean | null;
+  lpEvaluatedAt: Date | null;
+  blogPostingProhibited: boolean;
+  selectionScore: number | null;
+  scoreBreakdown: unknown;
   status: string;
   linkMode: string;
   startsAt: Date | null;
@@ -73,6 +79,12 @@ function toAppOffer(row: OfferRow): AppAffiliateOffer {
     userExperience: row.userExperience as UserExperience,
     userRating: row.userRating,
     denyConditions: row.denyConditions,
+    lpFormFields: row.lpFormFields,
+    lpMobileReady: row.lpMobileReady,
+    lpEvaluatedAt: row.lpEvaluatedAt,
+    blogPostingProhibited: row.blogPostingProhibited,
+    selectionScore: row.selectionScore,
+    scoreBreakdown: row.scoreBreakdown,
     status: row.status as OfferStatus,
     linkMode: row.linkMode as LinkMode,
     startsAt: row.startsAt,
@@ -96,6 +108,14 @@ const SELECT = {
   userExperience: true,
   userRating: true,
   denyConditions: true,
+  // LPの自動評価（D-2）の結果。**スコアリング（E-5）が読む**
+  lpFormFields: true,
+  lpMobileReady: true,
+  lpEvaluatedAt: true,
+  // ASPの規約。ADMIN が設定する（Q-019）
+  blogPostingProhibited: true,
+  selectionScore: true,
+  scoreBreakdown: true,
   status: true,
   linkMode: true,
   startsAt: true,
