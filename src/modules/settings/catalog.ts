@@ -47,6 +47,14 @@ export interface SettingDefinition {
   secret: boolean;
   /** 入力値の検証。整えた値を返す */
   schema: z.ZodType<string>;
+  /**
+   * 選べる値。決まっているものだけ持つ。
+   *
+   * **画面が `catalog.ts` を読まなくて済むように持たせる。** ここは
+   * サーバー専用モジュールの一部で、ブラウザ向けのコードから
+   * import できない（MODULE_RULES 4）。
+   */
+  choices?: readonly string[] | undefined;
 }
 
 /** 空でない文字列。前後の空白は落とす */
@@ -59,7 +67,8 @@ const positiveNumber = text.refine(
 );
 
 /** `true` / `false` のみ。曖昧な値で挙動が変わると原因が分かりにくい */
-const flag = z.enum(['true', 'false']);
+const FLAG_CHOICES = ['true', 'false'] as const;
+const flag = z.enum(FLAG_CHOICES);
 
 const mailAddress = text.refine(
   (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
@@ -80,6 +89,7 @@ export const SETTING_DEFINITIONS: readonly SettingDefinition[] = [
     description: '未設定なら anthropic。いまは anthropic のみ動きます',
     secret: false,
     schema: z.enum(['anthropic', 'openai']),
+    choices: ['anthropic', 'openai'],
   },
   {
     key: 'ANTHROPIC_API_KEY',
@@ -185,6 +195,7 @@ export const SETTING_DEFINITIONS: readonly SettingDefinition[] = [
       'Phase 0 は false のまま。止めると検証データが欠落します（SPEC 12.2）',
     secret: false,
     schema: flag,
+    choices: FLAG_CHOICES,
   },
   {
     key: 'AI_BUDGET_DOWNGRADE_ON_EXCEEDED',
@@ -193,6 +204,7 @@ export const SETTING_DEFINITIONS: readonly SettingDefinition[] = [
     description: '同上。既定は false',
     secret: false,
     schema: flag,
+    choices: FLAG_CHOICES,
   },
   {
     key: 'RESEND_API_KEY',

@@ -24,6 +24,8 @@ export interface SettingView {
   label: string;
   description: string;
   secret: boolean;
+  /** 選べる値。決まっていなければ `null`（自由入力） */
+  choices: readonly string[] | null;
   source: SettingSource;
   /**
    * 画面に出す値。秘密なら伏せ字、秘密でなければそのまま。

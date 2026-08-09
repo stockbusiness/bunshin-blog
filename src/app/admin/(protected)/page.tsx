@@ -24,9 +24,12 @@ export default async function AdminHomePage() {
     <div>
       <h1 className="text-lg font-bold">管理画面</h1>
       <p className="mt-2 text-sm">{admin.displayName} さん</p>
-      <nav className="mt-6">
+      <nav className="mt-6 flex flex-col gap-2">
         <Link href="/admin/users" className="text-sm underline">
           モニター一覧
+        </Link>
+        <Link href="/admin/settings" className="text-sm underline">
+          設定（APIキー・接続テスト）
         </Link>
       </nav>
 
