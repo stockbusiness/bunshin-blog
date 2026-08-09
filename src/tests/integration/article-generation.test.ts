@@ -8,10 +8,12 @@ import {
   createPromptVersionForAdmin,
   factCheckArticleForUser,
   generateArticleForUser,
-  isApprovable,
+  canSendToApproval,
   listArticleVersionsForUser,
+  scanRiskFlagsForUser,
   type FactCheckStatus,
   type JsonLdBlock,
+  type RiskFlag,
 } from '@/modules/content-generation';
 import {
   assertMigrationsApplied,
@@ -391,22 +393,24 @@ describe('受信後の検査（CONTENT_PLANNING 7.2）', () => {
 
 describe('生成しただけでは承認へ送れない', () => {
   /**
-   * **禁止表現の検査（E-13）を通っていない。**
-   * この時点で `READY_FOR_REVIEW` にすると、未検査の記事が承認依頼へ流れる。
+   * **記事の状態を進めるのは承認依頼の側**（F-4）。
+   * 生成の時点で `READY_FOR_REVIEW` にすると、承認依頼の作成に
+   * 失敗した記事が「承認待ち」に見える。
    */
-  it('リスクフラグは未実施のまま保存される', async () => {
+  it('検査は済んでいるが状態は進めない', async () => {
     const version = await generateArticleForUser(
       { userId, blogId, contentItemId: trafficItemId },
       { provider: provider() },
     );
 
-    const row = await prisma.articleVersion.findUnique({
-      where: { id: version.id },
-      select: { riskFlags: true },
+    expect(version.factCheckStatus).not.toBe('NOT_CHECKED');
+
+    const item = await prisma.contentItem.findUnique({
+      where: { id: version.contentItemId },
+      select: { status: true },
     });
 
-    // 禁止表現・リスクフラグは E-13
-    expect(row?.riskFlags).toEqual([]);
+    expect(item?.status).toBe('PLANNED');
   });
 
   it('記事の状態は PLANNED のまま', async () => {
@@ -631,7 +635,12 @@ describe('事実チェック（E-12）', () => {
     );
 
     expect(version.factCheckStatus).toBe('PASSED');
-    expect(isApprovable(version.factCheckStatus as FactCheckStatus)).toBe(true);
+    expect(
+      canSendToApproval({
+        factCheckStatus: version.factCheckStatus as FactCheckStatus,
+        riskFlags: [],
+      }),
+    ).toBe(true);
   });
 
   /** **完了条件の「facts外の数値を検出」** */
@@ -677,9 +686,12 @@ describe('事実チェック（E-12）', () => {
       { provider: provider() },
     );
 
-    expect(isApprovable(version.factCheckStatus as FactCheckStatus)).toBe(
-      false,
-    );
+    expect(
+      canSendToApproval({
+        factCheckStatus: version.factCheckStatus as FactCheckStatus,
+        riskFlags: [],
+      }),
+    ).toBe(false);
 
     const item = await prisma.contentItem.findUnique({
       where: { id: revenueItemId },
@@ -819,6 +831,140 @@ describe('事実チェック（E-12）', () => {
         { userId, blogId: otherBlog.id, contentItemId: trafficItemId },
         { provider: provider() },
       ),
+    ).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe('禁止表現とリスクフラグ（E-13）', () => {
+  /**
+   * **飛ばす経路を作らない。** フラグが空のまま残ると、
+   * 承認画面で「指摘なし」に見える
+   */
+  it('生成するとリスクフラグの検査まで走る', async () => {
+    respond = (input) => ({
+      ...goodArticle(input),
+      bodyHtml: `${goodArticle(input).bodyHtml}<p>これは間違いなくおすすめです</p>`,
+    });
+
+    const version = await generateArticleForUser(
+      { userId, blogId, contentItemId: trafficItemId },
+      { provider: provider() },
+    );
+
+    const row = await prisma.articleVersion.findUnique({
+      where: { id: version.id },
+      select: { riskFlags: true },
+    });
+
+    const flags = row?.riskFlags as { code: string; severity: string }[];
+
+    expect(flags.map((flag) => flag.code)).toContain('ASSERTIVE_CLAIM');
+  });
+
+  it('問題が無ければフラグは空', async () => {
+    const version = await generateArticleForUser(
+      { userId, blogId, contentItemId: trafficItemId },
+      { provider: provider() },
+    );
+
+    const row = await prisma.articleVersion.findUnique({
+      where: { id: version.id },
+      select: { riskFlags: true },
+    });
+
+    expect(row?.riskFlags).toEqual([]);
+  });
+
+  /** **本人が禁じた表現は承認を止める**（D-5。人格の設定は `絶対に`） */
+  it('NG表現があれば承認へ送れない', async () => {
+    respond = (input) => ({
+      ...goodArticle(input),
+      bodyHtml: `${goodArticle(input).bodyHtml}<p>絶対におすすめです</p>`,
+    });
+
+    const version = await generateArticleForUser(
+      { userId, blogId, contentItemId: trafficItemId },
+      { provider: provider() },
+    );
+
+    const row = await prisma.articleVersion.findUnique({
+      where: { id: version.id },
+      select: { riskFlags: true },
+    });
+
+    const flags = row?.riskFlags as RiskFlag[];
+
+    expect(flags.map((flag) => flag.code)).toContain('NG_EXPRESSION');
+    expect(
+      canSendToApproval({
+        factCheckStatus: version.factCheckStatus as FactCheckStatus,
+        riskFlags: flags,
+      }),
+    ).toBe(false);
+  });
+
+  /**
+   * **PR表記は本文の広告リンクの有無で決まる。** 収益記事は E-10 が
+   * 生成の時点で落とすため、ここへは PR表記のある本文しか来ない
+   */
+  it('収益記事のPR表記があればフラグは付かない', async () => {
+    const version = await generateArticleForUser(
+      { userId, blogId, contentItemId: revenueItemId },
+      { provider: provider() },
+    );
+
+    const row = await prisma.articleVersion.findUnique({
+      where: { id: version.id },
+      select: { riskFlags: true },
+    });
+
+    const flags = row?.riskFlags as RiskFlag[];
+
+    expect(flags.map((flag) => flag.code)).not.toContain(
+      'PR_DISCLOSURE_MISSING',
+    );
+  });
+
+  /** 修正依頼（F-6）で本文が書き換わったあとにも掛け直せる */
+  it('あとから単独でも掛け直せる', async () => {
+    const version = await generateArticleForUser(
+      { userId, blogId, contentItemId: trafficItemId },
+      { provider: provider() },
+    );
+
+    await prisma.articleVersion.update({
+      where: { id: version.id },
+      data: { bodyHtml: '<p>絶対に治ります</p>' },
+    });
+
+    const rescanned = await scanRiskFlagsForUser({
+      userId,
+      blogId,
+      contentItemId: trafficItemId,
+    });
+
+    expect(rescanned.flags.map((flag) => flag.code)).toEqual([
+      'NG_EXPRESSION',
+      'HIGH_RISK_ADVICE',
+      'ASSERTIVE_CLAIM',
+    ]);
+  });
+
+  it('他人のブログIDでは 404', async () => {
+    await generateArticleForUser(
+      { userId, blogId, contentItemId: trafficItemId },
+      { provider: provider() },
+    );
+
+    const other = await createUser(prisma);
+    const otherBlog = await createBlog(prisma, other.id);
+
+    await expect(
+      scanRiskFlagsForUser({
+        userId,
+        blogId: otherBlog.id,
+        contentItemId: trafficItemId,
+      }),
     ).rejects.toMatchObject({ status: 404 });
   });
 });

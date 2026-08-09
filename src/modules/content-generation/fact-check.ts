@@ -289,13 +289,19 @@ export function judgeFactCheck(params: {
 }
 
 /**
- * 承認依頼へ送ってよいかを判定する（SPEC 9.7）。
+ * 事実チェックの結果として承認へ送れるか（SPEC 9.7）。
  *
  * > `FAILED` は承認依頼へ送らない
  *
  * **`NOT_CHECKED` も送らない。** チェックしていない記事と
  * チェックを通った記事を、承認画面で見分けられなくなる。
+ *
+ * **これは判定の半分。** リスクフラグ（E-13）も見る必要があるため、
+ * 承認へ送ってよいかの最終判定は `canSendToApproval`
+ * （`risk-flags.ts`）を使う。**この関数を単独で使わない。**
  */
-export function isApprovable(status: FactCheckStatus | 'NOT_CHECKED'): boolean {
+export function factCheckAllowsApproval(
+  status: FactCheckStatus | 'NOT_CHECKED',
+): boolean {
   return status === 'PASSED' || status === 'WARNING';
 }

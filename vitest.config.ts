@@ -78,6 +78,7 @@ export default defineConfig({
         // | content-generation/ai.ts | article.ts | article-generation.test.ts |
         // | content-generation/claim-extraction.ts | fact-check.ts | article-generation.test.ts |
         // | content-generation/fact-check-service.ts | fact-check.ts | article-generation.test.ts |
+        // | content-generation/risk-flag-service.ts | risk-flags.ts | article-generation.test.ts |
         // | content-planning/plan-repository.ts | — | revenue-articles.test.ts |
         // | affiliate/scoring.ts | step2.ts | offer-scoring.test.ts |
         // | content-planning/ai.ts | step1.ts の filterAlternatives | genre-review.test.ts |
@@ -95,6 +96,7 @@ export default defineConfig({
         'src/modules/content-generation/ai.ts',
         'src/modules/content-generation/claim-extraction.ts',
         'src/modules/content-generation/fact-check-service.ts',
+        'src/modules/content-generation/risk-flag-service.ts',
         'src/modules/content-planning/plan-repository.ts',
         'src/modules/affiliate/scoring.ts',
         'src/modules/content-planning/ai.ts',

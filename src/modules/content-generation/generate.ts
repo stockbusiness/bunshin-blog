@@ -42,6 +42,7 @@ import {
 } from './article';
 import { buildStructuredData } from './structured-data';
 import { factCheckArticleForUser } from './fact-check-service';
+import { scanRiskFlagsForUser } from './risk-flag-service';
 import {
   listSiblingItemsForUser,
   requirePlannedItemForUser,
@@ -257,7 +258,7 @@ export async function generateArticleForUser(
   // **事実チェックを飛ばす経路を作らない**（E-12）。別の入口にすると
   // 「呼び忘れた記事」が `NOT_CHECKED` のまま残り、承認画面で
   // 「問題なし」に見える
-  const checked = await factCheckArticleForUser(
+  await factCheckArticleForUser(
     {
       userId: input.userId,
       blogId: input.blogId,
@@ -267,5 +268,14 @@ export async function generateArticleForUser(
     deps.provider === undefined ? {} : { provider: deps.provider },
   );
 
-  return checked.version;
+  // **禁止表現の検査も飛ばす経路を作らない**（E-13）。フラグが空のまま
+  // 残ると、承認画面で「指摘なし」に見える
+  const scanned = await scanRiskFlagsForUser({
+    userId: input.userId,
+    blogId: input.blogId,
+    contentItemId: item.id,
+    articleVersionId: saved.id,
+  });
+
+  return scanned.version;
 }
