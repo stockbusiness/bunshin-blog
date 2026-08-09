@@ -5,6 +5,7 @@ import * as affiliate from '@/modules/affiliate';
 import * as banners from '@/modules/banners';
 import * as blogs from '@/modules/blogs';
 import * as personas from '@/modules/personas';
+import * as settings from '@/modules/settings';
 import * as wordpress from '@/modules/wordpress';
 import {
   assertMigrationsApplied,
@@ -759,6 +760,16 @@ describe('入口の網羅', () => {
       'syncWordpressPostForUser',
       'findWordpressPostForUser',
     ],
+    /**
+     * **設定は利用者に紐づかない**（H-7、Q-017）。システム全体で1組で、
+     * 触れるのは ADMIN だけ。所有権の判定に使える情報が無いため
+     * `...ForUser` の入口は無い。
+     *
+     * ここを空で載せておくと、**うっかり利用者向けの入口を生やしたときに
+     * 落ちる** — 設定は越境の対象になりようがない、という前提が崩れたことに
+     * 気づける。
+     */
+    settings: [],
   } as const;
 
   it.each([
@@ -767,6 +778,7 @@ describe('入口の網羅', () => {
     ['banners', banners, covered.banners],
     ['blogs', blogs, covered.blogs],
     ['personas', personas, covered.personas],
+    ['settings', settings, covered.settings],
     ['wordpress', wordpress, covered.wordpress],
   ])(
     '%s の ...ForUser が全て把握されている',
