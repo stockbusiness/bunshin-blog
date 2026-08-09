@@ -6,7 +6,8 @@
  * > プロンプトに明記し、**かつ受信後にコードで検査する**
  * > （CONTENT_PLANNING 7.2）
  *
- * このファイルは受信後の検査だけを持つ。**AIの申告を信じない** —
+ * このファイルは受信後の検査と、**AIに任せない組み立て**（アンサーカプセルを
+ * H1直後に置く。E-11）を持つ。**AIの申告を信じない** —
  * 「リンクは指定されたものだけ使いました」と言われても、本文から
  * 実際に抜き出して確かめる。
  *
@@ -129,6 +130,132 @@ export function assertUsedFacts(params: {
       `渡していない事実が使われています（${unknown.length}件）`,
     );
   }
+}
+
+/**
+ * アンサーカプセルの文字数（SPEC 9.5、CONTENT_PLANNING 7.2）。
+ *
+ * **範囲外なら再生成する** — 落として終わりにしない。短すぎる結論は
+ * 検索結果で意味を成さず、長すぎると「H1直後の結論」ではなくなる。
+ */
+export const ANSWER_CAPSULE_MIN_LENGTH = 80;
+export const ANSWER_CAPSULE_MAX_LENGTH = 120;
+
+/**
+ * 文字数を数える。
+ *
+ * **`String.length` を使わない。** UTF-16 のコード単位を数えるため、
+ * 絵文字や一部の漢字が2文字に見え、80字の結論が「120字を超えた」と
+ * 判定されうる。
+ */
+export function countCharacters(text: string): number {
+  return [...text.trim()].length;
+}
+
+/**
+ * アンサーカプセルの長さを確かめる（CONTENT_PLANNING 7.2）。
+ *
+ * @throws {AppError} 80〜120字の範囲外
+ */
+export function assertAnswerCapsule(answerCapsule: string): void {
+  const length = countCharacters(answerCapsule);
+
+  if (
+    length < ANSWER_CAPSULE_MIN_LENGTH ||
+    length > ANSWER_CAPSULE_MAX_LENGTH
+  ) {
+    throw invalidArticleError(
+      `アンサーカプセルは${ANSWER_CAPSULE_MIN_LENGTH}〜${ANSWER_CAPSULE_MAX_LENGTH}字にしてください（${length}字）`,
+    );
+  }
+}
+
+/** FAQ の件数（SPEC 9.5「3〜5問」） */
+export const FAQ_MIN_COUNT = 3;
+export const FAQ_MAX_COUNT = 5;
+
+/** 疑問符として認める文字（全角・半角） */
+const QUESTION_MARKS = ['？', '?'];
+
+/**
+ * FAQ の件数と形を確かめる（SPEC 9.5、CONTENT_PLANNING 7.2）。
+ *
+ * **見出しを疑問形にする。** JSON-LD の `Question` になるため、
+ * 疑問形でない見出しはそのまま検索結果に出てしまう。
+ *
+ * @throws {AppError} 件数が範囲外、または疑問符で終わらない見出しがある
+ */
+export function assertFaq(
+  faq: readonly { question: string; answer: string }[],
+): void {
+  if (faq.length < FAQ_MIN_COUNT || faq.length > FAQ_MAX_COUNT) {
+    throw invalidArticleError(
+      `FAQ は${FAQ_MIN_COUNT}〜${FAQ_MAX_COUNT}件にしてください（${faq.length}件）`,
+    );
+  }
+
+  for (const entry of faq) {
+    const question = entry.question.trim();
+
+    if (!QUESTION_MARKS.some((mark) => question.endsWith(mark))) {
+      throw invalidArticleError(
+        `FAQ の見出しは疑問形にしてください（${question}）`,
+      );
+    }
+  }
+}
+
+/**
+ * 本文に `<h1>` が無いことを確かめる。
+ *
+ * **H1は記事タイトルが担う。** WordPress はタイトルを H1 として描画する
+ * （C-4 の投稿は `title` を別に渡す）。本文にもう1つ H1 があると
+ * 見出し構造が崩れ、**結論が「H1直後」ではなくなる**。
+ *
+ * @throws {AppError} 本文に `<h1>` がある
+ */
+export function assertNoH1(bodyHtml: string): void {
+  if (/<h1\b/i.test(bodyHtml)) {
+    throw invalidArticleError(
+      '本文に h1 を書かないでください（h1 は記事タイトルです）',
+    );
+  }
+}
+
+/**
+ * アンサーカプセルを本文の先頭に置く（TASKS E-11 の完了条件）。
+ *
+ * **置く位置をAIに任せない。** タイトルが H1 として描画されるので、
+ * 本文の先頭＝H1直後。`assertNoH1` と組で「H1直後に結論がある」ことを
+ * コードで保証する。
+ *
+ * 既に本文の中にカプセルと同じ文が含まれている場合は**足さない** —
+ * 同じ結論が二度並ぶ記事になるため。
+ */
+export function composeBodyWithCapsule(params: {
+  answerCapsule: string;
+  bodyHtml: string;
+}): string {
+  const capsule = params.answerCapsule.trim();
+
+  if (params.bodyHtml.includes(capsule)) {
+    return params.bodyHtml;
+  }
+
+  return `<p class="answer-capsule">${escapeHtml(capsule)}</p>${params.bodyHtml}`;
+}
+
+/**
+ * カプセルを本文へ埋め込むための最小限のエスケープ。
+ *
+ * **カプセルはAIの出力。** HTMLとして解釈させるとタグを混ぜられる。
+ */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 /**

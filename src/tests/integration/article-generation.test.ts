@@ -4,9 +4,11 @@ import type { PrismaClient } from '@prisma/client';
 import { createAiProvider } from '@/lib/ai';
 import {
   PROMPT_ERROR_CODES,
+  assertValidJsonLd,
   createPromptVersionForAdmin,
   generateArticleForUser,
   listArticleVersionsForUser,
+  type JsonLdBlock,
 } from '@/modules/content-generation';
 import {
   assertMigrationsApplied,
@@ -73,6 +75,17 @@ function provider() {
   return createAiProvider({ env: { ANTHROPIC_API_KEY: 'sk-test' }, baseUrl });
 }
 
+/** 87字。80〜120字の範囲に入る（SPEC 9.5、E-11） */
+const CAPSULE =
+  'この記事では、月額500円から使える格安SIMの選び方を、通信速度・料金・サポート体制の3つの観点から比較し、初めて乗り換える方が失敗しないための手順まで具体的に説明します。';
+
+/** 3件。疑問形（SPEC 9.5「3〜5問」） */
+const FAQ = [
+  { question: '料金はいくらですか？', answer: '月額500円です' },
+  { question: '解約はできますか？', answer: 'いつでもできます' },
+  { question: '対応端末は？', answer: '主要な機種に対応しています' },
+];
+
 /** 内部リンクを1本だけ含む、素直な記事 */
 function goodArticle(input: Record<string, unknown>) {
   const links = (input['internalLinks'] ?? []) as { url: string }[];
@@ -87,9 +100,9 @@ function goodArticle(input: Record<string, unknown>) {
   return {
     title: '生成されたタイトル',
     excerpt: '要約',
-    answerCapsule: '結論をここに書きます',
+    answerCapsule: CAPSULE,
     bodyHtml: body,
-    faq: [{ question: 'よくある質問は？', answer: '回答' }],
+    faq: FAQ,
     usedFactIds: [],
     claims: [{ text: '主張', source: 'general' }],
   };
@@ -367,12 +380,12 @@ describe('生成しただけでは承認へ送れない', () => {
 
     const row = await prisma.articleVersion.findUnique({
       where: { id: version.id },
-      select: { factCheckStatus: true, structuredDataJson: true },
+      select: { factCheckStatus: true, riskFlags: true },
     });
 
     expect(row?.factCheckStatus).toBe('NOT_CHECKED');
-    // JSON-LD の組み立ては E-11
-    expect(row?.structuredDataJson).toEqual({});
+    // 禁止表現・リスクフラグは E-13
+    expect(row?.riskFlags).toEqual([]);
   });
 
   it('記事の状態は PLANNED のまま', async () => {
@@ -387,6 +400,191 @@ describe('生成しただけでは承認へ送れない', () => {
     });
 
     expect(item?.status).toBe('PLANNED');
+  });
+});
+
+describe('アンサーカプセルとJSON-LD（E-11）', () => {
+  /** **結論を置く位置をAIに任せない。** タイトルがH1なので本文の先頭＝H1直後 */
+  it('本文の先頭にアンサーカプセルが入る', async () => {
+    const version = await generateArticleForUser(
+      { userId, blogId, contentItemId: trafficItemId },
+      { provider: provider() },
+    );
+
+    expect(version.bodyHtml.startsWith('<p class="answer-capsule">')).toBe(
+      true,
+    );
+    expect(version.bodyHtml).toContain(CAPSULE);
+    expect(version.answerCapsule).toBe(CAPSULE);
+  });
+
+  /** **80〜120字の範囲外なら作り直す**（CONTENT_PLANNING 7.2） */
+  it('短いカプセルは作り直し、2回目が通れば保存される', async () => {
+    let calls = 0;
+    respond = (input) => {
+      calls += 1;
+
+      return calls === 1
+        ? { ...goodArticle(input), answerCapsule: '短い結論です。' }
+        : goodArticle(input);
+    };
+
+    const version = await generateArticleForUser(
+      { userId, blogId, contentItemId: trafficItemId },
+      { provider: provider() },
+    );
+
+    expect(calls).toBe(2);
+    expect(version.answerCapsule).toBe(CAPSULE);
+  });
+
+  /** **2回とも範囲外なら落とす。** 暫定の記事を残さない */
+  it('作り直しても範囲外なら保存しない', async () => {
+    respond = (input) => ({
+      ...goodArticle(input),
+      answerCapsule: '短い結論です。',
+    });
+
+    await expect(
+      generateArticleForUser(
+        { userId, blogId, contentItemId: trafficItemId },
+        { provider: provider() },
+      ),
+    ).rejects.toMatchObject({ code: PROMPT_ERROR_CODES.invalidArticle });
+
+    expect(await prisma.articleVersion.count()).toBe(0);
+  });
+
+  /**
+   * **失敗した試行にも費用がかかる**（CONTENT_PLANNING 9
+   * 「再生成ループの各試行も個別に記録する」）
+   */
+  it('作り直した分の費用も記録される', async () => {
+    respond = (input) => ({
+      ...goodArticle(input),
+      answerCapsule: '短い結論です。',
+    });
+
+    await expect(
+      generateArticleForUser(
+        { userId, blogId, contentItemId: trafficItemId },
+        { provider: provider() },
+      ),
+    ).rejects.toMatchObject({ code: PROMPT_ERROR_CODES.invalidArticle });
+
+    expect(await prisma.aiUsageLog.count({ where: { userId } })).toBe(2);
+  });
+
+  it('FAQ が3件未満なら保存しない', async () => {
+    respond = (input) => ({
+      ...goodArticle(input),
+      faq: [{ question: '料金は？', answer: '月額500円です' }],
+    });
+
+    await expect(
+      generateArticleForUser(
+        { userId, blogId, contentItemId: trafficItemId },
+        { provider: provider() },
+      ),
+    ).rejects.toMatchObject({ code: PROMPT_ERROR_CODES.invalidArticle });
+
+    expect(await prisma.articleVersion.count()).toBe(0);
+  });
+
+  /** **H1は記事タイトルが担う** */
+  it('本文に h1 を書いたら保存しない', async () => {
+    respond = (input) => ({
+      ...goodArticle(input),
+      bodyHtml: `<h1>見出し</h1>${goodArticle(input).bodyHtml}`,
+    });
+
+    await expect(
+      generateArticleForUser(
+        { userId, blogId, contentItemId: trafficItemId },
+        { provider: provider() },
+      ),
+    ).rejects.toMatchObject({ code: PROMPT_ERROR_CODES.invalidArticle });
+
+    expect(await prisma.articleVersion.count()).toBe(0);
+  });
+
+  /** **AIに生成させない**（CONTENT_PLANNING 7.3） */
+  it('集客記事の JSON-LD は FAQPage だけ', async () => {
+    const version = await generateArticleForUser(
+      { userId, blogId, contentItemId: trafficItemId },
+      { provider: provider() },
+    );
+
+    const row = await prisma.articleVersion.findUnique({
+      where: { id: version.id },
+      select: { structuredDataJson: true },
+    });
+
+    const blocks = row?.structuredDataJson as Record<string, unknown>[];
+
+    expect(blocks.map((block) => block['@type'])).toEqual(['FAQPage']);
+    expect(blocks[0]?.['mainEntity']).toHaveLength(FAQ.length);
+  });
+
+  it('収益記事の JSON-LD は FAQPage と Review', async () => {
+    const version = await generateArticleForUser(
+      { userId, blogId, contentItemId: revenueItemId },
+      { provider: provider() },
+    );
+
+    const row = await prisma.articleVersion.findUnique({
+      where: { id: version.id },
+      select: { structuredDataJson: true },
+    });
+
+    const blocks = row?.structuredDataJson as Record<string, unknown>[];
+
+    expect(blocks.map((block) => block['@type'])).toEqual([
+      'FAQPage',
+      'Review',
+    ]);
+    // **案件名は `affiliate_offers.name` から取る。** AIの申告ではない
+    expect(blocks[1]?.['itemReviewed']).toEqual({
+      '@type': 'Product',
+      name: '案件',
+    });
+  });
+
+  /** 保存された値がそのまま JSON として読めること（完了条件） */
+  it('保存された JSON-LD は構文的に妥当', async () => {
+    const version = await generateArticleForUser(
+      { userId, blogId, contentItemId: revenueItemId },
+      { provider: provider() },
+    );
+
+    const row = await prisma.articleVersion.findUnique({
+      where: { id: version.id },
+      select: { structuredDataJson: true },
+    });
+
+    expect(() =>
+      assertValidJsonLd(row?.structuredDataJson as JsonLdBlock[]),
+    ).not.toThrow();
+  });
+
+  /** **案件の事実をAIへ渡す**（SPEC 9.6 の「offer.facts に無いことを書かない」） */
+  it('案件名と facts が生成の入力に入る', async () => {
+    let received: Record<string, unknown> = {};
+    respond = (input) => {
+      received = input;
+
+      return goodArticle(input);
+    };
+
+    await generateArticleForUser(
+      { userId, blogId, contentItemId: revenueItemId },
+      { provider: provider() },
+    );
+
+    expect(received['offer']).toMatchObject({
+      name: '案件',
+      facts: { features: ['機能A'] },
+    });
   });
 });
 

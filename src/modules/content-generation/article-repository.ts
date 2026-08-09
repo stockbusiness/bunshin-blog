@@ -101,6 +101,8 @@ export interface SaveArticleVersionInput {
   answerCapsule: string;
   bodyHtml: string;
   faq: Prisma.InputJsonValue;
+  /** **コードで組み立てた JSON-LD**（E-11、CONTENT_PLANNING 7.3） */
+  structuredData: Prisma.InputJsonValue;
   usedFactIds: readonly string[];
   claims: Prisma.InputJsonValue;
   contentHash: string;
@@ -116,9 +118,6 @@ export interface SaveArticleVersionInput {
  * 記事の版を保存する。
  *
  * **`version_no` は既存の続き。** 上書きしない。
- *
- * `structured_data_json` は空で入れる — **JSON-LD の組み立ては E-11**
- * （AIに作らせず、`faq` と記事種別からコードで組む。CONTENT_PLANNING 7.3）。
  */
 export async function saveArticleVersion(
   input: SaveArticleVersionInput,
@@ -139,8 +138,9 @@ export async function saveArticleVersion(
         answerCapsule: input.answerCapsule,
         bodyHtml: input.bodyHtml,
         faqJson: input.faq,
-        // **E-11 が組み立てる。** AIに作らせない（CONTENT_PLANNING 7.3）
-        structuredDataJson: {},
+        // **AIに作らせない。** `faq` と記事種別からコードで組み立てた値
+        // （E-11、CONTENT_PLANNING 7.3）
+        structuredDataJson: input.structuredData,
         // **E-12 が判定する。** 生成しただけでは未チェック
         factCheckStatus: 'NOT_CHECKED',
         // **E-13 が入れる**

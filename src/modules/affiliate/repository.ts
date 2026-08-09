@@ -128,6 +128,8 @@ const SELECT = {
 const LINK_SELECT = {
   id: true,
   blogId: true,
+  name: true,
+  facts: true,
   affiliateUrl: true,
   linkMode: true,
   subIdParam: true,
@@ -299,7 +301,12 @@ export async function endOfferForUser(params: {
 }
 
 /**
- * リンクの組み立てに使う案件を引く（`buildAffiliateLink` の入力）。
+ * リンクの組み立てと記事生成に使う案件を引く。
+ *
+ * `buildAffiliateLink` の入力であり、記事生成の入力
+ * （CONTENT_PLANNING 7.1 の `offer`）でもある。**`name` と `facts` は
+ * ここから渡す** — 記事に書いてよい事実の範囲そのもので、
+ * 呼び出し側に組み立てさせない。
  *
  * **`sub_id_param` を返す唯一の経路。** 外向けの `AppAffiliateOffer` には
  * 含めない。
@@ -312,6 +319,9 @@ export async function readLinkableOfferForUser(params: {
   id: string;
   /** 案件が属するブログ。**確認済みの値**（D-11 がリンクへ写す） */
   blogId: string;
+  name: string;
+  /** 記事に書いてよい価格・条件・機能（SPEC 9.6、E-12 が照合する） */
+  facts: unknown;
   affiliateUrl: string;
   linkMode: LinkMode;
   subIdParam: string | null;
@@ -330,6 +340,8 @@ export async function readLinkableOfferForUser(params: {
   return {
     id: row.id,
     blogId,
+    name: row.name,
+    facts: row.facts,
     affiliateUrl: row.affiliateUrl,
     linkMode: row.linkMode as LinkMode,
     subIdParam: row.subIdParam,

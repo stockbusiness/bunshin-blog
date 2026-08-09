@@ -38,9 +38,26 @@ export {
   assertAllowedLinks,
   assertPrDisclosure,
   assertUsedFacts,
+  assertAnswerCapsule,
+  assertFaq,
+  assertNoH1,
+  composeBodyWithCapsule,
+  countCharacters,
   articleContentHash,
+  ANSWER_CAPSULE_MIN_LENGTH,
+  ANSWER_CAPSULE_MAX_LENGTH,
+  FAQ_MIN_COUNT,
+  FAQ_MAX_COUNT,
   PR_DISCLOSURE_PATTERNS,
 } from './article';
+
+export {
+  buildStructuredData,
+  assertValidJsonLd,
+  type BuildStructuredDataInput,
+  type StructuredDataFaq,
+  type JsonLdBlock,
+} from './structured-data';
 
 export {
   generateArticle,
@@ -48,6 +65,7 @@ export {
   GENERATION_PROMPT_KEYS,
   type GeneratedArticle,
   type ArticleGenerationInput,
+  type ArticleGenerationAttempt,
   type GenerateArticleResult,
 } from './ai';
 
@@ -69,6 +87,7 @@ export {
   promptNotFoundError,
   noActiveVersionError,
   invalidArticleError,
+  invalidStructuredDataError,
   itemNotInPlanError,
   type PromptErrorCode,
 } from './errors';
