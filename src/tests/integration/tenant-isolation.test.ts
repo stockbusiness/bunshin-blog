@@ -509,6 +509,25 @@ describe('他人のブログIDを指定する', () => {
         }),
     ],
     [
+      '構成表を組み立てる（E-8）',
+      (): Promise<unknown> =>
+        contentPlanning.buildPlanForUser({
+          userId: bob.userId,
+          blogId: alice.blogIds[0],
+          genreName: '節約',
+          adoptedOfferIds: [],
+        }),
+    ],
+    [
+      'リンク込みで記事を引く（E-8）',
+      (): Promise<unknown> =>
+        contentPlanning.listPlanItemsWithLinksForUser({
+          userId: bob.userId,
+          blogId: alice.blogIds[0],
+          contentPlanId: '00000000-0000-4000-8000-000000000000',
+        }),
+    ],
+    [
       '集客記事とリンクを設計する（E-7）',
       (): Promise<unknown> =>
         contentPlanning.designTrafficArticlesForUser({
@@ -884,6 +903,8 @@ describe('入口の網羅', () => {
       'designTrafficArticlesForUser',
       'appendItemsToPlanForUser',
       'saveLinksForUser',
+      'buildPlanForUser',
+      'listPlanItemsWithLinksForUser',
     ],
   } as const;
 

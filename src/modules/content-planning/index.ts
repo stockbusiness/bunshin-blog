@@ -82,6 +82,7 @@ export {
 
 export {
   listContentItemsForUser,
+  listPlanItemsWithLinksForUser,
   findLatestPlanForUser,
   type AppContentItem,
   type NewContentItem,
@@ -112,6 +113,30 @@ export {
 export { appendItemsToPlanForUser, saveLinksForUser } from './plan-repository';
 
 export {
+  buildPlanForUser,
+  MAX_PLAN_RETRIES,
+  type BuildPlanInput,
+  type BuildPlanDeps,
+  type BuildPlanResult,
+  type BuildPlanAttempt,
+} from './plan-builder';
+
+export {
+  checkConstraints,
+  buildRepairHints,
+  CONSTRAINT_CODES,
+  TOTAL_ARTICLE_MAX,
+  INBOUND_MIN,
+  OUTBOUND_MAX,
+  WEEKLY_PUBLISH_CAP,
+  type ConstraintCode,
+  type ConstraintResult,
+  type ConstraintViolation,
+  type CheckableItem,
+  type RepairHints,
+} from './constraints';
+
+export {
   STEP1_PROMPT_KEYS,
   STEP2_PROMPT_KEYS,
   STEP3_PROMPT_KEYS,
@@ -130,6 +155,7 @@ export {
   invalidStep3InputError,
   invalidStep4InputError,
   planNotFoundError,
+  planningNotConvergedError,
   type PlanningErrorCode,
 } from './errors';
 
