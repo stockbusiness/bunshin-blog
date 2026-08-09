@@ -29,6 +29,7 @@ import type { AiProvider } from '@/lib/ai';
 import { invalidAiResponseError } from './errors';
 import type { GenreCandidate, Step1Decision } from './step1';
 import type { SearchDemand } from './step2';
+import type { RevenueSlot, RevenueTitle } from './step3';
 
 /** プロンプトのキー。CONTENT_PLANNING 1.4 で固定されている */
 export const STEP1_PROMPT_KEYS = {
@@ -38,6 +39,10 @@ export const STEP1_PROMPT_KEYS = {
 
 export const STEP2_PROMPT_KEYS = {
   searchDemand: 'planning.step2.search_demand',
+} as const;
+
+export const STEP3_PROMPT_KEYS = {
+  revenueTitles: 'planning.step3.revenue_titles',
 } as const;
 
 /** 案出し系は 0.7、抽出・分類系は 0.0（CONTENT_PLANNING 1.2） */
@@ -100,7 +105,8 @@ function stripFence(text: string): string {
 async function completeJson<T>(params: {
   provider: AiProvider;
   key: string;
-  operation: 'GENRE_SUGGESTION' | 'GENRE_REVIEW' | 'CLASSIFY';
+  operation:
+    'GENRE_SUGGESTION' | 'GENRE_REVIEW' | 'CLASSIFY' | 'PRIORITY_ARTICLE';
   system: string;
   input: unknown;
   temperature: number;
@@ -237,4 +243,62 @@ export async function askSearchDemand(params: {
   });
 
   return result.demand;
+}
+
+const revenueTitlesSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        slotId: z.string().trim().min(1),
+        title: z.string().trim().min(1).max(80),
+        primaryKeyword: z.string().trim().min(1).max(60),
+        searchIntent: z.string().trim().min(1).max(120),
+      }),
+    )
+    .default([]),
+});
+
+/**
+ * 収益記事のタイトルと検索意図を作る（CONTENT_PLANNING 4.2）。
+ *
+ * **枠を渡し、枠ごとに文言を付けさせる。** 記事の種類と本数はコードが
+ * 決めており、AIに増減させない。件数と `slotId` の突き合わせは
+ * `matchRevenueTitles` が行う。
+ */
+export async function writeRevenueTitles(params: {
+  provider: AiProvider;
+  penName: string | null;
+  targetReader: string;
+  slots: readonly RevenueSlot[];
+}): Promise<RevenueTitle[]> {
+  const result = await completeJson({
+    provider: params.provider,
+    key: STEP3_PROMPT_KEYS.revenueTitles,
+    // 収益記事は HIGH（CONTENT_PLANNING 1.3「収益記事の本文」に合わせる）
+    operation: 'PRIORITY_ARTICLE',
+    system: [
+      'あなたはアフィリエイトブログの編集長です。',
+      '渡された枠それぞれに、記事のタイトル・主キーワード・検索意図を付けてください。',
+      '**枠を増やしたり減らしたりしないでください。** slotId は渡されたものをそのまま返します。',
+      'title は40字以内、searchIntent は読者の状態を50字以内で書きます。',
+      '**primaryKeyword は枠ごとに違う語にしてください。**',
+    ].join('\n'),
+    input: {
+      blogPersona: {
+        penName: params.penName,
+        targetReader: params.targetReader,
+      },
+      slots: params.slots.map((slot) => ({
+        slotId: slot.slotId,
+        offerName: slot.offerName,
+        pattern: slot.pattern,
+        offerFacts: slot.facts,
+      })),
+    },
+    temperature: 0.7,
+    maxOutputTokens: 2_000,
+    schema: revenueTitlesSchema,
+  });
+
+  return result.items;
 }

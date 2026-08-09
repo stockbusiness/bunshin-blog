@@ -61,8 +61,36 @@ export {
 } from './step2';
 
 export {
+  designRevenueArticlesForUser,
+  type DesignRevenueArticlesInput,
+  type DesignRevenueArticlesDeps,
+  type DesignRevenueArticlesResult,
+} from './step3-service';
+
+export {
+  planRevenueSlots,
+  matchRevenueTitles,
+  revenueArticleCount,
+  REVENUE_ARTICLE_MAX,
+  REVENUE_PATTERN_LABELS,
+  type RevenuePattern,
+  type RevenueSlot,
+  type RevenueTitle,
+  type AdoptedOffer,
+  type PlannedRevenueItem,
+} from './step3';
+
+export {
+  listContentItemsForUser,
+  findLatestPlanForUser,
+  type AppContentItem,
+  type NewContentItem,
+} from './plan-repository';
+
+export {
   STEP1_PROMPT_KEYS,
   STEP2_PROMPT_KEYS,
+  STEP3_PROMPT_KEYS,
   ALTERNATIVE_GENRE_COUNT,
   type AlternativeGenre,
   type GenreReviewText,
@@ -74,6 +102,7 @@ export {
   genreNotFoundError,
   overrideNotAllowedError,
   invalidAiResponseError,
+  invalidStep3InputError,
   type PlanningErrorCode,
 } from './errors';
 

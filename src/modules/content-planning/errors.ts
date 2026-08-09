@@ -10,6 +10,8 @@ export const PLANNING_ERROR_CODES = {
   overrideNotAllowed: 'PLANNING_OVERRIDE_NOT_ALLOWED',
   /** AIの応答が想定の形でない */
   invalidAiResponse: 'PLANNING_INVALID_AI_RESPONSE',
+  /** STEP 3 の入力または受け取った記事が組み立てられない */
+  invalidStep3Input: 'PLANNING_INVALID_STEP3_INPUT',
 } as const;
 
 export type PlanningErrorCode =
@@ -62,5 +64,19 @@ export function invalidAiResponseError(key: string): AppError {
     PLANNING_ERROR_CODES.invalidAiResponse,
     502,
     `AIの応答を読めませんでした（${key}）`,
+  );
+}
+
+/**
+ * 収益記事を組み立てられないことを表す。
+ *
+ * **枠との一致を確かめずに保存しない。** 確かめないと、AIが枠を増やしたり
+ * 減らしたりした構成表がそのまま通る。
+ */
+export function invalidStep3InputError(reason: string): AppError {
+  return new AppError(
+    PLANNING_ERROR_CODES.invalidStep3Input,
+    422,
+    `収益記事の設計を確認してください：${reason}`,
   );
 }
