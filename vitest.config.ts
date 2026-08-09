@@ -58,6 +58,24 @@ export default defineConfig({
         // 判断を持つ集計は admin-counts.ts の toBlogCounts に切り出してあり、
         // そちらはユニットテストで数える
         '**/admin-list.ts',
+        // 以下は repository と同じ理由（DBか外部への呼び出しそのもの）だが、
+        // 名前が repository.ts ではないため個別に挙げる。**判断を持つ部分は
+        // 別ファイルへ切り出してあり、そちらはユニットテストで数える。**
+        //
+        // | 除外 | 判断を持つ相方 | 検証している統合テスト |
+        // |---|---|---|
+        // | settings/service.ts | catalog.ts / mask.ts | settings.test.ts |
+        // | settings/resolve.ts | — | settings.test.ts |
+        // | settings/provider.ts | — | settings-wiring.test.ts |
+        // | settings/connection-test.ts | — | settings-connection-test.test.ts |
+        // | content-planning/service.ts | step1.ts | genre-review.test.ts |
+        // | content-planning/ai.ts | step1.ts の filterAlternatives | genre-review.test.ts |
+        'src/modules/settings/service.ts',
+        'src/modules/settings/resolve.ts',
+        'src/modules/settings/provider.ts',
+        'src/modules/settings/connection-test.ts',
+        'src/modules/content-planning/service.ts',
+        'src/modules/content-planning/ai.ts',
       ],
       thresholds: {
         lines: 80,

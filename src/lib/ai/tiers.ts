@@ -19,6 +19,11 @@ export const MODEL_TIERS: readonly ModelTier[] = ['LOW', 'STANDARD', 'HIGH'];
  *
  * **`ai_usage_logs.operation` にそのまま入れる**ので、増やすときは
  * 集計（G-6・E-14）への影響を考えること。
+ *
+ * `GENRE_REVIEW` `GENRE_SUGGESTION` は **SPEC 9.8 の表に無い**（E-4 で追加。
+ * OPEN_QUESTIONS Q-018）。CONTENT_PLANNING 1.3 が「ジャンル審査の所見」に
+ * MODEL_HIGH を指定しているのに、対応する場面が9.8の一覧に無かった。
+ * 既存の場面へ寄せると**費用の内訳が用途とずれる**ため、場面のほうを足した。
  */
 export const AI_OPERATIONS = [
   // 低コストモデル
@@ -28,11 +33,13 @@ export const AI_OPERATIONS = [
   'KEYWORD_DEDUP',
   'FACT_CLAIM_EXTRACT',
   // 標準モデル
+  'GENRE_SUGGESTION',
   'ARTICLE_BODY',
   'ARTICLE_REWRITE',
   'INTERNAL_LINK',
   'CTA',
   // 高性能モデル
+  'GENRE_REVIEW',
   'PRIORITY_ARTICLE',
   'QUALITY_RECHECK',
   'COMPARISON',
@@ -53,11 +60,13 @@ const TIER_BY_OPERATION: Readonly<Record<AiOperation, ModelTier>> = {
   KEYWORD_DEDUP: 'LOW',
   FACT_CLAIM_EXTRACT: 'LOW',
 
+  GENRE_SUGGESTION: 'STANDARD',
   ARTICLE_BODY: 'STANDARD',
   ARTICLE_REWRITE: 'STANDARD',
   INTERNAL_LINK: 'STANDARD',
   CTA: 'STANDARD',
 
+  GENRE_REVIEW: 'HIGH',
   PRIORITY_ARTICLE: 'HIGH',
   QUALITY_RECHECK: 'HIGH',
   COMPARISON: 'HIGH',

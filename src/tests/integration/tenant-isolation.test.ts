@@ -3,6 +3,7 @@ import type { PrismaClient } from '@prisma/client';
 import * as aiCosts from '@/modules/ai-costs';
 import * as affiliate from '@/modules/affiliate';
 import * as banners from '@/modules/banners';
+import * as contentPlanning from '@/modules/content-planning';
 import * as blogs from '@/modules/blogs';
 import * as personas from '@/modules/personas';
 import * as settings from '@/modules/settings';
@@ -475,6 +476,39 @@ describe('他人のブログIDを指定する', () => {
         }),
     ],
     [
+      'ジャンルを審査する（E-4）',
+      (): Promise<unknown> =>
+        contentPlanning.reviewGenreForUser(
+          {
+            userId: bob.userId,
+            blogId: alice.blogIds[0],
+            genreId: '00000000-0000-4000-8000-000000000000',
+            serpTop10: [{ domainType: 'personal' }],
+            userHasExperience: true,
+          },
+          { skipAi: true },
+        ),
+    ],
+    [
+      '停止を承知で進める（E-4）',
+      (): Promise<unknown> =>
+        contentPlanning.overrideGenreBlockForUser({
+          userId: bob.userId,
+          blogId: alice.blogIds[0],
+          genreId: '00000000-0000-4000-8000-000000000000',
+          serpTop10: [{ domainType: 'personal' }],
+          userHasExperience: true,
+        }),
+    ],
+    [
+      '審査の履歴を見る（E-4）',
+      (): Promise<unknown> =>
+        contentPlanning.listPlanningRunsForUser({
+          userId: bob.userId,
+          blogId: alice.blogIds[0],
+        }),
+    ],
+    [
       '案件を登録する',
       (): Promise<unknown> =>
         affiliate.createOfferForUser(
@@ -770,6 +804,11 @@ describe('入口の網羅', () => {
      * 気づける。
      */
     settings: [],
+    'content-planning': [
+      'reviewGenreForUser',
+      'overrideGenreBlockForUser',
+      'listPlanningRunsForUser',
+    ],
   } as const;
 
   it.each([
@@ -779,6 +818,7 @@ describe('入口の網羅', () => {
     ['blogs', blogs, covered.blogs],
     ['personas', personas, covered.personas],
     ['settings', settings, covered.settings],
+    ['content-planning', contentPlanning, covered['content-planning']],
     ['wordpress', wordpress, covered.wordpress],
   ])(
     '%s の ...ForUser が全て把握されている',
