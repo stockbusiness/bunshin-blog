@@ -209,7 +209,7 @@ npm run build
 
 再試行の待ち時間は**専用の列を持たず** `updated_at` と `attempt_count` から求める（`backoff.ts` と取得SQLで同じ式）。
 
-**`vercel.json` の cron は毎分。これには Vercel Pro が要る**（Hobby は1日1回まで）。Hobby の場合、承認された記事が最大24時間投稿されない。
+**`vercel.json` の cron は毎分。これには Vercel Pro が要る**（Hobby は1日1回まで）。**Pro を使う**（Q-016、2026-08-09）。Hobby だと承認された記事が最大24時間投稿されず、承認の意味が薄れる。
 
 `CRON_SECRET` が未設定なら**ワーカーは動かない**（fail closed）。`src/lib/env.ts` の必須には入れていない。cron の設定漏れでアプリ全体を止めないため。
 
