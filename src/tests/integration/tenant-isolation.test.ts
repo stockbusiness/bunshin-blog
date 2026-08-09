@@ -509,6 +509,32 @@ describe('他人のブログIDを指定する', () => {
         }),
     ],
     [
+      '収益記事を設計する（E-6）',
+      (): Promise<unknown> =>
+        contentPlanning.designRevenueArticlesForUser({
+          userId: bob.userId,
+          blogId: alice.blogIds[0],
+          adoptedOfferIds: [],
+        }),
+    ],
+    [
+      '構成表の記事を一覧する（E-6）',
+      (): Promise<unknown> =>
+        contentPlanning.listContentItemsForUser({
+          userId: bob.userId,
+          blogId: alice.blogIds[0],
+        }),
+    ],
+    [
+      'いちばん新しい構成表を引く（E-6）',
+      (): Promise<unknown> =>
+        contentPlanning.findLatestPlanForUser({
+          userId: bob.userId,
+          blogId: alice.blogIds[0],
+          planType: 'INITIAL',
+        }),
+    ],
+    [
       '案件を採点する（E-5）',
       (): Promise<unknown> =>
         contentPlanning.scoreOffersForUser(
@@ -822,6 +848,9 @@ describe('入口の網羅', () => {
       'overrideGenreBlockForUser',
       'listPlanningRunsForUser',
       'scoreOffersForUser',
+      'designRevenueArticlesForUser',
+      'listContentItemsForUser',
+      'findLatestPlanForUser',
     ],
   } as const;
 
