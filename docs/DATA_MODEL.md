@@ -106,6 +106,14 @@ https://asp.example/click?a=xxxx&<sub_id_param>=<slot>-<contentItemId>
 - **`REDIRECT` の案件にも付ける。** リダイレクタはクリックを数え、サブIDは成果を紐づける。役割が違う（Q-001）
 - **パス埋め込み型のASP**（`.../click/<値>`）はこの列で表現できない。出てきた時点で論点として起票する
 
+### `affiliate_offers.blog_posting_prohibited`
+
+TASKS E-5-schema。SPEC 9.2.3 の足切り「ブログ掲載禁止」（OPEN_QUESTIONS Q-019）。
+
+**`deny_conditions` の文言から機械判定しない。** 表記が揺れ、黙って通すのも黙って落とすのも起きる。ASPの規約の判断なので **ADMIN が設定する**（`link_mode`・`sub_id_param` と同じ扱い）。
+
+**既定は `false`。ここだけは安全側に倒さない。** `true` にすると、設定されるまで全案件が足切りされ、STEP 2 が常に0件になって STEP 1 へ差し戻され続ける。
+
 ### `affiliate_offers.score_breakdown`
 
 ```ts

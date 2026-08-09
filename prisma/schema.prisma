@@ -457,43 +457,50 @@ model PersonaFact {
 // ============================================================
 
 model AffiliateOffer {
-  id              String         @id @default(uuid()) @db.Uuid
-  blogId          String         @map("blog_id") @db.Uuid
-  name            String
-  aspName         String         @map("asp_name")
-  advertiserName  String?        @map("advertiser_name")
-  landingPageUrl  String         @map("landing_page_url")
-  affiliateUrl    String         @map("affiliate_url")
-  rewardYen       Int?           @map("reward_yen")
-  conversionType  ConversionType @map("conversion_type")
-  facts           Json
-  userExperience  UserExperience @default(UNKNOWN) @map("user_experience")
-  userRating      Int?           @map("user_rating")
-  denyConditions  String[]       @map("deny_conditions")
-  lpFormFields    Int?           @map("lp_form_fields")
-  lpMobileReady   Boolean?       @map("lp_mobile_ready")
+  id                    String         @id @default(uuid()) @db.Uuid
+  blogId                String         @map("blog_id") @db.Uuid
+  name                  String
+  aspName               String         @map("asp_name")
+  advertiserName        String?        @map("advertiser_name")
+  landingPageUrl        String         @map("landing_page_url")
+  affiliateUrl          String         @map("affiliate_url")
+  rewardYen             Int?           @map("reward_yen")
+  conversionType        ConversionType @map("conversion_type")
+  facts                 Json
+  userExperience        UserExperience @default(UNKNOWN) @map("user_experience")
+  userRating            Int?           @map("user_rating")
+  denyConditions        String[]       @map("deny_conditions")
+  lpFormFields          Int?           @map("lp_form_fields")
+  lpMobileReady         Boolean?       @map("lp_mobile_ready")
   /// LPのページ長（取得したHTMLのバイト数・D-2）。
   ///
   /// SPEC 9.2.3 が「ページ長を機械判定する」と定めているが、スコアにも
   /// 足切りにも使われない。**判定した値を残さないと、後から
   /// 「なぜこの案件が落ちたのか」を確かめられない。**
-  lpContentLength Int?           @map("lp_content_length")
-  lpEvaluatedAt   DateTime?      @map("lp_evaluated_at") @db.Timestamptz(6)
-  selectionScore  Int?           @map("selection_score")
-  scoreBreakdown  Json?          @map("score_breakdown")
-  status          OfferStatus    @default(DRAFT)
+  lpContentLength       Int?           @map("lp_content_length")
+  lpEvaluatedAt         DateTime?      @map("lp_evaluated_at") @db.Timestamptz(6)
+  selectionScore        Int?           @map("selection_score")
+  scoreBreakdown        Json?          @map("score_breakdown")
+  status                OfferStatus    @default(DRAFT)
   /// リンクの出し方。既定は DIRECT（安全側・Q-001）
-  linkMode        LinkMode       @default(DIRECT) @map("link_mode")
+  linkMode              LinkMode       @default(DIRECT) @map("link_mode")
   /// サブIDのパラメータ名（D-10・OPEN_QUESTIONS Q-014）。
   ///
   /// ASPによって名前が違う（sub / s1 / argument など）。
   /// **NULL ならサブIDを付けない。** ASPの情報が無くても案件は登録でき、
   /// 分かったものから ADMIN が SQL で埋める。
-  subIdParam      String?        @map("sub_id_param")
-  startsAt        DateTime?      @map("starts_at") @db.Date
-  endsAt          DateTime?      @map("ends_at") @db.Date
-  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  subIdParam            String?        @map("sub_id_param")
+  /// ブログへの掲載が禁じられているか（E-5-schema・OPEN_QUESTIONS Q-019）。
+  ///
+  /// SPEC 9.2.3 の足切りの1つ。**ASPの規約の判断**なので ADMIN が設定する
+  /// （`link_mode` `sub_id_param` と同じ扱い）。既定は `false`。
+  /// `deny_conditions` の文言から機械判定しない — 表記が揺れ、
+  /// **黙って通す/黙って落とすのどちらも起きる。**
+  blogPostingProhibited Boolean        @default(false) @map("blog_posting_prohibited")
+  startsAt              DateTime?      @map("starts_at") @db.Date
+  endsAt                DateTime?      @map("ends_at") @db.Date
+  createdAt             DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   blog           Blog            @relation(fields: [blogId], references: [id], onDelete: Cascade)
   banners        Banner[]
