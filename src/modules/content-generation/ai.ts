@@ -19,6 +19,7 @@ import { invalidArticleError } from './errors';
 /** プロンプトのキー（CONTENT_PLANNING 1.4 で固定） */
 export const GENERATION_PROMPT_KEYS = {
   article: 'generation.article',
+  claimExtraction: 'generation.claim_extraction',
 } as const;
 
 const articleSchema = z.object({

@@ -24,6 +24,8 @@ export interface AppArticleVersion {
   answerCapsule: string;
   bodyHtml: string;
   contentHash: string;
+  /** 事実チェックの結果（E-12）。生成直後は `NOT_CHECKED` */
+  factCheckStatus: string;
   modelProvider: string;
   modelName: string;
   promptVersion: string;
@@ -41,6 +43,7 @@ const SELECT = {
   answerCapsule: true,
   bodyHtml: true,
   contentHash: true,
+  factCheckStatus: true,
   modelProvider: true,
   modelName: true,
   promptVersion: true,
@@ -158,6 +161,53 @@ export async function saveArticleVersion(
       },
       select: SELECT,
     });
+  });
+}
+
+/**
+ * 事実チェックの結果を書く（E-12）。
+ *
+ * **記事IDと版IDの両方を条件に入れる。** 版IDだけで更新すると、
+ * 他人の記事の版に結果を書ける（C-6 と同じ形の穴）。
+ *
+ * @throws {AppError} その記事の版ではない
+ */
+export async function saveFactCheckResult(params: {
+  contentItemId: string;
+  articleVersionId: string;
+  status: 'PASSED' | 'WARNING' | 'FAILED';
+  unverifiedClaims: Prisma.InputJsonValue;
+}): Promise<AppArticleVersion> {
+  const updated = await prisma.articleVersion.updateMany({
+    where: { id: params.articleVersionId, contentItemId: params.contentItemId },
+    data: {
+      factCheckStatus: params.status,
+      unverifiedClaims: params.unverifiedClaims,
+    },
+  });
+
+  if (updated.count === 0) {
+    throw itemNotInPlanError();
+  }
+
+  return prisma.articleVersion.findUniqueOrThrow({
+    where: { id: params.articleVersionId },
+    select: SELECT,
+  });
+}
+
+/**
+ * 記事の最新の版を引く。
+ *
+ * **所有権は呼び出し側が `requirePlannedItemForUser` で確かめる。**
+ */
+export async function findLatestArticleVersion(
+  contentItemId: string,
+): Promise<AppArticleVersion | null> {
+  return prisma.articleVersion.findFirst({
+    where: { contentItemId },
+    orderBy: [{ versionNo: 'desc' }],
+    select: SELECT,
   });
 }
 

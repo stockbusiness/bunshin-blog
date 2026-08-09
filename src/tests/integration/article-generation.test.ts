@@ -6,8 +6,11 @@ import {
   PROMPT_ERROR_CODES,
   assertValidJsonLd,
   createPromptVersionForAdmin,
+  factCheckArticleForUser,
   generateArticleForUser,
+  isApprovable,
   listArticleVersionsForUser,
+  type FactCheckStatus,
   type JsonLdBlock,
 } from '@/modules/content-generation';
 import {
@@ -37,6 +40,8 @@ let revenueItemId: string;
 let trafficItemId: string;
 
 let respond: (input: Record<string, unknown>) => unknown;
+/** 主張の抽出（E-12）。既定は「主張なし」＝ `PASSED` */
+let respondClaims: (input: Record<string, unknown>) => unknown;
 
 function aiText(payload: unknown): string {
   return JSON.stringify({
@@ -55,8 +60,14 @@ function startServer(): Promise<void> {
         ?.content;
       const input = JSON.parse(raw ?? '{}') as Record<string, unknown>;
 
+      // **記事生成と主張の抽出で入力の形が違う**（CONTENT_PLANNING 7.1 / 8.1）
+      const answer =
+        input['contentItem'] === undefined
+          ? respondClaims(input)
+          : respond(input);
+
       response.writeHead(200, { 'content-type': 'application/json' });
-      response.end(aiText(respond(input)));
+      response.end(aiText(answer));
     });
   });
 
@@ -148,6 +159,13 @@ beforeEach(async () => {
     activate: true,
   });
 
+  await createPromptVersionForAdmin({
+    key: 'generation.claim_extraction',
+    version: 'v1',
+    body: '主張を抽出してください。',
+    activate: true,
+  });
+
   const offer = await prisma.affiliateOffer.create({
     data: {
       blogId,
@@ -207,6 +225,7 @@ beforeEach(async () => {
   trafficItemId = traffic.id;
 
   respond = goodArticle;
+  respondClaims = () => ({ claims: [] });
 });
 
 describe('構成表を参照して生成する（完了条件）', () => {
@@ -281,7 +300,7 @@ describe('構成表を参照して生成する（完了条件）', () => {
   });
 
   /** 費用は必ず記録する（E-14）。予算の判定もここで走る（E-15） */
-  it('AI費用が記録される', async () => {
+  it('AI費用が呼び出しごとに記録される', async () => {
     await generateArticleForUser(
       { userId, blogId, contentItemId: trafficItemId },
       { provider: provider() },
@@ -289,11 +308,14 @@ describe('構成表を参照して生成する（完了条件）', () => {
 
     const logs = await prisma.aiUsageLog.findMany({
       where: { userId },
-      select: { operation: true, inputTokens: true, outputTokens: true },
+      select: { operation: true, inputTokens: true },
     });
 
-    expect(logs).toHaveLength(1);
-    expect(logs[0]?.operation).toBe('generation.article');
+    // 本文の生成（E-10）と主張の抽出（E-12）で2回
+    expect(logs.map((log) => log.operation).sort()).toEqual([
+      'generation.article',
+      'generation.claim_extraction',
+    ]);
     expect(logs[0]?.inputTokens).toBe(100);
   });
 });
@@ -369,10 +391,10 @@ describe('受信後の検査（CONTENT_PLANNING 7.2）', () => {
 
 describe('生成しただけでは承認へ送れない', () => {
   /**
-   * **事実チェック（E-12）と禁止表現の検査（E-13）を通っていない。**
+   * **禁止表現の検査（E-13）を通っていない。**
    * この時点で `READY_FOR_REVIEW` にすると、未検査の記事が承認依頼へ流れる。
    */
-  it('事実チェックは未実施のまま保存される', async () => {
+  it('リスクフラグは未実施のまま保存される', async () => {
     const version = await generateArticleForUser(
       { userId, blogId, contentItemId: trafficItemId },
       { provider: provider() },
@@ -380,10 +402,9 @@ describe('生成しただけでは承認へ送れない', () => {
 
     const row = await prisma.articleVersion.findUnique({
       where: { id: version.id },
-      select: { factCheckStatus: true, riskFlags: true },
+      select: { riskFlags: true },
     });
 
-    expect(row?.factCheckStatus).toBe('NOT_CHECKED');
     // 禁止表現・リスクフラグは E-13
     expect(row?.riskFlags).toEqual([]);
   });
@@ -585,6 +606,220 @@ describe('アンサーカプセルとJSON-LD（E-11）', () => {
       name: '案件',
       facts: { features: ['機能A'] },
     });
+  });
+});
+
+describe('事実チェック（E-12）', () => {
+  /**
+   * **チェックを飛ばす経路を作らない。** 別の入口にすると
+   * 「呼び忘れた記事」が `NOT_CHECKED` のまま残り、承認画面で
+   * 「問題なし」に見える
+   */
+  it('生成すると必ず事実チェックまで走る', async () => {
+    const version = await generateArticleForUser(
+      { userId, blogId, contentItemId: trafficItemId },
+      { provider: provider() },
+    );
+
+    expect(version.factCheckStatus).not.toBe('NOT_CHECKED');
+  });
+
+  it('主張が0件なら PASSED', async () => {
+    const version = await generateArticleForUser(
+      { userId, blogId, contentItemId: trafficItemId },
+      { provider: provider() },
+    );
+
+    expect(version.factCheckStatus).toBe('PASSED');
+    expect(isApprovable(version.factCheckStatus as FactCheckStatus)).toBe(true);
+  });
+
+  /** **完了条件の「facts外の数値を検出」** */
+  it('facts に無い数値を主張したら FAILED', async () => {
+    respondClaims = () => ({
+      claims: [
+        {
+          text: '初期費用は3,000円です',
+          type: 'PRICE',
+          excerpt: '初期費用は3,000円',
+        },
+      ],
+    });
+
+    const version = await generateArticleForUser(
+      { userId, blogId, contentItemId: revenueItemId },
+      { provider: provider() },
+    );
+
+    expect(version.factCheckStatus).toBe('FAILED');
+
+    const row = await prisma.articleVersion.findUnique({
+      where: { id: version.id },
+      select: { unverifiedClaims: true },
+    });
+
+    const claims = row?.unverifiedClaims as { reason: string }[];
+
+    expect(claims).toHaveLength(1);
+    expect(claims[0]?.reason).toBe('NOT_IN_FACTS');
+  });
+
+  /** **FAILED は承認依頼へ送らない**（SPEC 9.7、完了条件） */
+  it('FAILED の記事は承認へ送れない', async () => {
+    respondClaims = () => ({
+      claims: [
+        { text: '初月無料です', type: 'CONDITION', excerpt: '初月無料' },
+      ],
+    });
+
+    const version = await generateArticleForUser(
+      { userId, blogId, contentItemId: revenueItemId },
+      { provider: provider() },
+    );
+
+    expect(isApprovable(version.factCheckStatus as FactCheckStatus)).toBe(
+      false,
+    );
+
+    const item = await prisma.contentItem.findUnique({
+      where: { id: revenueItemId },
+      select: { status: true },
+    });
+
+    expect(item?.status).toBe('PLANNED');
+  });
+
+  it('GENERAL だけ未確認なら WARNING', async () => {
+    respondClaims = () => ({
+      claims: [
+        { text: '格安SIMは普及しています', type: 'GENERAL', excerpt: '普及' },
+      ],
+    });
+
+    const version = await generateArticleForUser(
+      { userId, blogId, contentItemId: trafficItemId },
+      { provider: provider() },
+    );
+
+    expect(version.factCheckStatus).toBe('WARNING');
+  });
+
+  /** **照合先は案件の facts。** AIの申告ではない */
+  it('facts に載っている主張は通る', async () => {
+    respondClaims = () => ({
+      claims: [
+        {
+          text: '機能Aが使えます',
+          type: 'FEATURE',
+          excerpt: '機能Aが使えます',
+        },
+      ],
+    });
+
+    const version = await generateArticleForUser(
+      { userId, blogId, contentItemId: revenueItemId },
+      { provider: provider() },
+    );
+
+    // facts に `updatedAt` が無いため、一致しても WARNING（Q-022）
+    expect(version.factCheckStatus).toBe('WARNING');
+  });
+
+  /**
+   * **一人称で使ってよい事実だけを照合先にする**（D-6 の制限）。
+   * 使ってはいけない事実を根拠に体験談を通したら、制限が無意味になる
+   */
+  it('使ってはいけない事実を根拠にした体験談は FAILED', async () => {
+    await prisma.personaFact.create({
+      data: {
+        userId,
+        factType: 'EXPERIENCE',
+        content: '格安SIMへ乗り換えました',
+        source: 'AI_INFERENCE',
+        verification: 'UNVERIFIED',
+        usableFirstPerson: false,
+      },
+    });
+
+    respondClaims = () => ({
+      claims: [
+        {
+          text: '私も格安SIMへ乗り換えました',
+          type: 'EXPERIENCE',
+          excerpt: '乗り換えました',
+        },
+      ],
+    });
+
+    const version = await generateArticleForUser(
+      { userId, blogId, contentItemId: trafficItemId },
+      { provider: provider() },
+    );
+
+    expect(version.factCheckStatus).toBe('FAILED');
+  });
+
+  it('使ってよい事実に基づく体験談は通る', async () => {
+    await prisma.personaFact.create({
+      data: {
+        userId,
+        factType: 'EXPERIENCE',
+        content: '格安SIMへ乗り換えました',
+        source: 'USER_INPUT',
+        verification: 'VERIFIED',
+        usableFirstPerson: true,
+      },
+    });
+
+    respondClaims = () => ({
+      claims: [
+        {
+          text: '私も格安SIMへ乗り換えました',
+          type: 'EXPERIENCE',
+          excerpt: '乗り換えました',
+        },
+      ],
+    });
+
+    const version = await generateArticleForUser(
+      { userId, blogId, contentItemId: trafficItemId },
+      { provider: provider() },
+    );
+
+    expect(version.factCheckStatus).toBe('PASSED');
+  });
+
+  /**
+   * **「主張が0件」と「抽出できなかった」を同じ扱いにしない。**
+   * 壊れた応答が `PASSED` に化ける
+   */
+  it('抽出に失敗したら記事を通さない', async () => {
+    respondClaims = () => 'これはJSONではありません';
+
+    await expect(
+      generateArticleForUser(
+        { userId, blogId, contentItemId: trafficItemId },
+        { provider: provider() },
+      ),
+    ).rejects.toMatchObject({ code: PROMPT_ERROR_CODES.invalidArticle });
+  });
+
+  /** 他人のブログの記事はチェックできない（C-6 と同じ形） */
+  it('他人のブログIDでは 404', async () => {
+    await generateArticleForUser(
+      { userId, blogId, contentItemId: trafficItemId },
+      { provider: provider() },
+    );
+
+    const other = await createUser(prisma);
+    const otherBlog = await createBlog(prisma, other.id);
+
+    await expect(
+      factCheckArticleForUser(
+        { userId, blogId: otherBlog.id, contentItemId: trafficItemId },
+        { provider: provider() },
+      ),
+    ).rejects.toMatchObject({ status: 404 });
   });
 });
 
