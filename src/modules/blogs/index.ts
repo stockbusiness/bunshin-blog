@@ -17,6 +17,8 @@ export {
   getSlotUsageForUser,
 } from './repository';
 
+export { findGenre, listSelectableGenres } from './genres';
+
 export {
   ownedBy,
   requireFound,
@@ -57,6 +59,7 @@ export type { ArticleRatio } from './article-ratio';
 export type {
   AppBlog,
   AppBlogGenre,
+  AppGenre,
   CreateBlogInput,
   UpdateBlogInput,
 } from './types';

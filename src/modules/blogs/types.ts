@@ -8,6 +8,17 @@ export interface AppBlogGenre {
 }
 
 /**
+ * `genres` マスタの1件（E-4）。
+ *
+ * **利用者に紐づかない。** システム全体で1組のマスタで、`ymyl_risk` は
+ * ここが唯一の正（利用者の申告で上書きしない。SPEC 9.2.2）。
+ */
+export interface AppGenre extends AppBlogGenre {
+  ymylRisk: 'HIGH' | 'MEDIUM' | 'LOW';
+  status: 'CANDIDATE' | 'APPROVED' | 'REJECTED';
+}
+
+/**
  * blogs モジュールが外部へ渡すブログ表現（B-3）。
  *
  * Prisma の型をそのまま外へ出さない（users と同じ方針）。
