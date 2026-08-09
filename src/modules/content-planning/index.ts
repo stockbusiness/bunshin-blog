@@ -110,16 +110,30 @@ export {
   type TrafficItemDraft,
 } from './step4';
 
-export { appendItemsToPlanForUser, saveLinksForUser } from './plan-repository';
+export {
+  appendItemsToPlanForUser,
+  saveLinksForUser,
+  savePublishOrderForUser,
+} from './plan-repository';
 
 export {
   buildPlanForUser,
   MAX_PLAN_RETRIES,
   type BuildPlanInput,
+  type JobPlanInput,
   type BuildPlanDeps,
   type BuildPlanResult,
   type BuildPlanAttempt,
 } from './plan-builder';
+
+export {
+  assignPublishOrder,
+  revenueFitsInInitialWeeks,
+  ABSOLUTE_WEEKLY_CAP,
+  REVENUE_WEEKS,
+  type OrderableItem,
+  type PublishSlot,
+} from './publish-order';
 
 export {
   checkConstraints,
@@ -156,6 +170,7 @@ export {
   invalidStep4InputError,
   planNotFoundError,
   planningNotConvergedError,
+  invalidPublishOrderError,
   type PlanningErrorCode,
 } from './errors';
 

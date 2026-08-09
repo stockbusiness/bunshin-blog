@@ -296,6 +296,77 @@ describe('収束しない場合（完了条件）', () => {
   });
 });
 
+describe('公開順序（E-9）', () => {
+  /** **収益記事が先行する**（完了条件） */
+  it('収益記事が先に公開される', async () => {
+    await buildPlanForUser(
+      { userId, blogId, genreName: '節約', adoptedOfferIds: [offerId] },
+      { provider: provider() },
+    );
+
+    const items = await prisma.contentItem.findMany({
+      where: { blogId },
+      orderBy: { publishPriority: 'asc' },
+      select: {
+        contentType: true,
+        publishPriority: true,
+        plannedPublishWeek: true,
+      },
+    });
+
+    // 先頭3本は収益記事（AFFILIATE 2 + COMPARISON 1）
+    expect(
+      items
+        .slice(0, 3)
+        .every(
+          (item) =>
+            item.contentType === 'AFFILIATE' ||
+            item.contentType === 'COMPARISON',
+        ),
+    ).toBe(true);
+  });
+
+  /** **週4本を超えない**（完了条件。SPEC 2.2） */
+  it('1週あたりの本数が上限を超えない', async () => {
+    await buildPlanForUser(
+      { userId, blogId, genreName: '節約', adoptedOfferIds: [offerId] },
+      { provider: provider() },
+    );
+
+    const items = await prisma.contentItem.findMany({
+      where: { blogId },
+      select: { plannedPublishWeek: true },
+    });
+
+    const perWeek = new Map<number, number>();
+    for (const item of items) {
+      if (item.plannedPublishWeek === null) continue;
+      perWeek.set(
+        item.plannedPublishWeek,
+        (perWeek.get(item.plannedPublishWeek) ?? 0) + 1,
+      );
+    }
+
+    expect(perWeek.size).toBeGreaterThan(0);
+    for (const count of perWeek.values()) {
+      expect(count).toBeLessThanOrEqual(4);
+    }
+  });
+
+  it('公開週が全ての記事に付く', async () => {
+    await buildPlanForUser(
+      { userId, blogId, genreName: '節約', adoptedOfferIds: [offerId] },
+      { provider: provider() },
+    );
+
+    const unassigned = await prisma.contentItem.count({
+      where: { blogId, plannedPublishWeek: null },
+    });
+
+    expect(unassigned).toBe(0);
+  });
+});
+
 describe('他人のブログでは組み立てられない', () => {
   it('他人のブログIDでは 404', async () => {
     const other = await createUser(prisma);

@@ -36,7 +36,11 @@ import { planningNotConvergedError } from './errors';
 import { recordPlanRun } from './repository';
 import { designRevenueArticlesForUser } from './step3-service';
 import { designTrafficArticlesForUser } from './step4-service';
-import { listPlanItemsWithLinksForUser } from './plan-repository';
+import {
+  listPlanItemsWithLinksForUser,
+  savePublishOrderForUser,
+} from './plan-repository';
+import { assignPublishOrder } from './publish-order';
 
 /** 再実行の上限（SPEC 9.2.6「最大3回」） */
 export const MAX_PLAN_RETRIES = 3;
@@ -47,6 +51,9 @@ export interface BuildPlanInput {
   genreName: string;
   adoptedOfferIds: readonly string[];
 }
+
+/** ジョブから渡す入力（`src/app/api/jobs/run/handlers.ts` が組み立てる） */
+export type JobPlanInput = BuildPlanInput;
 
 export interface BuildPlanDeps {
   provider?: AiProvider | undefined;
@@ -78,7 +85,7 @@ export async function buildPlanForUser(
   input: BuildPlanInput,
   deps: BuildPlanDeps = {},
 ): Promise<BuildPlanResult> {
-  await requireBlogForUser(input);
+  const blog = await requireBlogForUser(input);
 
   const attempts: BuildPlanAttempt[] = [];
 
@@ -102,6 +109,23 @@ export async function buildPlanForUser(
       },
       deps,
     );
+
+    // **公開順序を先に付ける**（E-9）。週の上限は制約チェックの対象で、
+    // 未割り当てのまま判定すると必ず通ってしまう
+    const drafted = await listPlanItemsWithLinksForUser({
+      userId: input.userId,
+      blogId: input.blogId,
+      contentPlanId: revenue.planId,
+    });
+
+    await savePublishOrderForUser({
+      userId: input.userId,
+      blogId: input.blogId,
+      slots: assignPublishOrder({
+        items: drafted,
+        weeklyCap: blog.articleRatio.weeklyPublishCap,
+      }),
+    });
 
     const items = await listPlanItemsWithLinksForUser({
       userId: input.userId,
