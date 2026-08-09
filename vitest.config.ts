@@ -69,12 +69,16 @@ export default defineConfig({
         // | settings/provider.ts | — | settings-wiring.test.ts |
         // | settings/connection-test.ts | — | settings-connection-test.test.ts |
         // | content-planning/service.ts | step1.ts | genre-review.test.ts |
+        // | content-planning/step2-service.ts | step2.ts | offer-scoring.test.ts |
+        // | affiliate/scoring.ts | step2.ts | offer-scoring.test.ts |
         // | content-planning/ai.ts | step1.ts の filterAlternatives | genre-review.test.ts |
         'src/modules/settings/service.ts',
         'src/modules/settings/resolve.ts',
         'src/modules/settings/provider.ts',
         'src/modules/settings/connection-test.ts',
         'src/modules/content-planning/service.ts',
+        'src/modules/content-planning/step2-service.ts',
+        'src/modules/affiliate/scoring.ts',
         'src/modules/content-planning/ai.ts',
       ],
       thresholds: {

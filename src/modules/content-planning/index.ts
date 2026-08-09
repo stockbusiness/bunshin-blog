@@ -38,7 +38,31 @@ export {
 } from './step1';
 
 export {
+  scoreOffersForUser,
+  type ScoreOffersInput,
+  type ScoreOffersDeps,
+  type ScoreOffersResult,
+} from './step2-service';
+
+export {
+  scoreOffer,
+  adoptOffers,
+  findExclusion,
+  unevaluatedOffers,
+  SCORE_MAX,
+  ADOPTION_MIN_SCORE,
+  ADOPTION_LIMIT,
+  EXCLUSION_REASONS,
+  type ScorableOffer,
+  type ScoredOffer,
+  type ScoreBreakdown,
+  type ExclusionReason,
+  type SearchDemand,
+} from './step2';
+
+export {
   STEP1_PROMPT_KEYS,
+  STEP2_PROMPT_KEYS,
   ALTERNATIVE_GENRE_COUNT,
   type AlternativeGenre,
   type GenreReviewText,

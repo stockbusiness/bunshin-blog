@@ -28,11 +28,16 @@ import { z } from 'zod';
 import type { AiProvider } from '@/lib/ai';
 import { invalidAiResponseError } from './errors';
 import type { GenreCandidate, Step1Decision } from './step1';
+import type { SearchDemand } from './step2';
 
 /** プロンプトのキー。CONTENT_PLANNING 1.4 で固定されている */
 export const STEP1_PROMPT_KEYS = {
   genreReview: 'planning.step1.genre_review',
   alternativeGenres: 'planning.step1.alternative_genres',
+} as const;
+
+export const STEP2_PROMPT_KEYS = {
+  searchDemand: 'planning.step2.search_demand',
 } as const;
 
 /** 案出し系は 0.7、抽出・分類系は 0.0（CONTENT_PLANNING 1.2） */
@@ -95,7 +100,7 @@ function stripFence(text: string): string {
 async function completeJson<T>(params: {
   provider: AiProvider;
   key: string;
-  operation: 'GENRE_SUGGESTION' | 'GENRE_REVIEW';
+  operation: 'GENRE_SUGGESTION' | 'GENRE_REVIEW' | 'CLASSIFY';
   system: string;
   input: unknown;
   temperature: number;
@@ -189,4 +194,47 @@ export async function suggestAlternativeGenres(params: {
   });
 
   return result.candidates;
+}
+
+const searchDemandSchema = z.object({
+  demand: z.enum(['HIGH', 'MEDIUM', 'NONE']),
+  note: z.string().trim().max(120).default(''),
+});
+
+export type SearchDemandAnswer = z.infer<typeof searchDemandSchema>;
+
+/**
+ * 商品名に検索需要があるかを聞く（CONTENT_PLANNING 3.2）。
+ *
+ * **スコアは返させない。** 3値だけを受け取り、点数への写像は
+ * `step2.ts` の定数で行う。返させると、プロンプト次第で合計が動く。
+ */
+export async function askSearchDemand(params: {
+  provider: AiProvider;
+  offerName: string;
+  advertiserName: string | null;
+  genreName: string;
+}): Promise<SearchDemand> {
+  const result = await completeJson({
+    provider: params.provider,
+    key: STEP2_PROMPT_KEYS.searchDemand,
+    // 分類は LOW（CONTENT_PLANNING 1.3）
+    operation: 'CLASSIFY',
+    system: [
+      'あなたは検索需要を見積もる担当です。',
+      '商品名に検索需要があるかだけを判定してください。',
+      '**点数を返さないでください。** demand は HIGH / MEDIUM / NONE のいずれかです。',
+      'note は60字以内です。',
+    ].join('\n'),
+    input: {
+      offerName: params.offerName,
+      advertiserName: params.advertiserName,
+      genreName: params.genreName,
+    },
+    temperature: 0,
+    maxOutputTokens: 300,
+    schema: searchDemandSchema,
+  });
+
+  return result.demand;
 }
