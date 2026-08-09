@@ -272,6 +272,7 @@ model User {
   aiUsageLogs    AiUsageLog[]
   auditLogs      AuditLog[]        @relation("AuditActor")
   loginTokens    AdminLoginToken[]
+  appSettings    AppSetting[]      @relation("AppSettingEditor")
 
   @@index([status])
   @@map("users")
@@ -456,43 +457,43 @@ model PersonaFact {
 // ============================================================
 
 model AffiliateOffer {
-  id             String         @id @default(uuid()) @db.Uuid
-  blogId         String         @map("blog_id") @db.Uuid
-  name           String
-  aspName        String         @map("asp_name")
-  advertiserName String?        @map("advertiser_name")
-  landingPageUrl String         @map("landing_page_url")
-  affiliateUrl   String         @map("affiliate_url")
-  rewardYen      Int?           @map("reward_yen")
-  conversionType ConversionType @map("conversion_type")
-  facts          Json
-  userExperience UserExperience @default(UNKNOWN) @map("user_experience")
-  userRating     Int?           @map("user_rating")
-  denyConditions String[]       @map("deny_conditions")
-  lpFormFields   Int?           @map("lp_form_fields")
-  lpMobileReady  Boolean?       @map("lp_mobile_ready")
+  id              String         @id @default(uuid()) @db.Uuid
+  blogId          String         @map("blog_id") @db.Uuid
+  name            String
+  aspName         String         @map("asp_name")
+  advertiserName  String?        @map("advertiser_name")
+  landingPageUrl  String         @map("landing_page_url")
+  affiliateUrl    String         @map("affiliate_url")
+  rewardYen       Int?           @map("reward_yen")
+  conversionType  ConversionType @map("conversion_type")
+  facts           Json
+  userExperience  UserExperience @default(UNKNOWN) @map("user_experience")
+  userRating      Int?           @map("user_rating")
+  denyConditions  String[]       @map("deny_conditions")
+  lpFormFields    Int?           @map("lp_form_fields")
+  lpMobileReady   Boolean?       @map("lp_mobile_ready")
   /// LPのページ長（取得したHTMLのバイト数・D-2）。
   ///
   /// SPEC 9.2.3 が「ページ長を機械判定する」と定めているが、スコアにも
   /// 足切りにも使われない。**判定した値を残さないと、後から
   /// 「なぜこの案件が落ちたのか」を確かめられない。**
-  lpContentLength Int?          @map("lp_content_length")
-  lpEvaluatedAt  DateTime?      @map("lp_evaluated_at") @db.Timestamptz(6)
-  selectionScore Int?           @map("selection_score")
-  scoreBreakdown Json?          @map("score_breakdown")
-  status         OfferStatus    @default(DRAFT)
+  lpContentLength Int?           @map("lp_content_length")
+  lpEvaluatedAt   DateTime?      @map("lp_evaluated_at") @db.Timestamptz(6)
+  selectionScore  Int?           @map("selection_score")
+  scoreBreakdown  Json?          @map("score_breakdown")
+  status          OfferStatus    @default(DRAFT)
   /// リンクの出し方。既定は DIRECT（安全側・Q-001）
-  linkMode       LinkMode       @default(DIRECT) @map("link_mode")
+  linkMode        LinkMode       @default(DIRECT) @map("link_mode")
   /// サブIDのパラメータ名（D-10・OPEN_QUESTIONS Q-014）。
   ///
   /// ASPによって名前が違う（sub / s1 / argument など）。
   /// **NULL ならサブIDを付けない。** ASPの情報が無くても案件は登録でき、
   /// 分かったものから ADMIN が SQL で埋める。
-  subIdParam     String?        @map("sub_id_param")
-  startsAt       DateTime?      @map("starts_at") @db.Date
-  endsAt         DateTime?      @map("ends_at") @db.Date
-  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  subIdParam      String?        @map("sub_id_param")
+  startsAt        DateTime?      @map("starts_at") @db.Date
+  endsAt          DateTime?      @map("ends_at") @db.Date
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   blog           Blog            @relation(fields: [blogId], references: [id], onDelete: Cascade)
   banners        Banner[]
@@ -910,4 +911,29 @@ model SearchConsoleConnection {
   blog Blog @relation(fields: [blogId], references: [id], onDelete: Cascade)
 
   @@map("search_console_connections")
+}
+
+/// 管理画面から変更できる設定（TASKS H-7-schema、OPEN_QUESTIONS Q-017）。
+///
+/// **秘密は `value_encrypted` にしか入らない。** どちらの列に入るかは
+/// `is_secret` と CHECK 制約で決まり、アプリ側の書き方に依存しない。
+///
+/// ここに置けるのは「アプリが動いた後で初めて要るもの」だけ。
+/// `DATABASE_URL` や `ENCRYPTION_KEY` は環境変数のまま（Q-017）。
+model AppSetting {
+  id              String   @id @default(uuid()) @db.Uuid
+  key             String   @unique
+  /// 秘密でない値。`is_secret = true` のときは必ず NULL
+  value           String?
+  /// AES-256-GCM で暗号化した値。`is_secret = false` のときは必ず NULL
+  valueEncrypted  String?  @map("value_encrypted")
+  isSecret        Boolean  @default(false) @map("is_secret")
+  /// 最後に変更した ADMIN。監査ログは `audit` モジュール未実装のため持たない
+  updatedByUserId String?  @map("updated_by_user_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  updatedBy User? @relation("AppSettingEditor", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@map("app_settings")
 }

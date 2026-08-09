@@ -130,15 +130,16 @@ jobs:
              where contype='c' and conname in
                ('blogs_slot_range','content_items_outbound_max',
                 'admin_login_tokens_expiry_after_creation',
-                'admin_login_tokens_used_after_creation')")
+                'admin_login_tokens_used_after_creation',
+                'app_settings_secret_column','app_settings_key_format')")
           echo "テーブル数: $TABLES / enum型数: $TYPES / CHECK制約: $CHECKS"
           if [ "$TABLES" -lt 1 ]; then
             echo "::error::テーブルが作成されていない"
             exit 1
           fi
-          # DATA_MODEL 4章でDB側にも入れると定めた4件
-          if [ "$CHECKS" -ne 4 ]; then
-            echo "::error::CHECK制約が4件そろっていない（$CHECKS 件）"
+          # DATA_MODEL 4章でDB側にも入れると定めた6件
+          if [ "$CHECKS" -ne 6 ]; then
+            echo "::error::CHECK制約が6件そろっていない（$CHECKS 件）"
             exit 1
           fi
 

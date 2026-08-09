@@ -37,13 +37,13 @@ describe('統合テスト基盤', () => {
     expect(rows[0]?.ok).toBe(1);
   });
 
-  it('マイグレーションで27テーブルが作られている', async () => {
+  it('マイグレーションで28テーブルが作られている', async () => {
     const rows = await prisma.$queryRawUnsafe<{ count: bigint }[]>(
       `select count(*)::bigint as count from information_schema.tables
        where table_schema = 'public' and table_name <> '_prisma_migrations'`,
     );
 
-    expect(Number(rows[0]?.count ?? 0)).toBe(27);
+    expect(Number(rows[0]?.count ?? 0)).toBe(28);
   });
 
   it('ユーザーとブログを作れる', async () => {
