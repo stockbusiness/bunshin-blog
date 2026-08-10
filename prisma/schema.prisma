@@ -662,7 +662,8 @@ model Approval {
   userId           String         @map("user_id") @db.Uuid
   blogId           String         @map("blog_id") @db.Uuid
   contentItemId    String         @map("content_item_id") @db.Uuid
-  articleVersionId String         @map("article_version_id") @db.Uuid
+  /// 記事の版1つにつき提案は1つまで（F-1）。同じ版を二度提案しない
+  articleVersionId String         @unique @map("article_version_id") @db.Uuid
   status           ApprovalStatus @default(PENDING)
   proposalType     ProposalType   @map("proposal_type")
   priorityScore    Int            @map("priority_score")
