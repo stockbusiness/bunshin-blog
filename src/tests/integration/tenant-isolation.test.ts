@@ -7,6 +7,7 @@ import * as affiliate from '@/modules/affiliate';
 import * as banners from '@/modules/banners';
 import * as contentPlanning from '@/modules/content-planning';
 import * as contentGeneration from '@/modules/content-generation';
+import * as analytics from '@/modules/analytics';
 import * as blogs from '@/modules/blogs';
 import * as line from '@/modules/line';
 import * as users from '@/modules/users';
@@ -943,6 +944,8 @@ describe('入口の網羅', () => {
      * ためのもので、利用者が自分の分だけを読む画面が無い（H-11）
      */
     audit: [],
+    /** クリックの記録は読者（未ログイン）なので `...ForUser` を持たない（D-8） */
+    analytics: ['saveWeeklyResultForUser', 'listWeeklyResultsForUser'],
     approvals: [
       'refreshProposalsForUser',
       'listApprovalsForUser',
@@ -1001,6 +1004,7 @@ describe('入口の網羅', () => {
     ['ai-costs', aiCosts, covered['ai-costs']],
     ['approvals', approvals, covered.approvals],
     ['audit', audit, covered.audit],
+    ['analytics', analytics, covered.analytics],
     ['line', line, covered.line],
     ['users', users, covered.users],
     ['affiliate', affiliate, covered.affiliate],

@@ -11,6 +11,19 @@
 export { recordLinkClick, countLinkClicks } from './repository';
 
 export {
+  saveWeeklyResultForUser,
+  listWeeklyResultsForUser,
+  normalizeWeeklyResult,
+  weekOf,
+  WEEKLY_RESULT_ERROR_CODES,
+  MAX_CONVERSIONS_PER_WEEK,
+  MAX_REVENUE_YEN_PER_WEEK,
+  type WeeklyResult,
+  type WeeklyResultInput,
+  type WeeklyResultRow,
+} from './weekly-result';
+
+export {
   parseReferrerHost,
   hashUserAgent,
   REFERRER_HOST_MAX_LENGTH,
