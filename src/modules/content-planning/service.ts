@@ -18,6 +18,7 @@
 
 import { logger } from '@/lib/logger';
 import { findGenre, requireBlogForUser } from '@/modules/blogs';
+import { recordAudit } from '@/modules/audit';
 import { listOffersForUser } from '@/modules/affiliate';
 import { listPersonaFactsForUser } from '@/modules/personas';
 import { createConfiguredAiProvider } from '@/modules/settings';
@@ -248,6 +249,24 @@ export async function overrideGenreBlockForUser(input: {
     reasons: judgement.reasons,
     rejectionCount,
     overridden: true,
+  });
+
+  // **「普通ではないこと」を横断で辿れるようにする**（SPEC 9.2.2、H-11）。
+  // 選択そのものは `planning_runs.overridden_at` にも残っているが、
+  // そちらはブログ単位でしか引けない
+  await recordAudit({
+    actorUserId: input.userId,
+    action: 'GENRE_BLOCK_OVERRIDDEN',
+    entityType: 'planning_run',
+    entityId: run.id,
+    // **秘密を入れない**（SPEC 14.2）。何を承知したかだけを残す
+    metadata: {
+      blogId: input.blogId,
+      genreId: input.genreId,
+      genreName: genre.name,
+      rejectionCount,
+      reasons: judgement.reasons,
+    },
   });
 
   return {

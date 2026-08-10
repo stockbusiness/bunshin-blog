@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import * as aiCosts from '@/modules/ai-costs';
 import * as approvals from '@/modules/approvals';
+import * as audit from '@/modules/audit';
 import * as affiliate from '@/modules/affiliate';
 import * as banners from '@/modules/banners';
 import * as contentPlanning from '@/modules/content-planning';
@@ -936,6 +937,11 @@ describe('入口の網羅', () => {
      * **`approvals` の入口は利用者単位。** 3ブログ横断で順位を付けるため
      * ブログIDを取らない（SPEC 9.1、F-1）
      */
+    /**
+     * **`audit` に `...ForUser` の入口は無い。** 監査ログは横断で辿る
+     * ためのもので、利用者が自分の分だけを読む画面が無い（H-11）
+     */
+    audit: [],
     approvals: [
       'refreshProposalsForUser',
       'listApprovalsForUser',
@@ -991,6 +997,7 @@ describe('入口の網羅', () => {
   it.each([
     ['ai-costs', aiCosts, covered['ai-costs']],
     ['approvals', approvals, covered.approvals],
+    ['audit', audit, covered.audit],
     ['line', line, covered.line],
     ['users', users, covered.users],
     ['affiliate', affiliate, covered.affiliate],

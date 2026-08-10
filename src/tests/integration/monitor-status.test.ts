@@ -24,6 +24,16 @@ import { createUser } from './helpers/factories';
 
 let prisma: PrismaClient;
 let userId: string;
+let adminId: string;
+
+/** 操作するADMINを必ず伴う（H-11） */
+async function act(action: 'ACTIVATE' | 'PAUSE' | 'RESUME') {
+  return updateMonitorStatusForAdmin({ userId, action, actorUserId: adminId });
+}
+
+async function activate() {
+  return act('ACTIVATE');
+}
 
 async function statusOf(id: string): Promise<string | undefined> {
   const user = await prisma.user.findUnique({
@@ -52,14 +62,18 @@ beforeEach(async () => {
     where: { id: userId },
     data: { status: 'INVITED' },
   });
+
+  const admin = await createUser(prisma);
+  adminId = admin.id;
+  await prisma.user.update({
+    where: { id: adminId },
+    data: { role: 'ADMIN', status: 'ACTIVE' },
+  });
 });
 
 describe('招待から利用開始まで（完了条件）', () => {
   it('承認すると ACTIVE になる', async () => {
-    const user = await updateMonitorStatusForAdmin({
-      userId,
-      action: 'ACTIVATE',
-    });
+    const user = await activate();
 
     expect(user.status).toBe('ACTIVE');
     expect(await statusOf(userId)).toBe('ACTIVE');
@@ -67,11 +81,9 @@ describe('招待から利用開始まで（完了条件）', () => {
 
   /** **管理画面は複数人が開きうる。** 二度押しで落とさない */
   it('二度承認しても成功する（冪等）', async () => {
-    await updateMonitorStatusForAdmin({ userId, action: 'ACTIVATE' });
+    await activate();
 
-    await expect(
-      updateMonitorStatusForAdmin({ userId, action: 'ACTIVATE' }),
-    ).resolves.toMatchObject({ status: 'ACTIVE' });
+    await expect(activate()).resolves.toMatchObject({ status: 'ACTIVE' });
   });
 
   /** **承認されるまでアプリを使えない** */
@@ -84,7 +96,7 @@ describe('招待から利用開始まで（完了条件）', () => {
   });
 
   it('承認し、同意が揃えば通れる', async () => {
-    await updateMonitorStatusForAdmin({ userId, action: 'ACTIVATE' });
+    await activate();
     await prisma.user.update({
       where: { id: userId },
       data: { termsAcceptedAt: new Date(), dataUseConsentAt: new Date() },
@@ -100,11 +112,11 @@ describe('招待から利用開始まで（完了条件）', () => {
 
 describe('利用停止と再開（SPEC 6.2）', () => {
   beforeEach(async () => {
-    await updateMonitorStatusForAdmin({ userId, action: 'ACTIVATE' });
+    await activate();
   });
 
   it('停止すると PAUSED になる', async () => {
-    await updateMonitorStatusForAdmin({ userId, action: 'PAUSE' });
+    await act('PAUSE');
 
     expect(await statusOf(userId)).toBe('PAUSED');
   });
@@ -121,7 +133,7 @@ describe('利用停止と再開（SPEC 6.2）', () => {
       requireConsentedUser(`bunshin_session=${token}`),
     ).resolves.toMatchObject({ id: userId });
 
-    await updateMonitorStatusForAdmin({ userId, action: 'PAUSE' });
+    await act('PAUSE');
 
     await expect(
       requireConsentedUser(`bunshin_session=${token}`),
@@ -129,8 +141,8 @@ describe('利用停止と再開（SPEC 6.2）', () => {
   });
 
   it('再開すると ACTIVE に戻る', async () => {
-    await updateMonitorStatusForAdmin({ userId, action: 'PAUSE' });
-    await updateMonitorStatusForAdmin({ userId, action: 'RESUME' });
+    await act('PAUSE');
+    await act('RESUME');
 
     expect(await statusOf(userId)).toBe('ACTIVE');
   });
@@ -139,9 +151,7 @@ describe('利用停止と再開（SPEC 6.2）', () => {
 describe('変えられない遷移', () => {
   /** **認めるのは `ACTIVATE` だけ。** 停止の解除で参加を認めない */
   it('INVITED を RESUME できない', async () => {
-    await expect(
-      updateMonitorStatusForAdmin({ userId, action: 'RESUME' }),
-    ).rejects.toMatchObject({
+    await expect(act('RESUME')).rejects.toMatchObject({
       code: USER_ADMIN_ERROR_CODES.invalidTransition,
       status: 409,
     });
@@ -150,9 +160,7 @@ describe('変えられない遷移', () => {
   });
 
   it('INVITED を PAUSE できない', async () => {
-    await expect(
-      updateMonitorStatusForAdmin({ userId, action: 'PAUSE' }),
-    ).rejects.toMatchObject({
+    await expect(act('PAUSE')).rejects.toMatchObject({
       code: USER_ADMIN_ERROR_CODES.invalidTransition,
     });
   });
@@ -165,9 +173,7 @@ describe('変えられない遷移', () => {
     });
 
     for (const action of ['ACTIVATE', 'PAUSE', 'RESUME'] as const) {
-      await expect(
-        updateMonitorStatusForAdmin({ userId, action }),
-      ).rejects.toMatchObject({
+      await expect(act(action)).rejects.toMatchObject({
         code: USER_ADMIN_ERROR_CODES.invalidTransition,
       });
     }
@@ -186,7 +192,11 @@ describe('ADMIN は対象にしない', () => {
     });
 
     await expect(
-      updateMonitorStatusForAdmin({ userId: admin.id, action: 'PAUSE' }),
+      updateMonitorStatusForAdmin({
+        userId: admin.id,
+        action: 'PAUSE',
+        actorUserId: adminId,
+      }),
     ).rejects.toMatchObject({ code: USER_ADMIN_ERROR_CODES.notFound });
 
     expect(await statusOf(admin.id)).toBe('ACTIVE');
@@ -197,6 +207,7 @@ describe('ADMIN は対象にしない', () => {
       updateMonitorStatusForAdmin({
         userId: '00000000-0000-4000-8000-000000000000',
         action: 'ACTIVATE',
+        actorUserId: adminId,
       }),
     ).rejects.toMatchObject({ code: USER_ADMIN_ERROR_CODES.notFound });
   });
