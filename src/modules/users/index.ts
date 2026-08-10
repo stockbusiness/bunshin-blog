@@ -17,6 +17,14 @@ export {
 } from './repository';
 
 export {
+  withdrawMonitorForAdmin,
+  exportUserDataForAdmin,
+  WITHDRAWAL_ERROR_CODES,
+  type WithdrawResult,
+  type UserDataExport,
+} from './withdrawal';
+
+export {
   updateMonitorStatusForAdmin,
   canApplyMonitorAction,
   isMonitorAdminAction,

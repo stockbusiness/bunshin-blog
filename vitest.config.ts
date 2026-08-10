@@ -86,6 +86,7 @@ export default defineConfig({
         // | approvals/detail.ts | — | proposals.test.ts |
         // | approvals/decide.ts | — | approval-decisions.test.ts |
         // | users/admin-status.ts | 遷移表の判定は同ファイルの純粋関数 | monitor-status.test.ts |
+        // | users/withdrawal.ts | — | withdrawal.test.ts |
         // | content-planning/plan-repository.ts | — | revenue-articles.test.ts |
         // | affiliate/scoring.ts | step2.ts | offer-scoring.test.ts |
         // | content-planning/ai.ts | step1.ts の filterAlternatives | genre-review.test.ts |
@@ -110,6 +111,7 @@ export default defineConfig({
         'src/lib/line/messaging.ts',
         'src/modules/approvals/detail.ts',
         'src/modules/approvals/decide.ts',
+        'src/modules/users/withdrawal.ts',
         'src/modules/content-planning/plan-repository.ts',
         'src/modules/affiliate/scoring.ts',
         'src/modules/content-planning/ai.ts',

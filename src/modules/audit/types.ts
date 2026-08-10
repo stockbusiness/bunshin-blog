@@ -31,6 +31,8 @@ export const AUDIT_ACTIONS = [
   'MONITOR_PAUSED',
   /** ADMIN がモニターの利用を再開した（H-1） */
   'MONITOR_RESUMED',
+  /** ADMIN がモニターを退会させた（H-4）。**戻せない** */
+  'MONITOR_WITHDRAWN',
   /** ADMIN がブログの接続先を変えた（Q-008 の救済手順） */
   'BLOG_SITE_URL_CHANGED',
 ] as const;
