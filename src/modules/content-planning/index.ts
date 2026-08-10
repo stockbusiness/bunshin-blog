@@ -114,6 +114,7 @@ export {
   appendItemsToPlanForUser,
   saveLinksForUser,
   savePublishOrderForUser,
+  markItemsReadyForReview,
 } from './plan-repository';
 
 export {

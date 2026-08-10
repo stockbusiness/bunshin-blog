@@ -14,6 +14,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { requireBlogForUser } from '@/modules/blogs';
 import { itemNotInPlanError } from './errors';
+import { canSendToApproval, type RiskFlag } from './risk-flags';
 
 export interface AppArticleVersion {
   id: string;
@@ -279,5 +280,126 @@ export async function listSiblingItemsForUser(params: {
     where: { contentPlanId: item.contentPlanId },
     orderBy: [{ sequenceNo: 'asc' }],
     select: { id: true, title: true, contentType: true },
+  });
+}
+
+export interface ApprovableArticle {
+  contentItemId: string;
+  blogId: string;
+  articleVersionId: string;
+  title: string;
+  contentType: string;
+  objective: string;
+  publishPriority: number;
+  outboundLinkCount: number;
+  factCheckStatus: string;
+  /** `warning` のリスクフラグの件数（`error` があるものはそもそも返さない） */
+  warningFlagCount: number;
+}
+
+/**
+ * 承認へ送れる記事を、指定したブログからまとめて引く（F-1）。
+ *
+ * **判定は `canSendToApproval` 一本**（E-13）。事実チェックとリスクフラグの
+ * 両方を見る関数をここで呼び、**SQLで条件を書き直さない** — 書き直すと、
+ * 判定が2箇所になって片方だけ直る日が来る。
+ *
+ * **記事ごとに最新の版だけを見る。** 古い版は既に提案済みか、
+ * 修正依頼で作り直されたもの。
+ *
+ * 所有権は呼び出し側が `blogIds` を絞ることで担保する。
+ * **IDだけで引く関数を公開しない**（SPEC 14.1）ため、`index.ts` からは
+ * `...ForUser` の入口だけを出す。
+ */
+export async function listApprovableArticles(
+  blogIds: readonly string[],
+): Promise<ApprovableArticle[]> {
+  if (blogIds.length === 0) {
+    return [];
+  }
+
+  const versions = await prisma.articleVersion.findMany({
+    where: {
+      contentItem: {
+        blogId: { in: [...blogIds] },
+        // **`PLANNED` のものだけ。** 承認済み・投稿済みを二度提案しない
+        status: 'PLANNED',
+      },
+    },
+    // 記事ごとに最新の版1つ
+    distinct: ['contentItemId'],
+    orderBy: [{ contentItemId: 'asc' }, { versionNo: 'desc' }],
+    select: {
+      id: true,
+      factCheckStatus: true,
+      riskFlags: true,
+      contentItem: {
+        select: {
+          id: true,
+          blogId: true,
+          title: true,
+          contentType: true,
+          objective: true,
+          publishPriority: true,
+          outboundLinkItemIds: true,
+        },
+      },
+    },
+  });
+
+  const approvable: ApprovableArticle[] = [];
+
+  for (const version of versions) {
+    const flags = toRiskFlags(version.riskFlags);
+
+    if (
+      !canSendToApproval({
+        factCheckStatus: version.factCheckStatus,
+        riskFlags: flags,
+      })
+    ) {
+      continue;
+    }
+
+    approvable.push({
+      contentItemId: version.contentItem.id,
+      blogId: version.contentItem.blogId,
+      articleVersionId: version.id,
+      title: version.contentItem.title,
+      contentType: version.contentItem.contentType,
+      objective: version.contentItem.objective,
+      publishPriority: version.contentItem.publishPriority,
+      outboundLinkCount: version.contentItem.outboundLinkItemIds.length,
+      factCheckStatus: version.factCheckStatus,
+      warningFlagCount: flags.filter((flag) => flag.severity === 'warning')
+        .length,
+    });
+  }
+
+  return approvable;
+}
+
+/**
+ * `jsonb` の値をリスクフラグとして読む。
+ *
+ * **形が違うものは「フラグあり」に倒さず、`error` として扱う。**
+ * 読めない値を「指摘なし」にすると、**壊れた行が承認へ通る**。
+ */
+function toRiskFlags(value: unknown): RiskFlag[] {
+  if (!Array.isArray(value)) {
+    return [
+      { code: 'NG_EXPRESSION', severity: 'error', message: '', excerpt: '' },
+    ];
+  }
+
+  return value.map((entry) => {
+    const flag = entry as Partial<RiskFlag>;
+
+    return {
+      code: flag.code ?? 'NG_EXPRESSION',
+      severity: flag.severity ?? 'error',
+      message: flag.message ?? '',
+      excerpt: flag.excerpt ?? '',
+    };
   });
 }

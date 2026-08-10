@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import * as aiCosts from '@/modules/ai-costs';
+import * as approvals from '@/modules/approvals';
 import * as affiliate from '@/modules/affiliate';
 import * as banners from '@/modules/banners';
 import * as contentPlanning from '@/modules/content-planning';
@@ -929,11 +930,17 @@ describe('入口の網羅', () => {
      * 気づける。
      */
     settings: [],
+    /**
+     * **`approvals` の入口は利用者単位。** 3ブログ横断で順位を付けるため
+     * ブログIDを取らない（SPEC 9.1、F-1）
+     */
+    approvals: ['refreshProposalsForUser', 'listApprovalsForUser'],
     'content-generation': [
       'factCheckArticleForUser',
       'generateArticleForUser',
       'listArticleVersionsForUser',
       'listSiblingItemsForUser',
+      'listApprovableArticlesForUser',
       'requirePlannedItemForUser',
       'scanRiskFlagsForUser',
     ],
@@ -956,6 +963,7 @@ describe('入口の網羅', () => {
 
   it.each([
     ['ai-costs', aiCosts, covered['ai-costs']],
+    ['approvals', approvals, covered.approvals],
     ['affiliate', affiliate, covered.affiliate],
     ['banners', banners, covered.banners],
     ['blogs', blogs, covered.blogs],

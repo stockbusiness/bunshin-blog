@@ -52,6 +52,10 @@ export {
 
 export { extractClaims, type ExtractClaimsResult } from './claim-extraction';
 
+export { listApprovableArticlesForUser } from './approvable';
+
+export type { ApprovableArticle } from './article-repository';
+
 export {
   scanRiskFlagsForUser,
   type ScanRiskFlagsInput,
