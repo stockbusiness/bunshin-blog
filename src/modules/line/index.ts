@@ -11,6 +11,7 @@ export {
   sendPendingProposalsForUser,
   sendEmergencyNotificationForUser,
   remainingSlotsForUser,
+  enqueueAlertsForUser,
   type SendProposalsDeps,
   type SendProposalsResult,
   type EmergencyKind,
@@ -36,3 +37,11 @@ export {
   notificationTargetMissingError,
   type LineErrorCode,
 } from './errors';
+
+export {
+  collectAlertsForUser,
+  judgeConnectionAlert,
+  alertIdempotencyKey,
+  type BlogAlert,
+  type CollectAlertsDeps,
+} from './alerts';

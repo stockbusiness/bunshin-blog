@@ -34,11 +34,17 @@ import {
   listUnsentApprovalsForUser,
   type UnsentApproval,
 } from '@/modules/approvals';
+import { enqueueJob } from '@/modules/jobs';
 import { getRuntimeEnv } from '@/modules/settings';
 import {
   findMaxDailyProposalsForUser,
   findNotificationTargetForUser,
 } from '@/modules/users';
+import {
+  alertIdempotencyKey,
+  collectAlertsForUser,
+  type BlogAlert,
+} from './alerts';
 import { dailyNotificationLimit, remainingNotificationSlots } from './limit';
 import { buildProposalMessages } from './message';
 import {
@@ -253,4 +259,46 @@ export async function sendEmergencyNotificationForUser(
       },
     ],
   });
+}
+
+/**
+ * 見つけた指摘を通知として積む（H-3）。
+ *
+ * **その場で送らずジョブにする。** 検出はブログごとにHTTPを叩くため
+ * 時間がかかり、途中で落ちると「一部だけ送った」状態になる。
+ * 積んでおけば、送信の失敗は再試行される（C-4）。
+ *
+ * **同じ日の同じ指摘は1回だけ**（冪等キーに日付を入れる）。
+ * 直っていなければ翌日また届く — 直すまで思い出させるのは正しい。
+ *
+ * @returns 新しく積んだ件数
+ */
+export async function enqueueAlertsForUser(
+  userId: string,
+  deps: { now?: Date | undefined; alerts?: BlogAlert[] | undefined } = {},
+): Promise<number> {
+  const now = deps.now ?? new Date();
+  const alerts = deps.alerts ?? (await collectAlertsForUser(userId));
+
+  let queued = 0;
+
+  for (const alert of alerts) {
+    const result = await enqueueJob({
+      jobType: 'LINE_NOTIFY',
+      idempotencyKey: alertIdempotencyKey({ alert, now }),
+      input: {
+        kind: alert.kind,
+        blogName: alert.blogName,
+        detail: alert.detail,
+      },
+      userId,
+      blogId: alert.blogId,
+    });
+
+    if (result.created) {
+      queued += 1;
+    }
+  }
+
+  return queued;
 }

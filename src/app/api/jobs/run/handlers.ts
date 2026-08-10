@@ -8,6 +8,11 @@ import {
   readArticleVersionDetailForUser,
 } from '@/modules/content-generation';
 import { markItemPosted } from '@/modules/content-planning';
+import {
+  enqueueAlertsForUser,
+  sendEmergencyNotificationForUser,
+  type EmergencyKind,
+} from '@/modules/line';
 import { publishDraftForUser } from '@/modules/wordpress';
 import type { AppJob, JobHandlerRegistry } from '@/modules/jobs';
 import type {
@@ -30,9 +35,10 @@ import type {
  * | `PLAN_GENERATION` | **E-9（登録済み）** |
  * | `WORDPRESS_POST` | **F-7（登録済み）** |
  * | `WORDPRESS_SYNC` | C-5 |
+ * | `LINK_CHECK` | **H-3（登録済み）** |
  * | `ARTICLE_GENERATION` | **E-10（登録済み）** |
  * | `SEARCH_CONSOLE_FETCH` | G-2 |
- * | `LINE_NOTIFY` | F-2 |
+ * | `LINE_NOTIFY` | **H-3（登録済み）** |
  */
 
 /**
@@ -140,6 +146,46 @@ function readPostTarget(job: AppJob): {
   };
 }
 
+/**
+ * 緊急通知の入力を読む。
+ *
+ * **`job.input` は jsonb で、何でも入りうる。** 形を確かめてから使う。
+ */
+function readAlertInput(job: AppJob): {
+  userId: string;
+  kind: EmergencyKind;
+  blogName: string;
+  detail: string;
+} {
+  if (job.userId === null) {
+    throw new AppError(
+      'BAD_REQUEST',
+      400,
+      'LINE_NOTIFY には user_id が要ります',
+    );
+  }
+
+  const input =
+    typeof job.input === 'object' && job.input !== null ? job.input : {};
+  const record = input as Record<string, unknown>;
+  const kind = record['kind'];
+
+  if (
+    kind !== 'LINK_BROKEN' &&
+    kind !== 'OFFER_ENDED' &&
+    kind !== 'WORDPRESS_DISCONNECTED'
+  ) {
+    throw new AppError('BAD_REQUEST', 400, 'kind が要ります');
+  }
+
+  return {
+    userId: job.userId,
+    kind,
+    blogName: typeof record['blogName'] === 'string' ? record['blogName'] : '',
+    detail: typeof record['detail'] === 'string' ? record['detail'] : '',
+  };
+}
+
 export interface JobHandlerDeps {
   /**
    * WordPress のクライアントを差し替える。
@@ -238,6 +284,45 @@ export function createJobHandlers(
         wpStatus: post.wpStatus,
         articleVersionId: target.articleVersionId,
       };
+    },
+
+    /**
+     * リンク切れ・接続切れ・案件終了を見て、通知を積む（H-3）。
+     *
+     * **その場で送らない。** 検出はブログごとにHTTPを叩くため時間がかかり、
+     * 途中で落ちると「一部だけ送った」状態になる。積んでおけば
+     * 送信の失敗は再試行される（C-4）。
+     */
+    LINK_CHECK: async (job) => {
+      if (job.userId === null) {
+        throw new AppError(
+          'BAD_REQUEST',
+          400,
+          'LINK_CHECK には user_id が要ります',
+        );
+      }
+
+      const queued = await enqueueAlertsForUser(job.userId);
+
+      return { queued };
+    },
+
+    /**
+     * 緊急通知を送る（H-3、SPEC 8.3）。
+     *
+     * **提案の1日の件数を消費しない**（F-3）。`approvals` の行を作らないので、
+     * 数えようがない。
+     */
+    LINE_NOTIFY: async (job) => {
+      const input = readAlertInput(job);
+
+      await sendEmergencyNotificationForUser(input.userId, {
+        kind: input.kind,
+        blogName: input.blogName,
+        detail: input.detail,
+      });
+
+      return { kind: input.kind };
     },
   };
 }

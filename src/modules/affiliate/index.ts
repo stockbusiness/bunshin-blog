@@ -105,3 +105,11 @@ export {
   type OfferStatus,
   type LinkMode,
 } from './types';
+
+export {
+  checkOfferLinksForUser,
+  judgeLinkHealth,
+  type LinkHealth,
+  type OfferLinkCheck,
+  type CheckOfferLinksDeps,
+} from './link-check';

@@ -83,6 +83,8 @@ export default defineConfig({
         // | approvals/propose.ts | priority.ts | proposals.test.ts |
         // | line/notify.ts | message.ts | line-notification.test.ts |
         // | lib/line/messaging.ts | — | line-notification.test.ts |
+        // | line/alerts.ts | judgeConnectionAlert は同ファイルの純粋関数 | emergency-alerts.test.ts |
+        // | affiliate/link-check.ts | judgeLinkHealth は同ファイルの純粋関数 | emergency-alerts.test.ts |
         // | approvals/detail.ts | — | proposals.test.ts |
         // | approvals/decide.ts | — | approval-decisions.test.ts |
         // | users/admin-status.ts | 遷移表の判定は同ファイルの純粋関数 | monitor-status.test.ts |
@@ -109,6 +111,8 @@ export default defineConfig({
         'src/modules/approvals/propose.ts',
         'src/modules/line/notify.ts',
         'src/lib/line/messaging.ts',
+        'src/modules/line/alerts.ts',
+        'src/modules/affiliate/link-check.ts',
         'src/modules/approvals/detail.ts',
         'src/modules/approvals/decide.ts',
         'src/modules/users/withdrawal.ts',
