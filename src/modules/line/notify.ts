@@ -13,21 +13,33 @@
  * 「立てたが送れなかった」は起こりうる。**提案は承認一覧（F-4）に残る**ので
  * 消えはせず、SPEC 8.3 が禁じている重複通知のほうを避けている。
  *
- * ## 1日に何件送るかはここで決めない
+ * ## 1日の件数は利用者単位で数える（F-3、SPEC 8.3）
  *
- * SPEC 8.3 の件数制御は F-3。ここは**渡された分を送る**だけにして、
- * 「送る条件」と「送る手順」を分けておく。
+ * 「3ブログ合計で制限」は、**数える単位が利用者だということ**。
+ * ブログごとに1日1件にすると、3ブログ持つ人には1日3件届く。
+ *
+ * 数えるのは **JSTの暦日**。UTCで数えると日本の1日が2日にまたがり、
+ * 夜に届いた1件が翌日の枠を1つ消す。
+ *
+ * **緊急通知は別枠**（`sendEmergencyNotificationForUser`）。
+ * `approvals` の行を作らないので、この計算に入りようがない。
  */
 
+import { jstDayRange, todayInJst } from '@/lib/datetime';
 import { requireLineClient, type LineClient } from '@/lib/line';
 import { logger } from '@/lib/logger';
 import {
   claimUnsentApprovalForUser,
+  countProposalsSentInRangeForUser,
   listUnsentApprovalsForUser,
   type UnsentApproval,
 } from '@/modules/approvals';
 import { getRuntimeEnv } from '@/modules/settings';
-import { findNotificationTargetForUser } from '@/modules/users';
+import {
+  findMaxDailyProposalsForUser,
+  findNotificationTargetForUser,
+} from '@/modules/users';
+import { dailyNotificationLimit, remainingNotificationSlots } from './limit';
 import { buildProposalMessages } from './message';
 import {
   lineNotConfiguredError,
@@ -44,15 +56,9 @@ export interface SendProposalsResult {
   sent: string[];
   /** 押さえられなかった提案の件数（既に別の実行が送っている） */
   skipped: number;
+  /** その日に送ってよい残り枠（送信前の値。SPEC 8.3） */
+  remaining: number;
 }
-
-/**
- * 通知する提案を選ぶ余地を呼び出し側へ残す。
- *
- * F-3 が件数制御を入れるまでは、**呼び出し側が `limit` を渡す**。
- * 既定を無制限にしないのは、初回に30件まとめて届くのを防ぐため。
- */
-export const DEFAULT_NOTIFICATION_LIMIT = 1;
 
 /**
  * まだ通知していない提案を送る。
@@ -64,10 +70,16 @@ export async function sendPendingProposalsForUser(
   options: { limit?: number | undefined } = {},
   deps: SendProposalsDeps = {},
 ): Promise<SendProposalsResult> {
+  const now = deps.now ?? new Date();
+
+  // **枠を先に数える。** 提案が無くても残り枠は返す（呼び出し側が
+  // 「今日はもう送れない」と「送るものが無い」を区別できるように）
+  const remaining = await remainingSlotsForUser(userId, now);
+
   const pending = await listUnsentApprovalsForUser(userId);
 
-  if (pending.length === 0) {
-    return { sent: [], skipped: 0 };
+  if (pending.length === 0 || remaining === 0) {
+    return { sent: [], skipped: 0, remaining };
   }
 
   const env = deps.env ?? (await getRuntimeEnv());
@@ -86,9 +98,10 @@ export async function sendPendingProposalsForUser(
   }
 
   const client = deps.client ?? createClient(env);
-  const now = deps.now ?? new Date();
 
-  const limit = options.limit ?? DEFAULT_NOTIFICATION_LIMIT;
+  // **上限は残り枠を超えられない。** 呼び出し側の指定は「それ以下に
+  // 絞る」ためだけに効く
+  const limit = Math.min(options.limit ?? remaining, remaining);
   const targets = pending.slice(0, Math.max(0, limit));
 
   const sent: string[] = [];
@@ -111,7 +124,34 @@ export async function sendPendingProposalsForUser(
     sent.push(approval.id);
   }
 
-  return { sent, skipped };
+  return { sent, skipped, remaining };
+}
+
+/**
+ * その日に送ってよい残り枠を返す（SPEC 8.3）。
+ *
+ * **ブログで絞らない。**「3ブログ合計で制限」は数える単位が利用者だということ。
+ */
+export async function remainingSlotsForUser(
+  userId: string,
+  now: Date = new Date(),
+): Promise<number> {
+  // **JSTの暦日で数える。** UTCで数えると日本の1日が2日にまたがる
+  const range = jstDayRange(todayInJst(now));
+
+  const [maxDaily, sentToday] = await Promise.all([
+    findMaxDailyProposalsForUser(userId),
+    countProposalsSentInRangeForUser({
+      userId,
+      from: range.start,
+      to: range.endExclusive,
+    }),
+  ]);
+
+  return remainingNotificationSlots({
+    limit: dailyNotificationLimit(maxDaily),
+    sentToday,
+  });
 }
 
 function createClient(
@@ -152,4 +192,65 @@ async function push(params: {
 
     throw cause;
   }
+}
+
+/**
+ * 緊急通知の種類（SPEC 8.3）。
+ *
+ * ```text
+ * - リンク切れ
+ * - 案件終了
+ * - WordPress接続切れ
+ * ```
+ *
+ * **提案ではないので `approvals` の行を作らない。** 作らないことが
+ * そのまま「別枠」になる — 1日の件数を数えているのは `approvals.sent_at`
+ * であり、ここを通った通知は数えようがない。
+ */
+export type EmergencyKind =
+  'LINK_BROKEN' | 'OFFER_ENDED' | 'WORDPRESS_DISCONNECTED';
+
+const EMERGENCY_LABELS: Readonly<Record<EmergencyKind, string>> = {
+  LINK_BROKEN: 'リンク切れ',
+  OFFER_ENDED: '案件終了',
+  WORDPRESS_DISCONNECTED: 'WordPress接続切れ',
+};
+
+/**
+ * 緊急通知を送る（SPEC 8.3「緊急通知は別枠」）。
+ *
+ * **1日の件数を消費しない。** 提案の枠と同じ数え方にすると、
+ * 「今日は1件送ったので接続切れを知らせない」が起きる。
+ *
+ * 中身を作るのは H-3。ここでは**別枠であること**だけを用意する。
+ *
+ * @throws {AppError} LINE の設定が無い・宛先が無い
+ */
+export async function sendEmergencyNotificationForUser(
+  userId: string,
+  input: { kind: EmergencyKind; blogName: string; detail: string },
+  deps: SendProposalsDeps = {},
+): Promise<void> {
+  const env = deps.env ?? (await getRuntimeEnv());
+
+  const to = await findNotificationTargetForUser(userId);
+
+  if (to === null) {
+    throw notificationTargetMissingError();
+  }
+
+  const client = deps.client ?? createClient(env);
+
+  await client.push({
+    to,
+    messages: [
+      {
+        type: 'text',
+        text: [
+          `【${input.blogName}】${EMERGENCY_LABELS[input.kind]}`,
+          input.detail,
+        ].join('\n'),
+      },
+    ],
+  });
 }

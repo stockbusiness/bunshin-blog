@@ -17,6 +17,7 @@ export {
   listApprovalsForUser,
   listUnsentApprovalsForUser,
   claimUnsentApprovalForUser,
+  countProposalsSentInRangeForUser,
   type AppApproval,
   type UnsentApproval,
 } from './repository';

@@ -2,7 +2,11 @@ import { createServer, type Server } from 'node:http';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import { createLineClient } from '@/lib/line';
-import { LINE_ERROR_CODES, sendPendingProposalsForUser } from '@/modules/line';
+import {
+  LINE_ERROR_CODES,
+  sendEmergencyNotificationForUser,
+  sendPendingProposalsForUser,
+} from '@/modules/line';
 import {
   assertMigrationsApplied,
   createTestPrisma,
@@ -77,14 +81,25 @@ function client() {
 }
 
 async function createProposal(
-  overrides: { priorityScore?: number; sentAt?: Date } = {},
+  overrides: { priorityScore?: number; sentAt?: Date; blogId?: string } = {},
 ): Promise<string> {
+  const targetBlogId = overrides.blogId ?? blogId;
+
   const plan = await prisma.contentPlan.upsert({
     where: {
-      blogId_planType_version: { blogId, planType: 'INITIAL', version: 1 },
+      blogId_planType_version: {
+        blogId: targetBlogId,
+        planType: 'INITIAL',
+        version: 1,
+      },
     },
     update: {},
-    create: { blogId, planType: 'INITIAL', version: 1, strategySnapshot: {} },
+    create: {
+      blogId: targetBlogId,
+      planType: 'INITIAL',
+      version: 1,
+      strategySnapshot: {},
+    },
     select: { id: true },
   });
 
@@ -94,7 +109,7 @@ async function createProposal(
   const item = await prisma.contentItem.create({
     data: {
       contentPlanId: plan.id,
-      blogId,
+      blogId: targetBlogId,
       sequenceNo,
       contentType: 'INFORMATIONAL',
       title: `記事${sequenceNo}`,
@@ -136,7 +151,7 @@ async function createProposal(
   const approval = await prisma.approval.create({
     data: {
       userId,
-      blogId,
+      blogId: targetBlogId,
       contentItemId: item.id,
       articleVersionId: version.id,
       status: 'PENDING',
@@ -149,6 +164,21 @@ async function createProposal(
   });
 
   return approval.id;
+}
+
+/** `monitor_profiles.max_daily_proposals` を設定する */
+async function setMaxDailyProposals(value: number): Promise<void> {
+  await prisma.monitorProfile.upsert({
+    where: { userId },
+    update: { maxDailyProposals: value },
+    create: {
+      userId,
+      primaryAspNames: [],
+      notificationDays: [1],
+      notificationTime: new Date('1970-01-01T09:00:00.000Z'),
+      maxDailyProposals: value,
+    },
+  });
 }
 
 beforeAll(async () => {
@@ -320,7 +350,7 @@ describe('同一提案を連続通知しない（完了条件）', () => {
   });
 });
 
-describe('件数は呼び出し側が決める（F-3 まで）', () => {
+describe('1日の件数（F-3、SPEC 8.3）', () => {
   it('既定は1件', async () => {
     await createProposal({ priorityScore: 100 });
     await createProposal({ priorityScore: 50 });
@@ -347,18 +377,209 @@ describe('件数は呼び出し側が決める（F-3 まで）', () => {
     expect(result.sent).toEqual([high]);
   });
 
-  it('limit を渡せば複数送る', async () => {
+  /** SPEC 8.3「最大：1日2件」 */
+  it('上限を2件にすれば2件送る', async () => {
+    await setMaxDailyProposals(2);
     await createProposal({ priorityScore: 100 });
     await createProposal({ priorityScore: 50 });
 
     const result = await sendPendingProposalsForUser(
       userId,
-      { limit: 2 },
+      {},
       { client: client(), env: ENV },
     );
 
     expect(result.sent).toHaveLength(2);
     expect(received).toHaveLength(2);
+  });
+
+  /** **呼び出し側の指定は「それ以下に絞る」ためだけに効く** */
+  it('呼び出し側は上限を超えられない', async () => {
+    await createProposal({ priorityScore: 100 });
+    await createProposal({ priorityScore: 50 });
+
+    const result = await sendPendingProposalsForUser(
+      userId,
+      { limit: 10 },
+      { client: client(), env: ENV },
+    );
+
+    expect(result.sent).toHaveLength(1);
+  });
+
+  /**
+   * **DBは3以上も入る。** 設定画面の検証だけに頼ると、直接書き換えられた
+   * 値がそのまま効く
+   */
+  it('3件以上に設定されていても2件で止まる', async () => {
+    await setMaxDailyProposals(5);
+    for (const score of [100, 90, 80, 70]) {
+      await createProposal({ priorityScore: score });
+    }
+
+    const result = await sendPendingProposalsForUser(
+      userId,
+      {},
+      { client: client(), env: ENV },
+    );
+
+    expect(result.sent).toHaveLength(2);
+  });
+
+  it('使い切ったら送らない', async () => {
+    await createProposal({ priorityScore: 100 });
+    await createProposal({ priorityScore: 50 });
+
+    await sendPendingProposalsForUser(
+      userId,
+      {},
+      { client: client(), env: ENV },
+    );
+    const second = await sendPendingProposalsForUser(
+      userId,
+      {},
+      { client: client(), env: ENV },
+    );
+
+    expect(second.sent).toEqual([]);
+    expect(second.remaining).toBe(0);
+    expect(received).toHaveLength(1);
+  });
+
+  /**
+   * **「3ブログ合計で制限」は、数える単位が利用者だということ。**
+   * ブログごとに数えると3ブログ持つ人には1日3件届く
+   */
+  it('別のブログの提案でも同じ枠を使う', async () => {
+    const second = await createBlog(prisma, userId, {
+      slotNumber: 2,
+      name: '2つめのブログ',
+    });
+
+    await createProposal({ priorityScore: 100 });
+    await createProposal({ priorityScore: 50, blogId: second.id });
+
+    await sendPendingProposalsForUser(
+      userId,
+      {},
+      { client: client(), env: ENV },
+    );
+    const again = await sendPendingProposalsForUser(
+      userId,
+      {},
+      { client: client(), env: ENV },
+    );
+
+    expect(again.sent).toEqual([]);
+    expect(received).toHaveLength(1);
+  });
+
+  /**
+   * **JSTの暦日で数える。** UTCで数えると日本の1日が2日にまたがり、
+   * 夜に届いた1件が翌日の枠を1つ消す
+   */
+  it('昨日送った分は今日の枠を使わない', async () => {
+    // JST 2026-08-09 23:00 = UTC 2026-08-09 14:00
+    await createProposal({ sentAt: new Date('2026-08-09T14:00:00.000Z') });
+    await createProposal({ priorityScore: 50 });
+
+    // JST 2026-08-10 09:00
+    const result = await sendPendingProposalsForUser(
+      userId,
+      {},
+      {
+        client: client(),
+        env: ENV,
+        now: new Date('2026-08-10T00:00:00.000Z'),
+      },
+    );
+
+    expect(result.sent).toHaveLength(1);
+  });
+
+  it('同じJSTの日に送った分は枠を使う', async () => {
+    // JST 2026-08-10 09:00 = UTC 2026-08-10 00:00
+    await createProposal({ sentAt: new Date('2026-08-10T00:00:00.000Z') });
+    await createProposal({ priorityScore: 50 });
+
+    // JST 2026-08-10 23:00 = UTC 2026-08-10 14:00
+    const result = await sendPendingProposalsForUser(
+      userId,
+      {},
+      {
+        client: client(),
+        env: ENV,
+        now: new Date('2026-08-10T14:00:00.000Z'),
+      },
+    );
+
+    expect(result.sent).toEqual([]);
+  });
+});
+
+describe('緊急通知は別枠（完了条件）', () => {
+  /**
+   * **提案の枠と同じ数え方にすると、「今日は1件送ったので接続切れを
+   * 知らせない」が起きる**
+   */
+  it('提案の枠を使い切っていても送れる', async () => {
+    await createProposal();
+    await sendPendingProposalsForUser(
+      userId,
+      {},
+      { client: client(), env: ENV },
+    );
+
+    await sendEmergencyNotificationForUser(
+      userId,
+      {
+        kind: 'WORDPRESS_DISCONNECTED',
+        blogName: '格安SIMブログ',
+        detail: '接続を確認してください',
+      },
+      { client: client(), env: ENV },
+    );
+
+    expect(received).toHaveLength(2);
+    expect(JSON.stringify(received[1]?.body)).toContain('WordPress接続切れ');
+  });
+
+  /** 緊急通知は `approvals` の行を作らないので、枠を消費しようがない */
+  it('緊急通知は提案の枠を減らさない', async () => {
+    await sendEmergencyNotificationForUser(
+      userId,
+      {
+        kind: 'LINK_BROKEN',
+        blogName: 'ブログ',
+        detail: 'リンクが切れています',
+      },
+      { client: client(), env: ENV },
+    );
+
+    await createProposal();
+
+    const result = await sendPendingProposalsForUser(
+      userId,
+      {},
+      { client: client(), env: ENV },
+    );
+
+    expect(result.sent).toHaveLength(1);
+  });
+
+  it('ACTIVE でない利用者には緊急通知も送らない', async () => {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { status: 'PAUSED' },
+    });
+
+    await expect(
+      sendEmergencyNotificationForUser(
+        userId,
+        { kind: 'OFFER_ENDED', blogName: 'ブログ', detail: '終了しました' },
+        { client: client(), env: ENV },
+      ),
+    ).rejects.toMatchObject({ code: LINE_ERROR_CODES.targetMissing });
   });
 });
 

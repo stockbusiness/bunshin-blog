@@ -223,3 +223,26 @@ export async function claimUnsentApprovalForUser(params: {
 
   return updated.count === 1;
 }
+
+/**
+ * その日に通知した提案の件数を数える（F-3、SPEC 8.3）。
+ *
+ * **ブログで絞らない。** SPEC 8.3 の「3ブログ合計で制限」は、
+ * 数える単位が利用者だということ。ブログごとに数えると、
+ * 3ブログ持つ人には1日3件届く。
+ *
+ * **緊急通知は入らない。** 緊急通知は `approvals` の行を作らないため、
+ * ここで数えようがない（SPEC 8.3「緊急通知は別枠」）。
+ */
+export async function countProposalsSentInRangeForUser(params: {
+  userId: string;
+  from: Date;
+  to: Date;
+}): Promise<number> {
+  return prisma.approval.count({
+    where: {
+      userId: params.userId,
+      sentAt: { gte: params.from, lt: params.to },
+    },
+  });
+}
