@@ -7,6 +7,8 @@ import * as banners from '@/modules/banners';
 import * as contentPlanning from '@/modules/content-planning';
 import * as contentGeneration from '@/modules/content-generation';
 import * as blogs from '@/modules/blogs';
+import * as line from '@/modules/line';
+import * as users from '@/modules/users';
 import * as personas from '@/modules/personas';
 import * as settings from '@/modules/settings';
 import * as wordpress from '@/modules/wordpress';
@@ -934,7 +936,18 @@ describe('入口の網羅', () => {
      * **`approvals` の入口は利用者単位。** 3ブログ横断で順位を付けるため
      * ブログIDを取らない（SPEC 9.1、F-1）
      */
-    approvals: ['refreshProposalsForUser', 'listApprovalsForUser'],
+    approvals: [
+      'refreshProposalsForUser',
+      'listApprovalsForUser',
+      'listUnsentApprovalsForUser',
+      'claimUnsentApprovalForUser',
+    ],
+    /** 送信は利用者単位。宛先は `users.line_user_id` から取る（F-2） */
+    line: ['sendPendingProposalsForUser'],
+    /**
+     * **`line_user_id` を返す唯一の経路**（F-2）。`AppUser` には載せない
+     */
+    users: ['findNotificationTargetForUser'],
     'content-generation': [
       'factCheckArticleForUser',
       'generateArticleForUser',
@@ -964,6 +977,8 @@ describe('入口の網羅', () => {
   it.each([
     ['ai-costs', aiCosts, covered['ai-costs']],
     ['approvals', approvals, covered.approvals],
+    ['line', line, covered.line],
+    ['users', users, covered.users],
     ['affiliate', affiliate, covered.affiliate],
     ['banners', banners, covered.banners],
     ['blogs', blogs, covered.blogs],

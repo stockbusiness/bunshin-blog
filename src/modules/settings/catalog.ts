@@ -26,11 +26,12 @@
 
 import { z } from 'zod';
 
-export type SettingGroup = 'AI' | 'MAIL';
+export type SettingGroup = 'AI' | 'MAIL' | 'LINE';
 
 export const SETTING_GROUP_LABELS: Readonly<Record<SettingGroup, string>> = {
   AI: 'AI（生成）',
   MAIL: 'メール送信',
+  LINE: 'LINE通知',
 };
 
 export interface SettingDefinition {
@@ -73,6 +74,23 @@ const flag = z.enum(FLAG_CHOICES);
 const mailAddress = text.refine(
   (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
   { message: 'メールアドレスの形式で入力してください' },
+);
+
+/**
+ * `https://` のURL。
+ *
+ * **`http://` を許さない。** 通知のボタンから開く先で、
+ * 途中で書き換えられると別のページへ誘導できる。
+ */
+const httpsUrl = text.refine(
+  (value) => {
+    try {
+      return new URL(value).protocol === 'https:';
+    } catch {
+      return false;
+    }
+  },
+  { message: 'https:// のURLを入力してください' },
 );
 
 /**
@@ -221,6 +239,23 @@ export const SETTING_DEFINITIONS: readonly SettingDefinition[] = [
     description: 'Resend で認証済みのドメインのアドレス',
     secret: false,
     schema: mailAddress,
+  },
+  {
+    key: 'LINE_CHANNEL_ACCESS_TOKEN',
+    group: 'LINE',
+    label: 'Messaging API チャネルアクセストークン',
+    description: '記事の提案をLINEへ送るために使います。読み返せません（F-2）',
+    secret: true,
+    schema: text.min(20, { message: 'トークンが短すぎます' }),
+  },
+  {
+    key: 'LIFF_BASE_URL',
+    group: 'LINE',
+    label: 'LIFF のURL',
+    description:
+      '通知の「内容を確認」ボタンの飛び先。例: https://liff.line.me/1234567890-abcdefgh',
+    secret: false,
+    schema: httpsUrl,
   },
   {
     key: 'ADMIN_ALERT_EMAIL',

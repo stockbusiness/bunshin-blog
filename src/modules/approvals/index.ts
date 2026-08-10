@@ -13,7 +13,13 @@ export {
   type RefreshProposalsResult,
 } from './propose';
 
-export { listApprovalsForUser, type AppApproval } from './repository';
+export {
+  listApprovalsForUser,
+  listUnsentApprovalsForUser,
+  claimUnsentApprovalForUser,
+  type AppApproval,
+  type UnsentApproval,
+} from './repository';
 
 export {
   rankProposals,

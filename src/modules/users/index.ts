@@ -9,6 +9,7 @@ export {
   findById,
   findAdminByEmail,
   findOrCreateByLineUserId,
+  findNotificationTargetForUser,
   recordConsent,
   type UsersDb,
   type UsersDeps,

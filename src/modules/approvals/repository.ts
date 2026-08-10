@@ -156,3 +156,70 @@ export async function listApprovalsForUser(
     select: SELECT,
   });
 }
+
+export interface UnsentApproval {
+  id: string;
+  blogId: string;
+  blogName: string;
+  articleTitle: string;
+  proposalReason: string;
+  priorityScore: number;
+}
+
+/**
+ * まだ通知していない提案を、優先度の高い順に引く（F-2）。
+ *
+ * **`sent_at` が空のものだけ。** SPEC 8.3 の「同一提案を連続通知しない」は
+ * ここと `claimApprovalForSending` の2段で守る。
+ */
+export async function listUnsentApprovalsForUser(
+  userId: string,
+): Promise<UnsentApproval[]> {
+  const rows = await prisma.approval.findMany({
+    where: { userId, status: 'PENDING', sentAt: null },
+    orderBy: [{ priorityScore: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
+    select: {
+      id: true,
+      blogId: true,
+      proposalReason: true,
+      priorityScore: true,
+      blog: { select: { name: true } },
+      articleVersion: { select: { title: true } },
+    },
+  });
+
+  return rows.map((row) => ({
+    id: row.id,
+    blogId: row.blogId,
+    blogName: row.blog.name,
+    articleTitle: row.articleVersion.title,
+    proposalReason: row.proposalReason,
+    priorityScore: row.priorityScore,
+  }));
+}
+
+/**
+ * 送信する提案を1件押さえる（F-2 の完了条件「同一提案を連続通知しない」）。
+ *
+ * **送る前に `sent_at` を立てる。** 送ってから立てると、送信の直後に
+ * 落ちたときに二度届く。逆にすると「立てたが送れなかった」が起こりうるが、
+ * **提案は承認一覧（F-4）に残る**ので消えはしない。
+ * SPEC 8.3 が禁じているのは重複通知のほうである。
+ *
+ * `updateMany` の条件に `sent_at: null` を入れることで、
+ * **同時に2回走っても片方しか押さえられない**。
+ *
+ * @returns 押さえられたら `true`
+ */
+export async function claimUnsentApprovalForUser(params: {
+  userId: string;
+  approvalId: string;
+  now: Date;
+}): Promise<boolean> {
+  const updated = await prisma.approval.updateMany({
+    where: { id: params.approvalId, userId: params.userId, sentAt: null },
+    data: { sentAt: params.now },
+  });
+
+  return updated.count === 1;
+}
