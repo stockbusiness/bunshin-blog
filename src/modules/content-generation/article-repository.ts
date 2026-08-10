@@ -403,3 +403,62 @@ function toRiskFlags(value: unknown): RiskFlag[] {
     };
   });
 }
+
+export interface ArticleVersionDetail extends AppArticleVersion {
+  faq: unknown;
+  structuredData: unknown;
+  /** E-12 が入れた未確認の主張。**形は Q-023 で未解決** */
+  unverifiedClaims: unknown;
+  /** E-13 が入れたリスクフラグ */
+  riskFlags: unknown;
+  usedFactIds: string[];
+  estimatedCostUsd: string;
+}
+
+/**
+ * 承認画面に出す一式を引く（F-5）。
+ *
+ * **所有権は `requirePlannedItemForUser` が確かめる。** IDだけで引く関数を
+ * 公開しない（SPEC 14.1）。`articleVersionId` は呼び出し側から渡るため、
+ * **その記事の版であることも条件に入れる**（C-6 と同じ形の穴を作らない）。
+ *
+ * @throws {AppError} 自分の記事でない・その記事の版でない
+ */
+export async function readArticleVersionDetailForUser(params: {
+  userId: string;
+  blogId: string;
+  contentItemId: string;
+  articleVersionId: string;
+}): Promise<ArticleVersionDetail> {
+  await requirePlannedItemForUser(params);
+
+  const row = await prisma.articleVersion.findFirst({
+    where: {
+      id: params.articleVersionId,
+      contentItemId: params.contentItemId,
+    },
+    select: {
+      ...SELECT,
+      faqJson: true,
+      structuredDataJson: true,
+      unverifiedClaims: true,
+      riskFlags: true,
+      usedFactIds: true,
+      estimatedCostUsd: true,
+    },
+  });
+
+  if (row === null) {
+    throw itemNotInPlanError();
+  }
+
+  const { faqJson, structuredDataJson, estimatedCostUsd, ...rest } = row;
+
+  return {
+    ...rest,
+    faq: faqJson,
+    structuredData: structuredDataJson,
+    // **`Decimal` をそのまま返さない。** JSON を通ると形が変わる
+    estimatedCostUsd: estimatedCostUsd.toString(),
+  };
+}

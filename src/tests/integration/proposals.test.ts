@@ -1,7 +1,9 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import {
+  APPROVAL_ERROR_CODES,
   listApprovalSummariesForUser,
+  readApprovalDetailForUser,
   listApprovalsForUser,
   refreshProposalsForUser,
 } from '@/modules/approvals';
@@ -408,5 +410,150 @@ describe('承認一覧（F-4、SPEC 6.1）', () => {
 
     expect(after[0]?.id).not.toBe(answered?.id);
     expect(after[1]?.status).toBe('APPROVED');
+  });
+});
+
+describe('承認詳細（F-5、SPEC 6.1）', () => {
+  async function proposalFor(userIdArg: string, blogIdArg: string) {
+    await createArticle({ blogId: blogIdArg, publishPriority: 1 });
+    const result = await refreshProposalsForUser(userIdArg, { now: NOW });
+
+    return result.created[0]?.id ?? '';
+  }
+
+  /** 完了条件は「**未確認事実とリスク警告が表示される**」 */
+  it('未確認事実とリスク警告を返す', async () => {
+    const blog = await createBlog(prisma, userId);
+    await createArticle({
+      blogId: blog.id,
+      publishPriority: 1,
+      factCheckStatus: 'WARNING',
+      riskFlags: [
+        { code: 'ASSERTIVE_CLAIM', severity: 'warning', message: '断定' },
+      ],
+    });
+    const created = await refreshProposalsForUser(userId, { now: NOW });
+    const approvalId = created.created[0]?.id ?? '';
+
+    await prisma.articleVersion.updateMany({
+      where: { contentItemId: created.created[0]?.contentItemId },
+      data: {
+        unverifiedClaims: [
+          { text: '初期費用は3,000円', type: 'PRICE', reason: 'NOT_IN_FACTS' },
+        ],
+      },
+    });
+
+    const detail = await readApprovalDetailForUser({ userId, approvalId });
+
+    expect(detail.article.unverifiedClaims).toHaveLength(1);
+    expect(detail.article.riskFlags).toHaveLength(1);
+    expect(detail.article.factCheckStatus).toBe('WARNING');
+  });
+
+  it('SPEC 6.1 の表示項目が揃う', async () => {
+    const blog = await createBlog(prisma, userId, { name: '節約ブログ' });
+    const approvalId = await proposalFor(userId, blog.id);
+
+    const detail = await readApprovalDetailForUser({ userId, approvalId });
+
+    expect(detail.blogName).toBe('節約ブログ');
+    expect(detail.article.title).toBe('タイトル1');
+    expect(detail.article.bodyHtml.length).toBeGreaterThan(0);
+    expect(detail.generation.modelName).toBe('test');
+    expect(detail.approval.proposalReason.length).toBeGreaterThan(0);
+  });
+
+  /** **開いたことを記録する。** 一覧では承認待ちのまま（F-4） */
+  it('開くと VIEWED になる', async () => {
+    const blog = await createBlog(prisma, userId);
+    const approvalId = await proposalFor(userId, blog.id);
+
+    const detail = await readApprovalDetailForUser({ userId, approvalId });
+
+    expect(detail.approval.status).toBe('VIEWED');
+
+    const row = await prisma.approval.findUnique({
+      where: { id: approvalId },
+      select: { viewedAt: true },
+    });
+
+    expect(row?.viewedAt).not.toBeNull();
+  });
+
+  /** **`viewed_at` は最初に開いた時刻のまま残す**（いつ気づいたかの記録） */
+  it('二度目に開いても viewed_at を更新しない', async () => {
+    const blog = await createBlog(prisma, userId);
+    const approvalId = await proposalFor(userId, blog.id);
+
+    await readApprovalDetailForUser({ userId, approvalId });
+    const first = await prisma.approval.findUnique({
+      where: { id: approvalId },
+      select: { viewedAt: true },
+    });
+
+    await readApprovalDetailForUser({ userId, approvalId });
+    const second = await prisma.approval.findUnique({
+      where: { id: approvalId },
+      select: { viewedAt: true },
+    });
+
+    expect(second?.viewedAt?.getTime()).toBe(first?.viewedAt?.getTime());
+  });
+
+  it('答えた提案を VIEWED へ戻さない', async () => {
+    const blog = await createBlog(prisma, userId);
+    const approvalId = await proposalFor(userId, blog.id);
+
+    await prisma.approval.update({
+      where: { id: approvalId },
+      data: { status: 'APPROVED', respondedAt: NOW },
+    });
+
+    const detail = await readApprovalDetailForUser({ userId, approvalId });
+
+    expect(detail.approval.status).toBe('APPROVED');
+  });
+
+  /** **他人のものは404。**「無い」と区別しない（SPEC 14.1） */
+  it('他人の承認は開けない', async () => {
+    const other = await createUser(prisma);
+    const otherBlog = await createBlog(prisma, other.id);
+    const approvalId = await proposalFor(other.id, otherBlog.id);
+
+    await expect(
+      readApprovalDetailForUser({ userId, approvalId }),
+    ).rejects.toMatchObject({
+      code: APPROVAL_ERROR_CODES.notFound,
+      status: 404,
+    });
+  });
+
+  it('存在しないIDも同じ404', async () => {
+    await expect(
+      readApprovalDetailForUser({
+        userId,
+        approvalId: '00000000-0000-4000-8000-000000000000',
+      }),
+    ).rejects.toMatchObject({ code: APPROVAL_ERROR_CODES.notFound });
+  });
+
+  /** **他人の承認を開いても、相手の記録は変わらない** */
+  it('他人の承認を開こうとしても viewed_at は付かない', async () => {
+    const other = await createUser(prisma);
+    const otherBlog = await createBlog(prisma, other.id);
+    const approvalId = await proposalFor(other.id, otherBlog.id);
+
+    await expect(
+      readApprovalDetailForUser({ userId, approvalId }),
+    ).rejects.toThrow();
+
+    const row = await prisma.approval.findUnique({
+      where: { id: approvalId },
+      select: { viewedAt: true, status: true },
+    });
+
+    expect(row?.viewedAt).toBeNull();
+    expect(row?.status).toBe('PENDING');
   });
 });

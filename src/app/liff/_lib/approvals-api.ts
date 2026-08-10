@@ -62,3 +62,67 @@ export async function fetchApprovals(): Promise<ApprovalListJson> {
 
   return (await response.json()) as ApprovalListJson;
 }
+
+/** 未確認の主張（E-12）。**形は Q-023 で未解決** */
+export interface UnverifiedClaimJson {
+  text?: string;
+  type?: string;
+  excerpt?: string;
+  reason?: string;
+}
+
+/** リスクフラグ（E-13、DATA_MODEL 132） */
+export interface RiskFlagJson {
+  code?: string;
+  severity?: string;
+  message?: string;
+  excerpt?: string;
+}
+
+export interface ApprovalDetailJson {
+  approval: {
+    id: string;
+    blogId: string;
+    blogName: string;
+    status: string;
+    proposalType: string;
+    proposalReason: string;
+  };
+  article: {
+    versionNo: number;
+    title: string;
+    excerpt: string;
+    answerCapsule: string;
+    bodyHtml: string;
+    faq: { question: string; answer: string }[];
+    factCheckStatus: string;
+    unverifiedClaims: UnverifiedClaimJson[];
+    riskFlags: RiskFlagJson[];
+  };
+  generation: {
+    modelProvider: string;
+    modelName: string;
+    promptVersion: string;
+    inputTokens: number;
+    outputTokens: number;
+    estimatedCostUsd: string;
+    createdAt: string;
+  };
+  offer: { name: string; affiliateUrl: string } | null;
+  banners: { id: string; name: string; imageUrl: string; slot: string }[];
+}
+
+export async function fetchApprovalDetail(
+  approvalId: string,
+): Promise<ApprovalDetailJson> {
+  const response = await fetch(
+    `/api/approvals/${encodeURIComponent(approvalId)}`,
+    { headers: { accept: 'application/json' } },
+  );
+
+  if (!response.ok) {
+    await readError(response);
+  }
+
+  return (await response.json()) as ApprovalDetailJson;
+}

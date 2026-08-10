@@ -334,3 +334,76 @@ function countWarningFlags(value: unknown): number {
     (entry) => (entry as { severity?: string })?.severity === 'warning',
   ).length;
 }
+
+export interface FoundApproval {
+  approval: AppApproval;
+  blogName: string;
+  slotNumber: number;
+  offerId: string | null;
+}
+
+/**
+ * 自分の承認を1件引く（F-5）。
+ *
+ * **`userId` を条件に入れる。** `approvalId` は画面から渡ってくる。
+ * 他人のものは `null`（「無い」と区別しない。SPEC 14.1）。
+ */
+export async function findApprovalForUser(params: {
+  userId: string;
+  approvalId: string;
+}): Promise<FoundApproval | null> {
+  const row = await prisma.approval.findFirst({
+    where: { id: params.approvalId, userId: params.userId },
+    select: {
+      ...SELECT,
+      blog: { select: { name: true, slotNumber: true } },
+      contentItem: { select: { affiliateOfferId: true } },
+    },
+  });
+
+  if (row === null) {
+    return null;
+  }
+
+  const { blog, contentItem, ...approval } = row;
+
+  return {
+    approval,
+    blogName: blog.name,
+    slotNumber: blog.slotNumber,
+    offerId: contentItem.affiliateOfferId,
+  };
+}
+
+/**
+ * 開いたことを記録する（F-5）。
+ *
+ * **`PENDING` のときだけ進める。** 承認済みや見送りを `VIEWED` へ
+ * 戻さない。`viewed_at` は最初に開いた時刻のまま残す —
+ * 「いつ気づいたか」の記録で、開くたびに更新すると意味が変わる。
+ *
+ * @returns 進めたら更新後の行、対象外なら `null`
+ */
+export async function markApprovalViewedForUser(params: {
+  userId: string;
+  approvalId: string;
+  now: Date;
+}): Promise<AppApproval | null> {
+  const updated = await prisma.approval.updateMany({
+    where: {
+      id: params.approvalId,
+      userId: params.userId,
+      status: 'PENDING',
+    },
+    data: { status: 'VIEWED', viewedAt: params.now },
+  });
+
+  if (updated.count === 0) {
+    return null;
+  }
+
+  return prisma.approval.findUniqueOrThrow({
+    where: { id: params.approvalId },
+    select: SELECT,
+  });
+}
