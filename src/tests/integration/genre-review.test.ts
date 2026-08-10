@@ -2,6 +2,7 @@ import { createServer, type Server } from 'node:http';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import { createAiProvider } from '@/lib/ai';
+import { listAuditLogsForAdmin } from '@/modules/audit';
 import {
   PLANNING_ERROR_CODES,
   listPlanningRunsForUser,
@@ -362,6 +363,33 @@ describe('承知で進める', () => {
 
     expect(result.run.step1Status).toBe('OVERRIDDEN');
     expect(result.run.overriddenAt).toBeInstanceOf(Date);
+  });
+
+  /**
+   * **「承知で進める」を横断で辿れるようにする**（SPEC 9.2.2、H-11）。
+   * 選択そのものは `planning_runs.overridden_at` にも残るが、
+   * そちらはブログ単位でしか引けない
+   */
+  it('監査ログに残る', async () => {
+    await rejectTwice();
+
+    const result = await overrideGenreBlockForUser({
+      userId,
+      blogId,
+      genreId: await createGenre('HIGH', '最後'),
+      serpTop10: HEALTHY_SERP,
+      userHasExperience: true,
+    });
+
+    const logs = await listAuditLogsForAdmin({ entityType: 'planning_run' });
+
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toMatchObject({
+      action: 'GENRE_BLOCK_OVERRIDDEN',
+      actorUserId: userId,
+      entityId: result.run.id,
+    });
+    expect(logs[0]?.metadata).toMatchObject({ rejectionCount: 2 });
   });
 
   /** **判定は書き換えない。** 停止した事実と理由は残す */

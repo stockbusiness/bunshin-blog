@@ -25,6 +25,7 @@
 
 import { prisma } from '@/lib/db';
 import { AppError } from '@/lib/errors';
+import { recordAuditInTx, type AuditAction } from '@/modules/audit';
 import type { AppUser } from './types';
 
 export const USER_ADMIN_ERROR_CODES = {
@@ -69,13 +70,28 @@ export type MonitorAdminAction = 'ACTIVATE' | 'PAUSE' | 'RESUME';
  * 「停止中を承認できてしまう」ような穴が後から入る。
  */
 const TRANSITIONS: Readonly<
-  Record<MonitorAdminAction, { from: readonly string[]; to: string }>
+  Record<
+    MonitorAdminAction,
+    { from: readonly string[]; to: string; audit: AuditAction }
+  >
 > = {
   // **`ACTIVE` からの `ACTIVATE` も通す**（冪等）。二度押しで落とさない
-  ACTIVATE: { from: ['INVITED', 'ACTIVE'], to: 'ACTIVE' },
-  PAUSE: { from: ['ACTIVE', 'PAUSED'], to: 'PAUSED' },
+  ACTIVATE: {
+    from: ['INVITED', 'ACTIVE'],
+    to: 'ACTIVE',
+    audit: 'MONITOR_ACTIVATED',
+  },
+  PAUSE: {
+    from: ['ACTIVE', 'PAUSED'],
+    to: 'PAUSED',
+    audit: 'MONITOR_PAUSED',
+  },
   // **`INVITED` を `RESUME` で `ACTIVE` にしない。** 認めるのは `ACTIVATE`
-  RESUME: { from: ['PAUSED', 'ACTIVE'], to: 'ACTIVE' },
+  RESUME: {
+    from: ['PAUSED', 'ACTIVE'],
+    to: 'ACTIVE',
+    audit: 'MONITOR_RESUMED',
+  },
 };
 
 /** その操作が今の状態に対して意味を持つか（画面のボタンの出し分けに使う） */
@@ -99,6 +115,8 @@ export function canApplyMonitorAction(params: {
 export async function updateMonitorStatusForAdmin(params: {
   userId: string;
   action: MonitorAdminAction;
+  /** 操作したADMIN。**誰が介入したかを残す**（H-11） */
+  actorUserId: string | null;
 }): Promise<AppUser> {
   const transition = TRANSITIONS[params.action];
 
@@ -115,17 +133,33 @@ export async function updateMonitorStatusForAdmin(params: {
     throw invalidTransitionError(current.status);
   }
 
-  const updated = await prisma.user.update({
-    where: { id: params.userId },
-    data: { status: transition.to as never },
-    select: {
-      id: true,
-      role: true,
-      displayName: true,
-      status: true,
-      termsAcceptedAt: true,
-      dataUseConsentAt: true,
-    },
+  // **介入と記録は同時に決まる**（H-11、Q-008 の決定）。
+  // 記録だけ残って状態が戻る、あるいはその逆を作らない
+  const updated = await prisma.$transaction(async (tx) => {
+    const user = await tx.user.update({
+      where: { id: params.userId },
+      data: { status: transition.to as never },
+      select: {
+        id: true,
+        role: true,
+        displayName: true,
+        status: true,
+        termsAcceptedAt: true,
+        dataUseConsentAt: true,
+      },
+    });
+
+    await recordAuditInTx(tx, {
+      actorUserId: params.actorUserId,
+      action: transition.audit,
+      entityType: 'user',
+      entityId: params.userId,
+      // **氏名や `line_user_id` を入れない**（SPEC 14.2）。
+      // どこからどこへ動いたかだけを残す
+      metadata: { from: current.status, to: transition.to },
+    });
+
+    return user;
   });
 
   return {

@@ -23,12 +23,17 @@ export async function POST(
   context: { params: Promise<{ userId: string }> },
 ): Promise<Response> {
   try {
-    await requireAdmin(request.headers.get('cookie'));
+    const admin = await requireAdmin(request.headers.get('cookie'));
 
     const { userId } = await context.params;
     const { action } = schema.parse(await request.json());
 
-    const user = await updateMonitorStatusForAdmin({ userId, action });
+    // **誰が介入したかを残す**（H-11、Q-008 の決定）
+    const user = await updateMonitorStatusForAdmin({
+      userId,
+      action,
+      actorUserId: admin.id,
+    });
 
     return Response.json({ status: user.status });
   } catch (error) {
