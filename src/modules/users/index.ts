@@ -10,6 +10,7 @@ export {
   findAdminByEmail,
   findOrCreateByLineUserId,
   findNotificationTargetForUser,
+  findMaxDailyProposalsForUser,
   recordConsent,
   type UsersDb,
   type UsersDeps,

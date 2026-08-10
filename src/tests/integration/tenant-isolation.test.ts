@@ -941,13 +941,18 @@ describe('入口の網羅', () => {
       'listApprovalsForUser',
       'listUnsentApprovalsForUser',
       'claimUnsentApprovalForUser',
+      'countProposalsSentInRangeForUser',
     ],
     /** 送信は利用者単位。宛先は `users.line_user_id` から取る（F-2） */
-    line: ['sendPendingProposalsForUser'],
+    line: [
+      'sendPendingProposalsForUser',
+      'sendEmergencyNotificationForUser',
+      'remainingSlotsForUser',
+    ],
     /**
      * **`line_user_id` を返す唯一の経路**（F-2）。`AppUser` には載せない
      */
-    users: ['findNotificationTargetForUser'],
+    users: ['findNotificationTargetForUser', 'findMaxDailyProposalsForUser'],
     'content-generation': [
       'factCheckArticleForUser',
       'generateArticleForUser',

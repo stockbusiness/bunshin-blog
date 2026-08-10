@@ -9,10 +9,19 @@
 
 export {
   sendPendingProposalsForUser,
-  DEFAULT_NOTIFICATION_LIMIT,
+  sendEmergencyNotificationForUser,
+  remainingSlotsForUser,
   type SendProposalsDeps,
   type SendProposalsResult,
+  type EmergencyKind,
 } from './notify';
+
+export {
+  dailyNotificationLimit,
+  remainingNotificationSlots,
+  DEFAULT_DAILY_PROPOSAL_LIMIT,
+  MAX_DAILY_PROPOSAL_LIMIT,
+} from './limit';
 
 export {
   buildProposalMessages,

@@ -191,3 +191,21 @@ export async function findNotificationTargetForUser(
 
   return record.lineUserId;
 }
+
+/**
+ * 1日に受け取る提案の上限を引く（F-3、SPEC 8.3）。
+ *
+ * **`monitor_profiles` が無ければ `null`。** 呼び出し側が既定へ落とす
+ * （`dailyNotificationLimit`）。ここで既定値を持つと、上限の既定が
+ * 2箇所になる。
+ */
+export async function findMaxDailyProposalsForUser(
+  userId: string,
+): Promise<number | null> {
+  const profile = await prisma.monitorProfile.findUnique({
+    where: { userId },
+    select: { maxDailyProposals: true },
+  });
+
+  return profile?.maxDailyProposals ?? null;
+}
