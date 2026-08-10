@@ -246,3 +246,91 @@ export async function countProposalsSentInRangeForUser(params: {
     },
   });
 }
+
+export interface ApprovalSummary {
+  id: string;
+  blogId: string;
+  blogName: string;
+  articleTitle: string;
+  status: string;
+  proposalType: string;
+  proposalReason: string;
+  priorityScore: number;
+  /** 事実チェックの結果。一覧で「確認が要る」ことを先に示す（E-12） */
+  factCheckStatus: string;
+  /** `warning` のリスクフラグの件数（E-13） */
+  riskFlagCount: number;
+  sentAt: Date | null;
+  respondedAt: Date | null;
+  createdAt: Date;
+}
+
+/**
+ * 承認一覧に出す一式を引く（F-4、SPEC 6.1 `/liff/approvals`）。
+ *
+ * **`userId` だけを入口にする。** 一覧の絞り込みをクエリで受けない
+ * （SPEC 14.1）。並べ分けは画面側（`approvalTabOf`）。
+ *
+ * **返事の済んだものは新しい順、待ちは優先度順。** 待っているものは
+ * 「どれから見るか」が要り、済んだものは「いつのことか」が要る。
+ */
+export async function listApprovalSummariesForUser(
+  userId: string,
+): Promise<ApprovalSummary[]> {
+  const rows = await prisma.approval.findMany({
+    where: { userId },
+    orderBy: [
+      { respondedAt: { sort: 'asc', nulls: 'first' } },
+      { priorityScore: 'desc' },
+      { createdAt: 'desc' },
+      { id: 'desc' },
+    ],
+    select: {
+      id: true,
+      blogId: true,
+      status: true,
+      proposalType: true,
+      proposalReason: true,
+      priorityScore: true,
+      sentAt: true,
+      respondedAt: true,
+      createdAt: true,
+      blog: { select: { name: true } },
+      articleVersion: {
+        select: { title: true, factCheckStatus: true, riskFlags: true },
+      },
+    },
+  });
+
+  return rows.map((row) => ({
+    id: row.id,
+    blogId: row.blogId,
+    blogName: row.blog.name,
+    articleTitle: row.articleVersion.title,
+    status: row.status,
+    proposalType: row.proposalType,
+    proposalReason: row.proposalReason,
+    priorityScore: row.priorityScore,
+    factCheckStatus: row.articleVersion.factCheckStatus,
+    riskFlagCount: countWarningFlags(row.articleVersion.riskFlags),
+    sentAt: row.sentAt,
+    respondedAt: row.respondedAt,
+    createdAt: row.createdAt,
+  }));
+}
+
+/**
+ * `warning` のリスクフラグを数える。
+ *
+ * **形が違えば0にせず、読めた分だけ数える。** `error` は F-1 の時点で
+ * 提案にならないため、ここに来るのは `warning` と `info` だけ。
+ */
+function countWarningFlags(value: unknown): number {
+  if (!Array.isArray(value)) {
+    return 0;
+  }
+
+  return value.filter(
+    (entry) => (entry as { severity?: string })?.severity === 'warning',
+  ).length;
+}

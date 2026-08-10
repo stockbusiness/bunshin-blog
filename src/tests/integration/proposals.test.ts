@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import {
+  approvalTabOf,
+  listApprovalSummariesForUser,
   listApprovalsForUser,
   refreshProposalsForUser,
 } from '@/modules/approvals';
@@ -333,5 +335,79 @@ describe('他人の記事は提案されない', () => {
     expect(
       (await refreshProposalsForUser(userId, { now: NOW })).created,
     ).toEqual([]);
+  });
+});
+
+describe('承認一覧（F-4、SPEC 6.1）', () => {
+  /** 完了条件は「**他ユーザーの承認を開けない**」 */
+  it('自分の提案だけが返る', async () => {
+    const blog = await createBlog(prisma, userId);
+    await createArticle({ blogId: blog.id, publishPriority: 1 });
+    await refreshProposalsForUser(userId, { now: NOW });
+
+    const other = await createUser(prisma);
+    const otherBlog = await createBlog(prisma, other.id);
+    await createArticle({ blogId: otherBlog.id, publishPriority: 1 });
+    await refreshProposalsForUser(other.id, { now: NOW });
+
+    const mine = await listApprovalSummariesForUser(userId);
+    const theirs = await listApprovalSummariesForUser(other.id);
+
+    expect(mine).toHaveLength(1);
+    expect(theirs).toHaveLength(1);
+    expect(mine[0]?.id).not.toBe(theirs[0]?.id);
+    expect(mine[0]?.blogId).toBe(blog.id);
+  });
+
+  it('ブログ名と記事タイトルが載る', async () => {
+    const blog = await createBlog(prisma, userId, { name: '節約ブログ' });
+    await createArticle({ blogId: blog.id, publishPriority: 1 });
+    await refreshProposalsForUser(userId, { now: NOW });
+
+    const [summary] = await listApprovalSummariesForUser(userId);
+
+    expect(summary?.blogName).toBe('節約ブログ');
+    expect(summary?.articleTitle).toBe('タイトル1');
+  });
+
+  /** **確認が要ることを開く前に示す**（E-12・E-13） */
+  it('事実チェックの結果と表現の指摘の件数が載る', async () => {
+    const blog = await createBlog(prisma, userId);
+    await createArticle({
+      blogId: blog.id,
+      publishPriority: 1,
+      factCheckStatus: 'WARNING',
+      riskFlags: [
+        { code: 'ASSERTIVE_CLAIM', severity: 'warning', message: 'x' },
+        { code: 'EXAGGERATION', severity: 'warning', message: 'y' },
+      ],
+    });
+    await refreshProposalsForUser(userId, { now: NOW });
+
+    const [summary] = await listApprovalSummariesForUser(userId);
+
+    expect(summary?.factCheckStatus).toBe('WARNING');
+    expect(summary?.riskFlagCount).toBe(2);
+  });
+
+  /** **返事の済んだものは後ろ。** 待っているものから見せる */
+  it('返事待ちが先に並ぶ', async () => {
+    const blog = await createBlog(prisma, userId);
+    await createArticle({ blogId: blog.id, publishPriority: 1 });
+    await createArticle({ blogId: blog.id, publishPriority: 2 });
+    await refreshProposalsForUser(userId, { now: NOW });
+
+    const before = await listApprovalSummariesForUser(userId);
+    const answered = before[0];
+
+    await prisma.approval.update({
+      where: { id: answered?.id },
+      data: { status: 'APPROVED', respondedAt: NOW },
+    });
+
+    const after = await listApprovalSummariesForUser(userId);
+
+    expect(after[0]?.id).not.toBe(answered?.id);
+    expect(approvalTabOf(after[1]?.status ?? '')).toBe('APPROVED');
   });
 });

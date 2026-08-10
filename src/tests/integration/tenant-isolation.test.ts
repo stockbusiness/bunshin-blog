@@ -942,6 +942,7 @@ describe('入口の網羅', () => {
       'listUnsentApprovalsForUser',
       'claimUnsentApprovalForUser',
       'countProposalsSentInRangeForUser',
+      'listApprovalSummariesForUser',
     ],
     /** 送信は利用者単位。宛先は `users.line_user_id` から取る（F-2） */
     line: [
