@@ -2,6 +2,11 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import { GET } from '@/app/go/[code]/route';
 import {
+  AI_REFERRAL_DOMAINS,
+  countAiReferrals,
+  recountAiReferrals,
+} from '@/modules/analytics';
+import {
   createOfferForUser,
   ensureRedirectLinkForUser,
   findRedirectTargetByCode,
@@ -282,20 +287,83 @@ describe('リダイレクトとクリック記録（完了条件）', () => {
     expect(click.referrerHost).toBeNull();
   });
 
-  /**
-   * **判別は G-4 の担当。** `referrer_host` を残してあるので後から
-   * 数え直せる。
-   */
-  it('is_ai_referral は false で入る（判別は G-4）', async () => {
+  /** AI検索経由を記録の時点で判別する（G-4、SPEC 11.4） */
+  it('AI検索経由なら is_ai_referral が立つ', async () => {
     await callGo(code, { referer: 'https://www.perplexity.ai/search' });
 
     const click = await prisma.linkClick.findFirstOrThrow({
       where: { affiliateLinkId: linkId },
     });
 
-    expect(click.isAiReferral).toBe(false);
-    // 後から数え直せるだけの情報は残っている
+    expect(click.isAiReferral).toBe(true);
+    // **元の値は書き換えない。** 後から数え直せる
     expect(click.referrerHost).toBe('www.perplexity.ai');
+  });
+
+  it('普通の検索経由なら立たない', async () => {
+    await callGo(code, { referer: 'https://www.google.com/search?q=x' });
+
+    const click = await prisma.linkClick.findFirstOrThrow({
+      where: { affiliateLinkId: linkId },
+    });
+
+    expect(click.isAiReferral).toBe(false);
+  });
+
+  /**
+   * **取れなかったものは `false`**（SPEC 11.4）。
+   * 「AI経由でない」ではなく「判別できなかった」
+   */
+  it('Referer が無ければ立たない', async () => {
+    await callGo(code);
+
+    const click = await prisma.linkClick.findFirstOrThrow({
+      where: { affiliateLinkId: linkId },
+    });
+
+    expect(click.isAiReferral).toBe(false);
+  });
+
+  /**
+   * **対象ドメインを足したあとに数え直せる**（完了条件の意図）。
+   * `referrer_host` を残してあるから成り立つ
+   */
+  it('あとから数え直せる', async () => {
+    await callGo(code, { referer: 'https://newai.example/search' });
+
+    const before = await prisma.linkClick.findFirstOrThrow({
+      where: { affiliateLinkId: linkId },
+    });
+
+    expect(before.isAiReferral).toBe(false);
+
+    const changed = await recountAiReferrals([
+      ...AI_REFERRAL_DOMAINS,
+      'newai.example',
+    ]);
+
+    expect(changed).toBe(1);
+
+    const after = await prisma.linkClick.findFirstOrThrow({
+      where: { affiliateLinkId: linkId },
+    });
+
+    expect(after.isAiReferral).toBe(true);
+    // **元の値は書き換えない**
+    expect(after.referrerHost).toBe('newai.example');
+  });
+
+  it('数え直しても判別が変わらなければ何もしない', async () => {
+    await callGo(code, { referer: 'https://www.perplexity.ai/search' });
+
+    expect(await recountAiReferrals()).toBe(0);
+  });
+
+  it('AI経由のクリック数を数えられる', async () => {
+    await callGo(code, { referer: 'https://www.perplexity.ai/search' });
+    await callGo(code, { referer: 'https://www.google.com/search' });
+
+    expect(await countAiReferrals([linkId])).toBe(1);
   });
 
   it('複数回のクリックが積み上がる', async () => {

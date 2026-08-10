@@ -8,7 +8,19 @@
  * ログインしていない。所有権の判定に使える情報が無い。
  */
 
-export { recordLinkClick, countLinkClicks } from './repository';
+export {
+  recordLinkClick,
+  countLinkClicks,
+  recountAiReferrals,
+  countAiReferrals,
+} from './repository';
+
+export {
+  isAiReferralHost,
+  matchesDomain,
+  resolveAiReferralDomains,
+  AI_REFERRAL_DOMAINS,
+} from './ai-referral';
 
 export {
   saveWeeklyResultForUser,

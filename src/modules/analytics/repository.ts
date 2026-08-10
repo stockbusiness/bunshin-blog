@@ -9,23 +9,29 @@
  */
 
 import { prisma } from '@/lib/db';
+import { isAiReferralHost, resolveAiReferralDomains } from './ai-referral';
 import { hashUserAgent, parseReferrerHost } from './click';
 import type { AppLinkClick, RecordClickInput } from './types';
 
 /**
  * クリックを記録する（完了条件「`REDIRECT` の案件でクリックが記録される」）。
  *
- * **`is_ai_referral` は常に `false` で入る。** 判別は G-4 の担当で、
- * 対象ドメインを設定ファイルで追加できる形にする。**`referrer_host` を
- * 残してあるので後から数え直せる。**
+ * **AI検索経由かをここで判別する**（G-4、SPEC 11.4）。`referrer_host` は
+ * そのまま残すので、**対象ドメインを足したあとに過去のクリックも
+ * 数え直せる**（`recountAiReferrals`）。
  */
 export async function recordLinkClick(
   input: RecordClickInput,
 ): Promise<AppLinkClick> {
+  const host = parseReferrerHost(input.referrer);
+
   const row = await prisma.linkClick.create({
     data: {
       affiliateLinkId: input.affiliateLinkId,
-      referrerHost: parseReferrerHost(input.referrer),
+      referrerHost: host,
+      // **取れなかったものは `false`。** `Referer` の欠落は異常ではなく、
+      // 「判別できなかった」だけ（SPEC 11.4）
+      isAiReferral: isAiReferralHost(host, resolveAiReferralDomains()),
       userAgentHash: hashUserAgent(input.userAgent),
     },
     select: {
@@ -46,4 +52,57 @@ export async function countLinkClicks(
   affiliateLinkId: string,
 ): Promise<number> {
   return prisma.linkClick.count({ where: { affiliateLinkId } });
+}
+
+/**
+ * 保存済みのクリックを数え直す（G-4）。
+ *
+ * **対象ドメインを足したあとに走らせる。** `referrer_host` を残してあるので
+ * （D-8）、判別だけをやり直せる。
+ *
+ * **`referrer_host` は書き換えない。** 元の値であり、判別の結果ではない。
+ *
+ * @returns 判別が変わった件数
+ */
+export async function recountAiReferrals(
+  domains: readonly string[] = resolveAiReferralDomains(),
+): Promise<number> {
+  const rows = await prisma.linkClick.findMany({
+    select: { id: true, referrerHost: true, isAiReferral: true },
+  });
+
+  let changed = 0;
+
+  for (const row of rows) {
+    const expected = isAiReferralHost(row.referrerHost, domains);
+
+    if (expected === row.isAiReferral) {
+      continue;
+    }
+
+    await prisma.linkClick.update({
+      where: { id: row.id },
+      data: { isAiReferral: expected },
+    });
+
+    changed += 1;
+  }
+
+  return changed;
+}
+
+/** AI検索経由のクリック数（SPEC 11.4「判別可能なAIサービス経由流入数」） */
+export async function countAiReferrals(
+  affiliateLinkIds: readonly string[],
+): Promise<number> {
+  if (affiliateLinkIds.length === 0) {
+    return 0;
+  }
+
+  return prisma.linkClick.count({
+    where: {
+      affiliateLinkId: { in: [...affiliateLinkIds] },
+      isAiReferral: true,
+    },
+  });
 }
