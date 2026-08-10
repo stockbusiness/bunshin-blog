@@ -365,3 +365,46 @@ export async function findJobByIdempotencyKey(
 
   return row === null ? null : toAppJob(row);
 }
+
+/**
+ * トランザクションの中でジョブを積む（F-7）。
+ *
+ * **承認とジョブは同時に決まる。** 承認したのにジョブが無いと、
+ * 記事が永久に投稿されない。逆に、承認が巻き戻ったのにジョブだけ残ると、
+ * 承認していない記事が投稿される。
+ *
+ * 同じ `idempotency_key` なら積み直さず、既にあることを返す。
+ * **例外にしない** — 二度承認しても失敗させないため（F-6 の冪等性）。
+ */
+export async function enqueueJobInTx(
+  tx: Prisma.TransactionClient,
+  input: EnqueueJobInput,
+): Promise<{ created: boolean }> {
+  if (!isJobType(input.jobType)) {
+    throw unknownJobTypeError(input.jobType);
+  }
+
+  assertIdempotencyKey(input.jobType, input.idempotencyKey);
+
+  const existing = await tx.job.findUnique({
+    where: { idempotencyKey: input.idempotencyKey },
+    select: { id: true },
+  });
+
+  if (existing !== null) {
+    return { created: false };
+  }
+
+  await tx.job.create({
+    data: {
+      jobType: input.jobType,
+      idempotencyKey: input.idempotencyKey,
+      inputJson: input.input as Prisma.InputJsonValue,
+      ...(input.userId === undefined ? {} : { userId: input.userId }),
+      ...(input.blogId === undefined ? {} : { blogId: input.blogId }),
+      ...(input.targetId === undefined ? {} : { targetId: input.targetId }),
+    },
+  });
+
+  return { created: true };
+}

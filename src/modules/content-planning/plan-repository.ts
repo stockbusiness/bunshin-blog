@@ -442,3 +442,20 @@ export async function setItemStatusInTx(
 
   return updated.count;
 }
+
+/**
+ * 投稿できた記事を `POSTED` にする（F-7）。
+ *
+ * **`APPROVED` からのみ動かす。** 承認されていない記事を投稿済みに
+ * しない。既に `POSTED` なら何もしない（ジョブの再実行で戻らない）。
+ *
+ * @returns 実際に進めた件数
+ */
+export async function markItemPosted(contentItemId: string): Promise<number> {
+  const updated = await prisma.contentItem.updateMany({
+    where: { id: contentItemId, status: 'APPROVED' },
+    data: { status: 'POSTED' },
+  });
+
+  return updated.count;
+}
