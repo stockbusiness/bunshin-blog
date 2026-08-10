@@ -944,8 +944,12 @@ describe('入口の網羅', () => {
       'countProposalsSentInRangeForUser',
       'listApprovalSummariesForUser',
       'findApprovalForUser',
-      'markApprovalViewedForUser',
       'readApprovalDetailForUser',
+      'markViewedForUser',
+      'approveForUser',
+      'skipForUser',
+      'requestRevisionForUser',
+      'listRevisionRequestsForUser',
     ],
     /** 送信は利用者単位。宛先は `users.line_user_id` から取る（F-2） */
     line: [

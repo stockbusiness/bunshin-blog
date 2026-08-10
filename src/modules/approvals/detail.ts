@@ -3,17 +3,11 @@
  *
  * 完了条件は「**未確認事実とリスク警告が表示される**」。
  *
- * ## 開いたことを記録する
+ * ## 読むだけ。状態を変えない
  *
- * `PENDING` を `VIEWED` へ進め、`viewed_at` を入れる。
- * **答えないまま閉じた提案を「読んだが保留」として残す**ためで、
- * 一覧では承認待ちのままにする（F-4）。
- *
- * ## 操作は F-6
- *
- * SPEC 6.1 の「承認・修正依頼・見送り・後で確認」はここには無い。
- * **見るのと変えるのを分ける** — 見ただけで状態が変わる操作は
- * `viewed_at` の1つに限る。
+ * SPEC 13.6 は `GET /api/approvals/:id` と `POST /api/approvals/:id/view` を
+ * 別々に定めている。**読み取りで状態が変わると、一覧を先読みしただけで
+ * 「開いた」ことになる。** 開いた記録は F-6 の `markViewedForUser`。
  */
 
 import {
@@ -22,11 +16,7 @@ import {
 } from '@/modules/affiliate';
 import { listBannersForUser } from '@/modules/banners';
 import { readArticleVersionDetailForUser } from '@/modules/content-generation';
-import {
-  findApprovalForUser,
-  markApprovalViewedForUser,
-  type AppApproval,
-} from './repository';
+import { findApprovalForUser, type AppApproval } from './repository';
 import { approvalNotFoundError } from './errors';
 
 export interface ApprovalDetail {
@@ -101,16 +91,8 @@ export async function readApprovalDetailForUser(params: {
     }),
   ]);
 
-  // **見た記録は最後に付ける。** 途中で落ちた場合に「開いた」ことに
-  // しないため
-  const approval = await markApprovalViewedForUser({
-    userId: params.userId,
-    approvalId: params.approvalId,
-    now: new Date(),
-  });
-
   return {
-    approval: approval ?? found.approval,
+    approval: found.approval,
     blogName: found.blogName,
     article: {
       id: article.id,

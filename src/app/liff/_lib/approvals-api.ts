@@ -126,3 +126,62 @@ export async function fetchApprovalDetail(
 
   return (await response.json()) as ApprovalDetailJson;
 }
+
+/** 修正依頼の種類（SPEC 5.15）。**画面に出す順で並べる** */
+export const REVISION_CHOICES = [
+  { value: 'SHORTER', label: '短くしてほしい' },
+  { value: 'SOFTER', label: '表現をやわらげてほしい' },
+  { value: 'CHANGE_TITLE', label: 'タイトルを変えてほしい' },
+  { value: 'CHANGE_PRODUCT', label: '案件を変えてほしい' },
+  { value: 'FACT_ERROR', label: '事実に誤りがある' },
+  { value: 'FREE_TEXT', label: 'その他（自由記述）' },
+] as const;
+
+export type RevisionChoice = (typeof REVISION_CHOICES)[number]['value'];
+
+async function post(path: string, body?: unknown): Promise<{ status: string }> {
+  const response = await fetch(path, {
+    method: 'POST',
+    headers: {
+      accept: 'application/json',
+      ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+    },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+
+  if (!response.ok) {
+    await readError(response);
+  }
+
+  return (await response.json()) as { status: string };
+}
+
+function base(approvalId: string): string {
+  return `/api/approvals/${encodeURIComponent(approvalId)}`;
+}
+
+/** 開いたことを記録する。**読み取りとは別**（SPEC 13.6） */
+export async function markApprovalViewed(
+  approvalId: string,
+): Promise<{ status: string }> {
+  return post(`${base(approvalId)}/view`);
+}
+
+export async function approveApproval(
+  approvalId: string,
+): Promise<{ status: string }> {
+  return post(`${base(approvalId)}/approve`);
+}
+
+export async function skipApproval(
+  approvalId: string,
+): Promise<{ status: string }> {
+  return post(`${base(approvalId)}/skip`);
+}
+
+export async function requestRevision(
+  approvalId: string,
+  input: { requestType: RevisionChoice; comment?: string },
+): Promise<{ status: string }> {
+  return post(`${base(approvalId)}/revision`, input);
+}

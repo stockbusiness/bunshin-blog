@@ -408,3 +408,37 @@ export async function markItemsReadyForReview(
 
   return updated.count;
 }
+
+/**
+ * 記事の状態を進める（F-6）。
+ *
+ * **`content_items` を触ってよいのはこのモジュールだけ**（MODULE_RULES 1）。
+ * 承認の結果を書くのは `approvals` だが、状態の遷移はここを通す。
+ *
+ * **トランザクションを受け取る。** 承認の記録と記事の状態は同時に
+ * 決まらなければならない（SPEC 13.6「承認処理はトランザクションと
+ * 冪等性を持たせる」）。片方だけ残ると、承認済みなのに `PLANNED` の
+ * 記事や、その逆が生まれる。
+ *
+ * **`from` に無い状態は動かさない。** 二重に呼ばれても結果が変わらない。
+ *
+ * @returns 実際に進めた件数（0なら対象外）
+ */
+export async function setItemStatusInTx(
+  tx: Prisma.TransactionClient,
+  params: {
+    contentItemId: string;
+    from: readonly string[];
+    to: string;
+  },
+): Promise<number> {
+  const updated = await tx.contentItem.updateMany({
+    where: {
+      id: params.contentItemId,
+      status: { in: [...params.from] as never },
+    },
+    data: { status: params.to as never },
+  });
+
+  return updated.count;
+}

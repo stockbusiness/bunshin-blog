@@ -374,36 +374,3 @@ export async function findApprovalForUser(params: {
     offerId: contentItem.affiliateOfferId,
   };
 }
-
-/**
- * 開いたことを記録する（F-5）。
- *
- * **`PENDING` のときだけ進める。** 承認済みや見送りを `VIEWED` へ
- * 戻さない。`viewed_at` は最初に開いた時刻のまま残す —
- * 「いつ気づいたか」の記録で、開くたびに更新すると意味が変わる。
- *
- * @returns 進めたら更新後の行、対象外なら `null`
- */
-export async function markApprovalViewedForUser(params: {
-  userId: string;
-  approvalId: string;
-  now: Date;
-}): Promise<AppApproval | null> {
-  const updated = await prisma.approval.updateMany({
-    where: {
-      id: params.approvalId,
-      userId: params.userId,
-      status: 'PENDING',
-    },
-    data: { status: 'VIEWED', viewedAt: params.now },
-  });
-
-  if (updated.count === 0) {
-    return null;
-  }
-
-  return prisma.approval.findUniqueOrThrow({
-    where: { id: params.approvalId },
-    select: SELECT,
-  });
-}
