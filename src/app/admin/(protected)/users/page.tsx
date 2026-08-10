@@ -11,14 +11,18 @@ import {
   type AdminMonitorSummary,
   type OnboardingStatus,
 } from '@/modules/users';
+import { MonitorStatusActions } from './_components/monitor-status-actions';
 
 /**
  * `/admin/users` モニター一覧（TASKS B-7、SPEC 6.2）。
  *
- * 完了条件「モニター一覧とオンボーディング状況が表示される」。
+ * B-7 の完了条件「モニター一覧とオンボーディング状況が表示される」に、
+ * H-1 で**状態を変える操作**を足した（SPEC 6.2 の「利用停止」と、
+ * `INVITED` を `ACTIVE` にする承認）。
  *
- * **招待・利用停止・サポート依頼は範囲外。** 前2つは操作であり完了条件に
- * 無い。サポート依頼は H-3 が作る。
+ * **退会（`WITHDRAWN`）は置かない**（H-4）。戻せない操作を停止と同じ
+ * 並びに置くと、停止のつもりで退会させる事故が起きる。
+ * サポート依頼は H-3 が作る。
  */
 
 export const dynamic = 'force-dynamic';
@@ -78,6 +82,7 @@ export default async function AdminUsersPage() {
                 <th className="p-2">同意</th>
                 <th className="p-2">ブログ</th>
                 <th className="p-2">登録日</th>
+                <th className="p-2">操作</th>
               </tr>
             </thead>
             <tbody>
@@ -124,6 +129,13 @@ function MonitorRow({
         <BlogCell blogs={blogs} />
       </td>
       <td className="p-2">{formatDate(monitor.createdAt)}</td>
+      <td className="p-2">
+        <MonitorStatusActions
+          userId={monitor.id}
+          status={monitor.status}
+          displayName={monitor.displayName}
+        />
+      </td>
     </tr>
   );
 }

@@ -17,6 +17,15 @@ export {
 } from './repository';
 
 export {
+  updateMonitorStatusForAdmin,
+  canApplyMonitorAction,
+  isMonitorAdminAction,
+  USER_ADMIN_ERROR_CODES,
+  type MonitorAdminAction,
+  type UserAdminErrorCode,
+} from './admin-status';
+
+export {
   listMonitorsForAdmin,
   type AdminMonitorSummary,
   type OnboardingStatus,
