@@ -66,11 +66,17 @@ describe('設定できる名前', () => {
 
   /**
    * **読む処理が無い設定を出さない**（A-3 の方針）。
-   * LINE Messaging API のトークンは F-2 で足す。
+   * `LINE_CHANNEL_ACCESS_TOKEN` は F-2 で読む処理ができたので足した。
+   * `LINE_CHANNEL_SECRET`（webhook の署名検証）は D-7 まで読み手がいない。
    */
   it('まだ誰も読まない設定を並べていない', () => {
-    expect(isSettingKey('LINE_CHANNEL_ACCESS_TOKEN')).toBe(false);
     expect(isSettingKey('LINE_CHANNEL_SECRET')).toBe(false);
+  });
+
+  /** 通知に使うトークンは伏せる。飛び先のURLは伏せない（F-2） */
+  it('LINE の設定が並んでいる', () => {
+    expect(isSecretSetting('LINE_CHANNEL_ACCESS_TOKEN')).toBe(true);
+    expect(isSecretSetting('LIFF_BASE_URL')).toBe(false);
   });
 
   it('すべての項目に説明がある', () => {

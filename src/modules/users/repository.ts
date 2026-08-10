@@ -164,3 +164,30 @@ export async function recordConsent(
 
   return toAppUser(record);
 }
+
+/**
+ * 通知の宛先を引く（F-2）。
+ *
+ * **`AppUser` に `line_user_id` を載せない。** 身元そのもので、
+ * 画面へ渡る型に混ぜると出力先が増える（SPEC 14.2）。通知を送るときだけ
+ * ここから取る。
+ *
+ * **`ACTIVE` 以外には送らない。** 停止・退会した利用者に提案が届くと、
+ * 止めたはずのものが動いているように見える。
+ *
+ * @returns 送ってよければ `line_user_id`、そうでなければ `null`
+ */
+export async function findNotificationTargetForUser(
+  userId: string,
+): Promise<string | null> {
+  const record = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { lineUserId: true, status: true },
+  });
+
+  if (record === null || record.status !== 'ACTIVE') {
+    return null;
+  }
+
+  return record.lineUserId;
+}

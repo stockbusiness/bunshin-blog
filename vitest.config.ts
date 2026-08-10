@@ -81,6 +81,8 @@ export default defineConfig({
         // | content-generation/risk-flag-service.ts | risk-flags.ts | article-generation.test.ts |
         // | content-generation/approvable.ts | — | proposals.test.ts |
         // | approvals/propose.ts | priority.ts | proposals.test.ts |
+        // | line/notify.ts | message.ts | line-notification.test.ts |
+        // | lib/line/messaging.ts | — | line-notification.test.ts |
         // | content-planning/plan-repository.ts | — | revenue-articles.test.ts |
         // | affiliate/scoring.ts | step2.ts | offer-scoring.test.ts |
         // | content-planning/ai.ts | step1.ts の filterAlternatives | genre-review.test.ts |
@@ -101,6 +103,8 @@ export default defineConfig({
         'src/modules/content-generation/risk-flag-service.ts',
         'src/modules/content-generation/approvable.ts',
         'src/modules/approvals/propose.ts',
+        'src/modules/line/notify.ts',
+        'src/lib/line/messaging.ts',
         'src/modules/content-planning/plan-repository.ts',
         'src/modules/affiliate/scoring.ts',
         'src/modules/content-planning/ai.ts',
