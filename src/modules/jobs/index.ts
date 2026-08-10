@@ -12,6 +12,7 @@
 
 export {
   enqueueJob,
+  enqueueJobInTx,
   claimNextJob,
   completeJob,
   failJob,

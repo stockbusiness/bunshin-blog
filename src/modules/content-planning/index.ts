@@ -116,6 +116,7 @@ export {
   savePublishOrderForUser,
   markItemsReadyForReview,
   setItemStatusInTx,
+  markItemPosted,
 } from './plan-repository';
 
 export {

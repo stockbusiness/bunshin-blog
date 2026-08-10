@@ -21,6 +21,7 @@
 
 import { prisma } from '@/lib/db';
 import { setItemStatusInTx } from '@/modules/content-planning';
+import { buildIdempotencyKey, enqueueJobInTx } from '@/modules/jobs';
 import { findApprovalForUser, type AppApproval } from './repository';
 import {
   approvalAlreadyDecidedError,
@@ -80,10 +81,22 @@ export async function markViewedForUser(
 /**
  * 承認する（`POST /api/approvals/:id/approve`）。
  *
- * 記事を `APPROVED` にする。**投稿はしない** — WordPress への連携は F-7。
+ * 記事を `APPROVED` にし、**同じトランザクションで投稿ジョブを積む**（F-7）。
+ *
+ * **承認とジョブは同時に決まる。** 承認したのにジョブが無いと記事が
+ * 永久に投稿されず、承認が巻き戻ったのにジョブだけ残ると承認していない
+ * 記事が投稿される。
+ *
+ * 実際に WordPress を呼ぶのはジョブのハンドラ（`WORDPRESS_POST`）。
+ * **承認の応答を外部サービスの応答時間に縛らない。**
  */
 export async function approveForUser(input: DecideInput): Promise<AppApproval> {
-  return decide({ ...input, to: 'APPROVED', itemStatus: 'APPROVED' });
+  return decide({
+    ...input,
+    to: 'APPROVED',
+    itemStatus: 'APPROVED',
+    enqueuePost: true,
+  });
 }
 
 /**
@@ -147,6 +160,7 @@ async function decide(params: {
   itemStatus: string;
   revision?:
     { requestType: RevisionRequestType; comment: string | null } | undefined;
+  enqueuePost?: boolean | undefined;
 }): Promise<AppApproval> {
   const found = await requireOwn(params);
 
@@ -195,6 +209,21 @@ async function decide(params: {
       from: ['READY_FOR_REVIEW'],
       to: params.itemStatus,
     });
+
+    if (params.enqueuePost === true) {
+      // **冪等キーは記事ID。** 同じ記事に二度積まない（C-4）
+      await enqueueJobInTx(tx, {
+        jobType: 'WORDPRESS_POST',
+        idempotencyKey: buildIdempotencyKey(
+          'WORDPRESS_POST',
+          found.contentItemId,
+        ),
+        input: { articleVersionId: found.articleVersionId },
+        userId: found.userId,
+        blogId: found.blogId,
+        targetId: found.contentItemId,
+      });
+    }
   });
 
   return readBack(params.approvalId);
