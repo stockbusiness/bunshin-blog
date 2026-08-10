@@ -20,7 +20,6 @@ export {
   countProposalsSentInRangeForUser,
   listApprovalSummariesForUser,
   findApprovalForUser,
-  markApprovalViewedForUser,
   type AppApproval,
   type UnsentApproval,
   type ApprovalSummary,
@@ -46,5 +45,21 @@ export { readApprovalDetailForUser, type ApprovalDetail } from './detail';
 export {
   APPROVAL_ERROR_CODES,
   approvalNotFoundError,
+  approvalAlreadyDecidedError,
+  invalidRevisionRequestError,
   type ApprovalErrorCode,
 } from './errors';
+
+export {
+  markViewedForUser,
+  approveForUser,
+  skipForUser,
+  requestRevisionForUser,
+  listRevisionRequestsForUser,
+  isRevisionRequestType,
+  REVISION_REQUEST_TYPES,
+  REVISION_COMMENT_MAX_LENGTH,
+  type RevisionRequestType,
+  type DecideInput,
+  type RevisionInput,
+} from './decide';

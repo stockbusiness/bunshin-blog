@@ -464,55 +464,24 @@ describe('承認詳細（F-5、SPEC 6.1）', () => {
     expect(detail.approval.proposalReason.length).toBeGreaterThan(0);
   });
 
-  /** **開いたことを記録する。** 一覧では承認待ちのまま（F-4） */
-  it('開くと VIEWED になる', async () => {
+  /**
+   * **読むだけでは状態を変えない**（SPEC 13.6 は `POST /view` を別に定める）。
+   * 開いた記録は F-6
+   */
+  it('読むだけでは VIEWED にならない', async () => {
     const blog = await createBlog(prisma, userId);
     const approvalId = await proposalFor(userId, blog.id);
 
     const detail = await readApprovalDetailForUser({ userId, approvalId });
 
-    expect(detail.approval.status).toBe('VIEWED');
+    expect(detail.approval.status).toBe('PENDING');
 
     const row = await prisma.approval.findUnique({
       where: { id: approvalId },
       select: { viewedAt: true },
     });
 
-    expect(row?.viewedAt).not.toBeNull();
-  });
-
-  /** **`viewed_at` は最初に開いた時刻のまま残す**（いつ気づいたかの記録） */
-  it('二度目に開いても viewed_at を更新しない', async () => {
-    const blog = await createBlog(prisma, userId);
-    const approvalId = await proposalFor(userId, blog.id);
-
-    await readApprovalDetailForUser({ userId, approvalId });
-    const first = await prisma.approval.findUnique({
-      where: { id: approvalId },
-      select: { viewedAt: true },
-    });
-
-    await readApprovalDetailForUser({ userId, approvalId });
-    const second = await prisma.approval.findUnique({
-      where: { id: approvalId },
-      select: { viewedAt: true },
-    });
-
-    expect(second?.viewedAt?.getTime()).toBe(first?.viewedAt?.getTime());
-  });
-
-  it('答えた提案を VIEWED へ戻さない', async () => {
-    const blog = await createBlog(prisma, userId);
-    const approvalId = await proposalFor(userId, blog.id);
-
-    await prisma.approval.update({
-      where: { id: approvalId },
-      data: { status: 'APPROVED', respondedAt: NOW },
-    });
-
-    const detail = await readApprovalDetailForUser({ userId, approvalId });
-
-    expect(detail.approval.status).toBe('APPROVED');
+    expect(row?.viewedAt).toBeNull();
   });
 
   /** **他人のものは404。**「無い」と区別しない（SPEC 14.1） */

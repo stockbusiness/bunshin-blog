@@ -1,9 +1,14 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApprovalDetail } from '@/app/liff/approvals/_components/approval-detail';
 import {
   ApprovalApiError,
+  approveApproval,
   fetchApprovalDetail,
+  markApprovalViewed,
+  requestRevision,
+  skipApproval,
   type ApprovalDetailJson,
 } from '@/app/liff/_lib/approvals-api';
 
@@ -21,7 +26,14 @@ vi.mock('@/app/liff/_lib/approvals-api', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@/app/liff/_lib/approvals-api')>();
 
-  return { ...actual, fetchApprovalDetail: vi.fn() };
+  return {
+    ...actual,
+    fetchApprovalDetail: vi.fn(),
+    markApprovalViewed: vi.fn(),
+    approveApproval: vi.fn(),
+    skipApproval: vi.fn(),
+    requestRevision: vi.fn(),
+  };
 });
 
 function detail(
@@ -63,6 +75,10 @@ function detail(
 }
 
 const mocked = vi.mocked(fetchApprovalDetail);
+const viewed = vi.mocked(markApprovalViewed);
+const approve = vi.mocked(approveApproval);
+const skip = vi.mocked(skipApproval);
+const revision = vi.mocked(requestRevision);
 
 function renderPage() {
   return render(<ApprovalDetail approvalId="approval-1" />);
@@ -70,6 +86,14 @@ function renderPage() {
 
 beforeEach(() => {
   mocked.mockReset();
+  viewed.mockReset();
+  viewed.mockResolvedValue({ status: 'VIEWED' });
+  approve.mockReset();
+  approve.mockResolvedValue({ status: 'APPROVED' });
+  skip.mockReset();
+  skip.mockResolvedValue({ status: 'SKIPPED' });
+  revision.mockReset();
+  revision.mockResolvedValue({ status: 'REVISION_REQUESTED' });
 });
 
 afterEach(() => {
@@ -261,16 +285,128 @@ describe('他人の承認は開けない', () => {
   });
 });
 
-describe('操作は F-6', () => {
-  /** 押せて何も起きないボタンを先に置かない */
-  it('準備中と伝える', async () => {
+describe('操作（F-6、SPEC 6.1）', () => {
+  it('開くと view を送る', async () => {
+    mocked.mockResolvedValue(detail());
+
+    renderPage();
+
+    await screen.findByText('格安SIMの選び方');
+
+    expect(viewed).toHaveBeenCalledWith('approval-1');
+  });
+
+  it('承認できる', async () => {
+    mocked.mockResolvedValue(detail());
+
+    renderPage();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: '承認する' }),
+    );
+
+    expect(approve).toHaveBeenCalledWith('approval-1');
+    expect(await screen.findByText(/回答済みです/)).toBeInTheDocument();
+  });
+
+  it('見送れる', async () => {
+    mocked.mockResolvedValue(detail());
+
+    renderPage();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: '今回は見送る' }),
+    );
+
+    expect(skip).toHaveBeenCalledWith('approval-1');
+  });
+
+  it('修正を依頼できる', async () => {
+    mocked.mockResolvedValue(detail());
+
+    renderPage();
+
+    await userEvent.click(
+      await screen.findByRole('radio', { name: '短くしてほしい' }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: '修正を依頼する' }),
+    );
+
+    expect(revision).toHaveBeenCalledWith('approval-1', {
+      requestType: 'SHORTER',
+    });
+  });
+
+  /** **何を直すか分からない依頼を残さない** */
+  it('その他を選んで本文が無ければ押せない', async () => {
+    mocked.mockResolvedValue(detail());
+
+    renderPage();
+
+    await userEvent.click(
+      await screen.findByRole('radio', { name: 'その他（自由記述）' }),
+    );
+
+    expect(
+      screen.getByRole('button', { name: '修正を依頼する' }),
+    ).toBeDisabled();
+
+    await userEvent.type(screen.getByRole('textbox'), '料金が違います');
+
+    expect(
+      screen.getByRole('button', { name: '修正を依頼する' }),
+    ).toBeEnabled();
+  });
+
+  it('種類を選ぶまで依頼できない', async () => {
     mocked.mockResolvedValue(detail());
 
     renderPage();
 
     expect(
-      await screen.findByText(/承認・修正依頼・見送りの操作は準備中です/),
+      await screen.findByRole('button', { name: '修正を依頼する' }),
+    ).toBeDisabled();
+  });
+
+  /** **答えたあとはボタンを消す。** 押せるままだと 409 を見ることになる */
+  it('回答済みならボタンを出さない', async () => {
+    mocked.mockResolvedValue(
+      detail({ approval: { ...detail().approval, status: 'APPROVED' } }),
+    );
+    viewed.mockResolvedValue({ status: 'APPROVED' });
+
+    renderPage();
+
+    expect(await screen.findByText(/回答済みです/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '承認する' })).toBeNull();
+  });
+
+  /** **「後で確認」は何もせず閉じること。** ボタンを置かない */
+  it('「後で確認」のボタンは置かない', async () => {
+    mocked.mockResolvedValue(detail());
+
+    renderPage();
+
+    await screen.findByText('格安SIMの選び方');
+
+    expect(screen.queryByRole('button', { name: /後で/ })).toBeNull();
+  });
+
+  it('送信に失敗したらサーバーの文言を出す', async () => {
+    mocked.mockResolvedValue(detail());
+    approve.mockRejectedValue(
+      new ApprovalApiError(409, 'この提案には既に回答済みです'),
+    );
+
+    renderPage();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: '承認する' }),
+    );
+
+    expect(
+      await screen.findByText('この提案には既に回答済みです'),
     ).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '承認' })).toBeNull();
   });
 });

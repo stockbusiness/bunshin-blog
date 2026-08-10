@@ -4,8 +4,14 @@ import { useEffect, useState } from 'react';
 import { approvalStatusLabel } from '../../_lib/approval-tabs';
 import {
   ApprovalApiError,
+  REVISION_CHOICES,
+  approveApproval,
   fetchApprovalDetail,
+  markApprovalViewed,
+  requestRevision,
+  skipApproval,
   type ApprovalDetailJson,
+  type RevisionChoice,
 } from '../../_lib/approvals-api';
 
 /**
@@ -28,10 +34,14 @@ import {
  * 確かめるべきアフィリエイトURLは SPEC 6.1 が別項目として並べており、
  * **本文中のリンクを踏ませる必要は無い**。
  *
- * ## 操作は F-6
+ * ## 操作（F-6）
  *
- * SPEC 6.1 の「承認・修正依頼・見送り・後で確認」はまだ無い。
- * 押せて何も起きないボタンを先に置かない（F-4 と同じ）。
+ * SPEC 6.1 の「承認・修正依頼・見送り・後で確認」。
+ * **「後で確認」はボタンを置かない** — 何もせず閉じることがそれで、
+ * 開いた記録は `POST /view` が既に付けている。
+ *
+ * **答えたあとはボタンを消す。** 押せるままにすると、承認したものを
+ * 見送ろうとして 409 を見ることになる（サーバー側は F-6 が弾く）。
  */
 
 const PREVIEW_MIN_HEIGHT = 480;
@@ -67,13 +77,28 @@ function Section({
 export function ApprovalDetail({ approvalId }: { approvalId: string }) {
   const [detail, setDetail] = useState<ApprovalDetailJson | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [revisionType, setRevisionType] = useState<RevisionChoice | null>(null);
+  const [comment, setComment] = useState('');
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
     void fetchApprovalDetail(approvalId).then(
       (result) => {
-        if (!cancelled) setDetail(result);
+        if (cancelled) return;
+
+        setDetail(result);
+        setStatus(result.approval.status);
+        // **開いた記録は明示的に送る**（SPEC 13.6）。失敗しても画面は出す
+        void markApprovalViewed(approvalId).then(
+          (viewed) => {
+            if (!cancelled) setStatus(viewed.status);
+          },
+          () => undefined,
+        );
       },
       (thrown: unknown) => {
         if (!cancelled) {
@@ -101,6 +126,26 @@ export function ApprovalDetail({ approvalId }: { approvalId: string }) {
 
   const { approval, article, generation, offer, banners } = detail;
   const warnings = article.riskFlags;
+  const current = status ?? approval.status;
+  const answered = current !== 'PENDING' && current !== 'VIEWED';
+
+  async function run(action: () => Promise<{ status: string }>) {
+    setBusy(true);
+    setActionError(null);
+
+    try {
+      const result = await action();
+      setStatus(result.status);
+    } catch (thrown) {
+      setActionError(
+        thrown instanceof ApprovalApiError
+          ? thrown.message
+          : '送信できませんでした',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <main className="min-h-dvh p-4">
@@ -226,10 +271,96 @@ export function ApprovalDetail({ approvalId }: { approvalId: string }) {
         </p>
       </Section>
 
-      {/* **操作は F-6。** 押せて何も起きないボタンを先に置かない */}
-      <p className="mt-8 text-xs leading-relaxed">
-        承認・修正依頼・見送りの操作は準備中です。
-      </p>
+      <Section title="この提案をどうしますか">
+        {answered ? (
+          /* **答えたあとはボタンを消す。** 押せるままだと 409 を見ることになる */
+          <p className="mt-1 text-sm">
+            回答済みです（{approvalStatusLabel(current)}）。
+          </p>
+        ) : (
+          <div className="mt-2 flex flex-col gap-3">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void run(() => approveApproval(approvalId))}
+                className="rounded border px-4 py-2 text-sm font-bold"
+              >
+                承認する
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void run(() => skipApproval(approvalId))}
+                className="rounded border px-4 py-2 text-sm"
+              >
+                今回は見送る
+              </button>
+            </div>
+
+            <fieldset className="rounded border p-3">
+              <legend className="px-1 text-xs">修正を依頼する</legend>
+              <div className="flex flex-col gap-1">
+                {REVISION_CHOICES.map((choice) => (
+                  <label key={choice.value} className="text-sm">
+                    <input
+                      type="radio"
+                      name="revisionType"
+                      value={choice.value}
+                      checked={revisionType === choice.value}
+                      onChange={() => setRevisionType(choice.value)}
+                      className="mr-2"
+                    />
+                    {choice.label}
+                  </label>
+                ))}
+              </div>
+
+              <label className="mt-2 block text-xs">
+                補足（その他を選んだときは必須）
+                <textarea
+                  value={comment}
+                  onChange={(event) => setComment(event.target.value)}
+                  rows={3}
+                  className="mt-1 w-full rounded border p-2 text-sm"
+                />
+              </label>
+
+              <button
+                type="button"
+                /* **その他は本文が要る。** 何を直すか分からない依頼を残さない */
+                disabled={
+                  busy ||
+                  revisionType === null ||
+                  (revisionType === 'FREE_TEXT' && comment.trim() === '')
+                }
+                onClick={() =>
+                  void run(() =>
+                    requestRevision(approvalId, {
+                      requestType: revisionType as RevisionChoice,
+                      ...(comment.trim() === ''
+                        ? {}
+                        : { comment: comment.trim() }),
+                    }),
+                  )
+                }
+                className="mt-2 rounded border px-4 py-2 text-sm"
+              >
+                修正を依頼する
+              </button>
+            </fieldset>
+
+            {/*
+              **「後で確認」のボタンは置かない。** 何もせず閉じることが
+              それで、開いた記録は `POST /view` が付けている
+            */}
+          </div>
+        )}
+
+        {actionError === null ? null : (
+          <p className="mt-2 text-sm leading-relaxed">{actionError}</p>
+        )}
+      </Section>
     </main>
   );
 }
