@@ -871,6 +871,7 @@ describe('入口の網羅', () => {
       'listOffersForUser',
       'findOfferForUser',
       'requireOfferForUser',
+      'checkOfferLinksForUser',
       'createOfferForUser',
       'updateOfferForUser',
       'endOfferForUser',
@@ -962,6 +963,8 @@ describe('入口の網羅', () => {
       'sendPendingProposalsForUser',
       'sendEmergencyNotificationForUser',
       'remainingSlotsForUser',
+      'enqueueAlertsForUser',
+      'collectAlertsForUser',
     ],
     /**
      * **`line_user_id` を返す唯一の経路**（F-2）。`AppUser` には載せない
