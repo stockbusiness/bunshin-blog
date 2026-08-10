@@ -382,3 +382,29 @@ export async function savePublishOrderForUser(params: {
 
   return updated;
 }
+
+/**
+ * 記事を「承認待ち」にする（F-1）。
+ *
+ * **`content_items` を触ってよいのはこのモジュールだけ**（MODULE_RULES 1）。
+ * 提案を作るのは `approvals` だが、状態の遷移はここを通す。
+ *
+ * **`PLANNED` のものだけを進める。** 既に承認済み・投稿済みの記事を
+ * 巻き戻さないため、条件に状態を入れる。
+ *
+ * @returns 実際に進めた件数
+ */
+export async function markItemsReadyForReview(
+  contentItemIds: readonly string[],
+): Promise<number> {
+  if (contentItemIds.length === 0) {
+    return 0;
+  }
+
+  const updated = await prisma.contentItem.updateMany({
+    where: { id: { in: [...contentItemIds] }, status: 'PLANNED' },
+    data: { status: 'READY_FOR_REVIEW' },
+  });
+
+  return updated.count;
+}
