@@ -18,8 +18,10 @@ export {
   listUnsentApprovalsForUser,
   claimUnsentApprovalForUser,
   countProposalsSentInRangeForUser,
+  listApprovalSummariesForUser,
   type AppApproval,
   type UnsentApproval,
+  type ApprovalSummary,
 } from './repository';
 
 export {
