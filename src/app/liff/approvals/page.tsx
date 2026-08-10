@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import {
   APPROVAL_TABS,
@@ -20,9 +21,6 @@ import {
  * 完了条件は「**他ユーザーの承認を開けない**」。一覧はセッションの
  * ユーザーで絞られたものだけが返る（`/api/approvals`）。
  * **画面から他人のIDを指定する経路が無い。**
- *
- * **詳細画面（`/liff/approvals/[approvalId]`）への導線は F-5。**
- * 飛び先がまだ無い状態でリンクだけ置くと、押せて何も出ない。
  *
  * ## 確認が要るものを先に示す
  *
@@ -119,28 +117,30 @@ export default function ApprovalListPage() {
         <ul className="mt-4 flex flex-col gap-3">
           {shown.map((approval) => (
             <li key={approval.id} className="rounded-lg border p-4">
-              {/*
-                **詳細への導線は F-5。** 飛び先の画面がまだ無く、
-                リンクだけ先に置くと押せて何も出ない状態になる
-              */}
-              <p className="text-xs">{approval.blogName}</p>
-              <p className="mt-1 text-base font-bold">
-                {approval.articleTitle}
-              </p>
-              <p className="mt-1 text-xs leading-relaxed">
-                {approval.proposalReason}
-              </p>
+              <Link
+                href={`/liff/approvals/${approval.id}`}
+                className="block"
+                aria-label={`${approval.articleTitle} を確認`}
+              >
+                <p className="text-xs">{approval.blogName}</p>
+                <p className="mt-1 text-base font-bold">
+                  {approval.articleTitle}
+                </p>
+                <p className="mt-1 text-xs leading-relaxed">
+                  {approval.proposalReason}
+                </p>
 
-              <p className="mt-2 text-xs">
-                {approvalStatusLabel(approval.status)}
-                {/* **確認が要ることを開く前に示す**（E-12・E-13） */}
-                {approval.factCheckStatus === 'WARNING'
-                  ? '・未確認の事実あり'
-                  : ''}
-                {approval.riskFlagCount > 0
-                  ? `・表現の指摘 ${approval.riskFlagCount}件`
-                  : ''}
-              </p>
+                <p className="mt-2 text-xs">
+                  {approvalStatusLabel(approval.status)}
+                  {/* **確認が要ることを開く前に示す**（E-12・E-13） */}
+                  {approval.factCheckStatus === 'WARNING'
+                    ? '・未確認の事実あり'
+                    : ''}
+                  {approval.riskFlagCount > 0
+                    ? `・表現の指摘 ${approval.riskFlagCount}件`
+                    : ''}
+                </p>
+              </Link>
             </li>
           ))}
         </ul>

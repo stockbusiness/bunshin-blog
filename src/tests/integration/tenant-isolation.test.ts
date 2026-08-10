@@ -943,6 +943,9 @@ describe('入口の網羅', () => {
       'claimUnsentApprovalForUser',
       'countProposalsSentInRangeForUser',
       'listApprovalSummariesForUser',
+      'findApprovalForUser',
+      'markApprovalViewedForUser',
+      'readApprovalDetailForUser',
     ],
     /** 送信は利用者単位。宛先は `users.line_user_id` から取る（F-2） */
     line: [
@@ -960,6 +963,7 @@ describe('入口の網羅', () => {
       'listArticleVersionsForUser',
       'listSiblingItemsForUser',
       'listApprovableArticlesForUser',
+      'readArticleVersionDetailForUser',
       'requirePlannedItemForUser',
       'scanRiskFlagsForUser',
     ],

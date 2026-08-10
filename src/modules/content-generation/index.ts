@@ -80,11 +80,13 @@ export {
   listArticleVersionsForUser,
   listSiblingItemsForUser,
   findLatestArticleVersion,
+  readArticleVersionDetailForUser,
   saveArticleVersion,
   saveFactCheckResult,
   saveRiskFlags,
   type AppArticleVersion,
   type SaveArticleVersionInput,
+  type ArticleVersionDetail,
 } from './article-repository';
 
 export {

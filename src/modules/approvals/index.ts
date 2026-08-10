@@ -19,9 +19,12 @@ export {
   claimUnsentApprovalForUser,
   countProposalsSentInRangeForUser,
   listApprovalSummariesForUser,
+  findApprovalForUser,
+  markApprovalViewedForUser,
   type AppApproval,
   type UnsentApproval,
   type ApprovalSummary,
+  type FoundApproval,
 } from './repository';
 
 export {
@@ -37,3 +40,11 @@ export {
   type BlogProposalState,
   type ScoredProposal,
 } from './priority';
+
+export { readApprovalDetailForUser, type ApprovalDetail } from './detail';
+
+export {
+  APPROVAL_ERROR_CODES,
+  approvalNotFoundError,
+  type ApprovalErrorCode,
+} from './errors';
