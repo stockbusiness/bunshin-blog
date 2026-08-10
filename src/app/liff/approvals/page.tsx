@@ -7,7 +7,7 @@ import {
   approvalStatusLabel,
   approvalTabOf,
   type ApprovalTab,
-} from '@/modules/approvals';
+} from '../_lib/approval-tabs';
 import {
   ApprovalApiError,
   fetchApprovals,

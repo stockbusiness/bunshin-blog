@@ -1,7 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import {
-  approvalTabOf,
   listApprovalSummariesForUser,
   listApprovalsForUser,
   refreshProposalsForUser,
@@ -408,6 +407,6 @@ describe('承認一覧（F-4、SPEC 6.1）', () => {
     const after = await listApprovalSummariesForUser(userId);
 
     expect(after[0]?.id).not.toBe(answered?.id);
-    expect(approvalTabOf(after[1]?.status ?? '')).toBe('APPROVED');
+    expect(after[1]?.status).toBe('APPROVED');
   });
 });

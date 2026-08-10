@@ -5,7 +5,7 @@ import {
   approvalStatusLabel,
   approvalTabOf,
   isOpenApproval,
-} from '@/modules/approvals';
+} from '@/app/liff/_lib/approval-tabs';
 
 /**
  * 承認一覧の並べ分け（TASKS F-4、SPEC 6.1 `/liff/approvals`）。

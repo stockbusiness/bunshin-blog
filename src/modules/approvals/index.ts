@@ -37,13 +37,3 @@ export {
   type BlogProposalState,
   type ScoredProposal,
 } from './priority';
-
-export {
-  approvalTabOf,
-  approvalStatusLabel,
-  isOpenApproval,
-  APPROVAL_TABS,
-  APPROVAL_TAB_LABELS,
-  APPROVAL_STATUS_LABELS,
-  type ApprovalTab,
-} from './tabs';

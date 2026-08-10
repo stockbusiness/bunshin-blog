@@ -18,6 +18,15 @@
  * 判断の記録として使えない。集計（G-7）は `status` をそのまま見るので、
  * ここでまとめても数字は混ざらない。
  *
+ * ## `src/modules/approvals/` に置かない
+ *
+ * これは**画面の表示の話**で、`approvals` モジュールの `index.ts` は
+ * `repository.ts` 経由で Prisma を引き込む。クライアントコンポーネントから
+ * 読むと、ブラウザ向けの束に `node:dns` が混ざってビルドが落ちる
+ * （MODULE_RULES 4「browser code must not import server-only」）。
+ *
+ * 表記が `_lib/labels.ts` にあるのと同じ理由。
+ *
  * DBも外部も触らない純粋な処理。
  */
 
