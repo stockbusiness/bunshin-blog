@@ -8,7 +8,10 @@ import {
   readArticleVersionDetailForUser,
 } from '@/modules/content-generation';
 import { markItemPosted } from '@/modules/content-planning';
-import { fetchSearchMetricsForUser } from '@/modules/analytics';
+import {
+  fetchIndexStatusForUser,
+  fetchSearchMetricsForUser,
+} from '@/modules/analytics';
 import {
   enqueueAlertsForUser,
   sendEmergencyNotificationForUser,
@@ -39,6 +42,7 @@ import type {
  * | `LINK_CHECK` | **H-3（登録済み）** |
  * | `ARTICLE_GENERATION` | **E-10（登録済み）** |
  * | `SEARCH_CONSOLE_FETCH` | **G-2（登録済み）** |
+ * | `URL_INSPECTION` | **G-3（登録済み）** |
  * | `LINE_NOTIFY` | **H-3（登録済み）** |
  */
 
@@ -345,6 +349,30 @@ export function createJobHandlers(
       }
 
       const summary = await fetchSearchMetricsForUser({
+        userId: job.userId,
+        blogId: job.blogId,
+      });
+
+      return summary === null ? { skipped: true } : { ...summary };
+    },
+
+    /**
+     * インデックス状況を調べる（G-3、SPEC 11.3「URL Inspectionは別ジョブ」）。
+     *
+     * **`SEARCH_CONSOLE_FETCH` と分ける。** 呼び出しの上限の枠が別で、
+     * こちらは記事の本数だけ呼ぶ。同じジョブにすると、上限に当たったときに
+     * 取れていたはずの検索データまで巻き戻る。
+     */
+    URL_INSPECTION: async (job) => {
+      if (job.userId === null || job.blogId === null) {
+        throw new AppError(
+          'BAD_REQUEST',
+          400,
+          'URL_INSPECTION には user_id と blog_id が要ります',
+        );
+      }
+
+      const summary = await fetchIndexStatusForUser({
         userId: job.userId,
         blogId: job.blogId,
       });

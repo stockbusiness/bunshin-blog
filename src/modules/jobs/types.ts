@@ -22,6 +22,10 @@ export const JOB_TYPES = [
   'WORDPRESS_POST',
   'WORDPRESS_SYNC',
   'SEARCH_CONSOLE_FETCH',
+  // **インデックス状況は別ジョブ**（TASKS G-3、SPEC 11.3）。
+  // 呼び出しの上限の枠が Search Analytics と別で、記事の本数だけ呼ぶ。
+  // 同じジョブにすると、上限に当たったときに検索データまで巻き戻る
+  'URL_INSPECTION',
   'GA4_FETCH',
   'PROPOSAL_SELECTION',
   'LINE_NOTIFY',
