@@ -28,6 +28,17 @@ export {
 } from './search-console';
 
 export {
+  createSearchAnalyticsClient,
+  SearchAnalyticsError,
+  SEARCH_ANALYTICS_MAX_ROWS,
+  SEARCH_ANALYTICS_MAX_PAGES,
+  type SearchAnalyticsClient,
+  type CreateSearchAnalyticsClientOptions,
+  type SearchAnalyticsQuery,
+  type SearchAnalyticsRow,
+} from './search-analytics';
+
+export {
   GoogleNotConfiguredError,
   GoogleServiceAccountInvalidError,
   GoogleAuthError,

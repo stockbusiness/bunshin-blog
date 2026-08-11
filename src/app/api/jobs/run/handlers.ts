@@ -8,6 +8,7 @@ import {
   readArticleVersionDetailForUser,
 } from '@/modules/content-generation';
 import { markItemPosted } from '@/modules/content-planning';
+import { fetchSearchMetricsForUser } from '@/modules/analytics';
 import {
   enqueueAlertsForUser,
   sendEmergencyNotificationForUser,
@@ -37,7 +38,7 @@ import type {
  * | `WORDPRESS_SYNC` | C-5 |
  * | `LINK_CHECK` | **H-3（登録済み）** |
  * | `ARTICLE_GENERATION` | **E-10（登録済み）** |
- * | `SEARCH_CONSOLE_FETCH` | G-2 |
+ * | `SEARCH_CONSOLE_FETCH` | **G-2（登録済み）** |
  * | `LINE_NOTIFY` | **H-3（登録済み）** |
  */
 
@@ -323,6 +324,32 @@ export function createJobHandlers(
       });
 
       return { kind: input.kind };
+    },
+
+    /**
+     * Search Console の実績を取り込む（G-2、SPEC 11.3）。
+     *
+     * **直近数日を毎回取り直す。** Search Console のデータは遅れて
+     * 確定するため、昨日ぶんだけ取ると取りこぼしたまま二度と取り直さない。
+     *
+     * **未連携・読めない状態のブログは `null` が返る。** 失敗ではないので
+     * ジョブは成功として終える — 再試行しても状況は変わらない。
+     */
+    SEARCH_CONSOLE_FETCH: async (job) => {
+      if (job.userId === null || job.blogId === null) {
+        throw new AppError(
+          'BAD_REQUEST',
+          400,
+          'SEARCH_CONSOLE_FETCH には user_id と blog_id が要ります',
+        );
+      }
+
+      const summary = await fetchSearchMetricsForUser({
+        userId: job.userId,
+        blogId: job.blogId,
+      });
+
+      return summary === null ? { skipped: true } : { ...summary };
     },
   };
 }
