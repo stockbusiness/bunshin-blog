@@ -220,6 +220,7 @@ B-1 が実装したのは**サーバー側のIDトークン検証**であり、�
 | D-6 | `persona_facts` | D-4 | `AI_INFERENCE` かつ `UNVERIFIED` が一人称利用不可のフラグを持つ | `src/modules/personas/` |
 | D-7 | LINE返信からのfacts保存 | D-6 | 返信が `persona_facts` または `revision_requests` に保存される。**着手前に Q-015 の決定が要る**（`revision_requests` 側は `approvals` が無いと書けない） | `src/modules/line/` |
 | D-8 | アフィリエイトリダイレクタとクリック計測 | D-1 | リンク方式に従って組み立てられ、**`REDIRECT` の案件でクリックが記録される**。`DIRECT` の案件は直リンクのまま（OPEN_QUESTIONS Q-001） | `src/app/go/` `src/modules/analytics/` |
+| D-12 | リダイレクタを各ブログのドメインへ移す | D-8 | 各WordPressのスニペットが `/go/{code}` を処理し、Bunshin の受信APIへ送る。**受信APIはブログ単位のトークンで認証し、他ブログのイベントを投入できない**。IPアドレスを保存せずUser-Agentはハッシュ化する。**WordPress側スニペットの導入手順が `docs/` に文書化されている**（Q-001 の再決定・2026-08-11） | `src/app/api/link-events/` `src/modules/analytics/` `docs/` |
 | D-9 | 案件のリンク方式のテーブル追加 | A-8 | `migrate deploy` が成功し、スキーマとの乖離が無い。既定が `DIRECT` になる | `prisma/`, `docs/DATA_MODEL.md` |
 | D-10 | サブIDのパラメータ名のテーブル追加 | A-8 | `migrate deploy` が成功し、スキーマとの乖離が無い。既定が `NULL`（サブIDを付けない）になる | `prisma/`, `docs/DATA_MODEL.md` |
 | D-11 | リンクの案件と記事を同じブログに縛る | A-2, E-6 | 他人の記事IDを紐づけたリンクが作れない（Q-020）。**マイグレーションと実装を分けられない** — `blog_id` は NOT NULL で、埋める側が同じ変更に要る | `prisma/`, `src/modules/affiliate/` |
@@ -323,7 +324,7 @@ B-1 が実装したのは**サーバー側のIDトークン検証**であり、�
 | ID | タスク | 依存 | 完了条件 | 主な変更先 |
 |---|---|---|---|---|
 | H-1 | 招待フロー | B-7 | 招待〜ACTIVE化が管理画面で完結 | `src/modules/users/` |
-| H-2 | オンボーディング（LIFF 10ステップ） | H-1, C-2, D-1 | 中断・再開ができる | `src/app/liff/onboarding/` |
+| H-2 | オンボーディング（LIFF 10ステップ） | H-1, C-2, D-1, D-12 | 中断・再開ができる。**`/go/` 用スニペットの導入がステップに含まれる**（Q-001 の再決定） | `src/app/liff/onboarding/` |
 | H-3 | エラー通知とサポート依頼 | F-2 | 接続切れ・リンク切れ・案件終了が緊急通知される | `src/modules/line/` |
 | H-4 | 退会・停止処理 | B-2 | 物理削除せずCLOSED。データエクスポートができる | `src/modules/users/` |
 | H-5 | バックアップ | A-2 | 日次バックアップと復旧手順が文書化されている | `docs/` |
