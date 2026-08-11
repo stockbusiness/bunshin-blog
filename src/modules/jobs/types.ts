@@ -26,6 +26,8 @@ export const JOB_TYPES = [
   // 呼び出しの上限の枠が Search Analytics と別で、記事の本数だけ呼ぶ。
   // 同じジョブにすると、上限に当たったときに検索データまで巻き戻る
   'URL_INSPECTION',
+  // **日次集計は外部に依存しない**（TASKS G-6）。Google が落ちていても数えられる
+  'METRICS_AGGREGATE',
   'GA4_FETCH',
   'PROPOSAL_SELECTION',
   'LINE_NOTIFY',

@@ -962,6 +962,15 @@ describe('他人のブログの Search Console 連携', () => {
     expect(await analytics.enqueueIndexStatusForUser(bob.userId)).toBe(0);
   });
 
+  it('他人のブログの集計を回せない', async () => {
+    await expect(
+      analytics.aggregateDailyMetricsForUser({
+        userId: bob.userId,
+        blogId: alice.blogIds[0],
+      }),
+    ).rejects.toMatchObject({ code: blogs.BLOG_ERROR_CODES.notFound });
+  });
+
   it('他人の連携を外せない', async () => {
     await expect(
       analytics.disconnectSearchConsoleForUser({
@@ -1083,6 +1092,8 @@ describe('入口の網羅', () => {
       'enqueueSearchMetricsForUser',
       'fetchIndexStatusForUser',
       'enqueueIndexStatusForUser',
+      'aggregateDailyMetricsForUser',
+      'enqueueDailyAggregateForUser',
     ],
     approvals: [
       'refreshProposalsForUser',

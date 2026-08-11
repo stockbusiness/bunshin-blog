@@ -53,6 +53,13 @@ export {
 } from './index-status';
 
 export {
+  aggregateDailyMetricsForUser,
+  enqueueDailyAggregateForUser,
+  AGGREGATE_LOOKBACK_DAYS,
+  type DailyAggregateSummary,
+} from './daily-aggregate';
+
+export {
   isAiReferralHost,
   matchesDomain,
   resolveAiReferralDomains,
