@@ -46,6 +46,24 @@ enum BlogStatus {
   CLOSED
 }
 
+/// 分身の種類（ROADMAP 2章、TASKS A-2-R-1）
+enum PersonaType {
+  /// 本人に近い人格
+  SELF
+  /// なりたい姿
+  IDEAL
+  /// 作り込んだ別人格
+  CHARACTER
+}
+
+/// 分身の状態。`ACTIVE` の数が段階解放の対象になる（ROADMAP 5章）
+enum PersonaStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
 enum ConnectionStatus {
   UNTESTED
   CONNECTED
@@ -266,6 +284,7 @@ model User {
 
   monitorProfile MonitorProfile?
   userPersona    UserPersona?
+  personas       Persona[]
   blogs          Blog[]
   personaFacts   PersonaFact[]
   approvals      Approval[]
@@ -323,6 +342,14 @@ model Blog {
   name              String
   slug              String
   genreId           String?     @map("genre_id") @db.Uuid
+  /// どの分身の媒体か（A-2-R-1）。
+  ///
+  /// **A-2-R-1 では nullable。** 既存のブログには分身がまだ無く、
+  /// いきなり必須にすると作成の全経路とテストが落ちる。
+  /// A-2-R-3 で `NOT NULL` にする。
+  ///
+  /// **`Restrict`。** 分身を消してもブログを道連れにしない
+  personaId         String?     @map("persona_id") @db.Uuid
   penName           String?     @map("pen_name")
   targetReader      String      @map("target_reader")
   purpose           BlogPurpose @default(AFFILIATE)
@@ -336,6 +363,7 @@ model Blog {
 
   user            User                     @relation(fields: [userId], references: [id], onDelete: Restrict)
   genre           Genre?                   @relation(fields: [genreId], references: [id], onDelete: SetNull)
+  persona         Persona?                 @relation(fields: [personaId], references: [id], onDelete: Restrict)
   experimentGroup ExperimentGroup?         @relation(fields: [experimentGroupId], references: [id], onDelete: SetNull)
   wordpress       WordpressConnection?
   personaSettings BlogPersonaSetting?
@@ -399,6 +427,44 @@ model Genre {
 // ============================================================
 // 分身
 // ============================================================
+
+/// 分身（TASKS A-2-R-1、ROADMAP 2章）。
+///
+/// **1ユーザーが複数持てる。** `user_personas` が1ユーザー1件だったのを
+/// 改めるもので、事業計画の「分身が主、媒体が従」に合わせる。
+///
+/// **`user_personas` は A-2-R-3 まで残る。** いま消すと参照している20ファイルが
+/// 一斉に壊れ、CIが赤のままになる（OPEN_QUESTIONS Q-033）。
+/// 移行が済むまでの並存であり、恒久的な二重管理ではない。
+///
+/// jsonb の4つは「6つの頭脳」のうち記憶と成長を除いたもの。
+/// **記憶は `persona_facts` と記事履歴、成長は `metrics_daily` で代替する**
+/// （専用テーブルを作らない）。
+model Persona {
+  id          String        @id @default(uuid()) @db.Uuid
+  userId      String        @map("user_id") @db.Uuid
+  name        String
+  personaType PersonaType   @map("persona_type")
+  /// 名前・性格・価値観・文体・禁止表現
+  identity    Json
+  /// 専門領域・情報源・評価基準
+  expertise   Json
+  /// 読者像・悩み・検索意図
+  audience    Json
+  /// 収益方針・目標・KPI・撤退条件
+  business    Json
+  status      PersonaStatus @default(DRAFT)
+  /// 段階解放の起点（ROADMAP 5章）。`ACTIVE` になった時刻
+  activatedAt DateTime?     @map("activated_at") @db.Timestamptz(6)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  blogs Blog[]
+
+  @@index([userId, status])
+  @@map("personas")
+}
 
 model UserPersona {
   id            String   @id @default(uuid()) @db.Uuid
