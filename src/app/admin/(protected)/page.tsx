@@ -6,8 +6,8 @@ import { requireAdmin } from '@/modules/auth';
  * `/admin` の入口（TASKS B-6）。
  *
  * **B-6 は「MONITORが `/admin` へアクセスできない」ことまで。**
- * SPEC 6.2 の `/admin/dashboard`（集計）は G-7。モニター一覧は B-7。
- * ここにその内容を作らない。
+ * SPEC 6.2 の `/admin/dashboard`（集計）は G-7、モニター一覧は B-7 に置く。
+ * ここは入口の一覧に徹する。
  */
 export default async function AdminHomePage() {
   // **レイアウトの判定だけに頼らない**（B-6）。理由の表示はレイアウトの
@@ -31,11 +31,10 @@ export default async function AdminHomePage() {
         <Link href="/admin/settings" className="text-sm underline">
           設定（APIキー・接続テスト）
         </Link>
+        <Link href="/admin/dashboard" className="text-sm underline">
+          実験の集計（ジャンル別・戦略別・ブログ別）
+        </Link>
       </nav>
-
-      <p className="mt-6 text-sm leading-relaxed">
-        ダッシュボードは G-7 で追加します。
-      </p>
     </div>
   );
 }
