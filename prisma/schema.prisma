@@ -277,6 +277,20 @@ model User {
   lineUserId       String?    @unique @map("line_user_id")
   status           UserStatus @default(INVITED)
   timezone         String     @default("Asia/Tokyo")
+  /// ADMINが参加を認めた時刻（OPEN_QUESTIONS Q-034、H-1）。
+  ///
+  /// **`created_at` では代用できない。** 登録しただけでは `INVITED` のままで
+  /// アプリを使えず、承認までは何も始まらない。承認待ちが長い人ほど
+  /// 早く枠が開いてしまう。
+  ///
+  /// ここを起点にするもの：
+  /// - 分身の段階解放（ROADMAP 5章。1〜30日は1体、31〜60日は2体、61〜90日は3体）
+  /// - 90日検証の期間（ROADMAP 4章）
+  /// - 8週間継続率（SPEC 11.1）
+  ///
+  /// **最初の1回だけ入れる。** 停止して再開しても動かさない
+  /// （動くと3つとも数え方が変わる）。
+  activatedAt      DateTime?  @map("activated_at") @db.Timestamptz(6)
   termsAcceptedAt  DateTime?  @map("terms_accepted_at") @db.Timestamptz(6)
   dataUseConsentAt DateTime?  @map("data_use_consent_at") @db.Timestamptz(6)
   createdAt        DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
