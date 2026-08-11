@@ -20,6 +20,7 @@ BUNSHIN BLOG のドキュメント一覧。
 | ファイル | 内容 |
 |---|---|
 | `SPEC.md` | 実装仕様書 v2.1。全体の唯一の正 |
+| `ROADMAP.md` | 事業計画と実装計画の対応。用語・フェーズ呼称・検証の数値 |
 | `TASKS.md` | Phase A〜H のタスク分解表（53タスク）と運用ルール |
 | `ARCHITECTURE.md` | 実装構成。技術スタック、ディレクトリ、共通基盤、品質ゲート |
 | `MODULE_RULES.md` | モジュール境界の3ルールと依存の向き。テーブルの所有 |
@@ -37,3 +38,4 @@ BUNSHIN BLOG のドキュメント一覧。
 - `IMPLEMENTATION_STATUS.md` はタスク完了時に必ず更新する
 - 判断できない事項は実装せず `OPEN_QUESTIONS.md` へ記録する
 - `DATA_MODEL.md` はスキーマ変更と同じPRで更新する（同9章）
+- **用語・フェーズ呼称・検証の数値は `ROADMAP.md` が正**（同1章）。実装に関することは `SPEC.md` が正
