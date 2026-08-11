@@ -9,6 +9,7 @@ import {
 } from '@/modules/content-generation';
 import { markItemPosted } from '@/modules/content-planning';
 import {
+  aggregateDailyMetricsForUser,
   fetchIndexStatusForUser,
   fetchSearchMetricsForUser,
 } from '@/modules/analytics';
@@ -43,6 +44,7 @@ import type {
  * | `ARTICLE_GENERATION` | **E-10（登録済み）** |
  * | `SEARCH_CONSOLE_FETCH` | **G-2（登録済み）** |
  * | `URL_INSPECTION` | **G-3（登録済み）** |
+ * | `METRICS_AGGREGATE` | **G-6（登録済み）** |
  * | `LINE_NOTIFY` | **H-3（登録済み）** |
  */
 
@@ -378,6 +380,29 @@ export function createJobHandlers(
       });
 
       return summary === null ? { skipped: true } : { ...summary };
+    },
+
+    /**
+     * クリックを日ごとに数え直す（G-6、SPEC 10.2）。
+     *
+     * **外部に依存しない。** Google が落ちていても数えられるので、
+     * 検索データの取得（G-2）とは別のジョブにする。
+     */
+    METRICS_AGGREGATE: async (job) => {
+      if (job.userId === null || job.blogId === null) {
+        throw new AppError(
+          'BAD_REQUEST',
+          400,
+          'METRICS_AGGREGATE には user_id と blog_id が要ります',
+        );
+      }
+
+      const summary = await aggregateDailyMetricsForUser({
+        userId: job.userId,
+        blogId: job.blogId,
+      });
+
+      return { ...summary, dates: [...summary.dates] };
     },
   };
 }

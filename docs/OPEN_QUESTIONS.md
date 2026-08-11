@@ -1263,3 +1263,67 @@ G-1 は権限の水準を**保存していない**。`sites.get` が返す `perm
 
 **再発を防ぐために：** `jstDateColumn` の doc に、どちらをどこで使うかの表を置いた。
 `date` 型の列を新しく足すときは必ずこちらを使う。
+
+---
+
+### Q-032 SPEC 10.2 のうち「広告クリック」と「PV」に記録する経路が無い
+
+- 発生タスク：G-6（TASKS.md）
+- 状況：G-6 の完了条件は「**SPEC 10.2の記録条件が全て保存される**」。
+  19項目を1つずつ当たった結果、**17項目は保存先がある**が、
+  **2項目は測る手段そのものが無い。**
+
+  | SPEC 10.2 の項目 | 保存先 | 状態 |
+  |---|---|---|
+  | ジャンル | `blogs.genre_id` → `genres.name` | ✅ |
+  | 競争レベル | `genres.competition_level` | ✅ |
+  | YMYLリスク | `genres.ymyl_risk` | ✅ |
+  | 運営戦略 | `experiment_groups.strategy_type` | ✅ |
+  | 更新頻度 | `experiment_groups.settings`（jsonb） | ✅（形は運用で決める） |
+  | 記事数 | `content_items` を数える | ✅ |
+  | 記事平均文字数 | `article_versions.body_html` から数える | ✅ |
+  | 収益記事比率 | `content_items.content_type` | ✅ |
+  | リライト数 | `article_versions.version_no` | ✅ |
+  | 内部リンク数 | `content_items.inbound/outbound_link_item_ids` | ✅ |
+  | バナー位置 | `banners.slot` | ✅ |
+  | 承認率 | `approvals.status` | ✅ |
+  | 修正率 | `revision_requests` | ✅ |
+  | AI費用 | `ai_usage_logs.cost_usd` | ✅ |
+  | 検索表示・検索クリック | `metrics_daily`（G-2） | ✅ |
+  | アフィリエイトクリック | `metrics_daily`（**G-6 で実装**） | ✅ |
+  | 成果・収益 | `metrics_daily`（G-5） | ✅ |
+  | **広告クリック** | `metrics_daily.banner_clicks` | ❌ **数える経路が無い** |
+  | （PV・SPEC 11.2） | `metrics_daily.page_views` | ❌ **GA4 が未実装** |
+
+  **1. 広告クリック。** 列（`banner_clicks` / `banner_impressions`）はあるが、
+  **バナーの表示もクリックも記録するテーブルが無い。** アフィリエイトリンクは
+  自前のリダイレクタ（D-8）を通るので数えられるが、**バナーは
+  `destination_url` へ直接飛ぶ**（B-8）。
+
+  これは **SPEC 20.2 が「該当Phase開始前に決定する項目」の6番目に挙げている
+  「広告クリックの計測方式」そのもの**である。Q-030 と同じ形。
+
+  **2. PV。** `GA4_FETCH` というジョブの種類は SPEC 4.3 にあるが、
+  **TASKS に GA4 のタスクが1つも無い**（`grep` で確認）。
+  SPEC 20.2 の5番目「GA4必須化の有無」も未決。
+
+- 選択肢（広告クリック）：
+
+  | | 案 | 内容 |
+  |---|---|---|
+  | (a) | **バナーもリダイレクタを通す** | D-8 の仕組みをそのまま使える。**公開済み記事のバナーを貼り替えることになる**（Q-001 が同じ理由でリダイレクタを先に決めた） |
+  | (b) | 表示・クリックを記録する経路を別に作る | テーブルとエンドポイントが要る。バナーは記事本文に埋まるため、**WordPress 側にJSを置く必要がある** |
+  | (c) | Phase 0 では測らない | `banner_clicks` は0のまま。**SPEC 10.2 の項目が1つ欠ける** |
+
+- 影響範囲：`prisma/schema.prisma`、`src/modules/banners/`、B-8、G-6、G-7、
+  `docs/SPEC.md` 10.2
+- 状態：未解決
+
+**G-6 は17項目まで実装した。** 残る2つは**測る手段の決定**であって、
+集計の実装で埋まるものではない。**推測で `banner_clicks` に何かを入れない** —
+0のままなら「測っていない」と読めるが、それらしい数字を入れると
+「測ったが少ない」と読めてしまう。
+
+**(a) は早いほど安い。** Q-001 が「リダイレクタを後から入れると公開済み記事の
+リンクを全て貼り替えることになる」としてPhase A着手前に決めたのと同じ理由が、
+バナーにもそのまま当てはまる。
