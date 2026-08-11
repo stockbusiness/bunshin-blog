@@ -55,6 +55,7 @@ docs/          仕様・設計・進捗
 | ファイル | 内容 |
 |---|---|
 | `docs/SPEC.md` | 実装仕様書 v2.1。全体の唯一の正 |
+| `docs/ROADMAP.md` | 事業計画と実装計画の対応。用語・フェーズ呼称・検証の数値 |
 | `docs/TASKS.md` | Phase A〜Hのタスク分解表（53タスク） |
 | `docs/ARCHITECTURE.md` | 実装構成 |
 | `docs/DATA_MODEL.md` | スキーマ補足 |
