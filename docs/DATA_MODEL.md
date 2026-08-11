@@ -83,6 +83,12 @@ business  = { revenuePolicy: string; monthlyGoalYen: number;
 
 `onDelete` は `Restrict`。**分身を消してもブログを道連れにしない。**
 
+**参照は `(persona_id, user_id)` の複合外部キー**（A-2-R-2c-schema）。他人の分身IDを紐づけられなくする。
+
+依存の向きは `personas → blogs`（MODULE_RULES）なので、**`blogs` から分身の持ち主を確かめると循環する。** 「上位へ寄せる」で `src/app/` に確認を置くこともできるが、それは確認を呼び出し側の作法に頼ることになり、経路が増えたときに抜けてもレビューでしか気づけない。C-6・D-11 と同じ形で**制約をDBに置く。**
+
+PostgreSQL の複合外部キーは既定で MATCH SIMPLE のため、**`persona_id` が NULL のあいだは検査されない。** `user_id` は NOT NULL なので、片方だけ NULL にしてすり抜ける余地は無い。
+
 #### `persona_facts` の所属
 
 **記憶は媒体ではなく人格に溜まる。** 同じ分身が将来べつの媒体（SNS・動画）へ広がっても引き継げるようにするため、`persona_facts` の所属を `personas` へ移す。

@@ -362,7 +362,13 @@ model Blog {
   /// いきなり必須にすると作成の全経路とテストが落ちる。
   /// A-2-R-3 で `NOT NULL` にする。
   ///
-  /// **`Restrict`。** 分身を消してもブログを道連れにしない
+  /// **`Restrict`。** 分身を消してもブログを道連れにしない。
+  ///
+  /// **参照は `(persona_id, user_id)` の複合外部キー**（A-2-R-2c-schema）。
+  /// 他人の分身IDを紐づけられなくする。D-11 の
+  /// `affiliate_links` とまったく同じ形で、理由も同じ —
+  /// **依存の向きが `personas → blogs` なので、`blogs` から
+  /// 分身の持ち主を確かめられない**（MODULE_RULES 3）
   personaId         String?     @map("persona_id") @db.Uuid
   penName           String?     @map("pen_name")
   targetReader      String      @map("target_reader")
@@ -377,7 +383,7 @@ model Blog {
 
   user            User                     @relation(fields: [userId], references: [id], onDelete: Restrict)
   genre           Genre?                   @relation(fields: [genreId], references: [id], onDelete: SetNull)
-  persona         Persona?                 @relation(fields: [personaId], references: [id], onDelete: Restrict)
+  persona         Persona?                 @relation(fields: [personaId, userId], references: [id, userId], onDelete: Restrict)
   experimentGroup ExperimentGroup?         @relation(fields: [experimentGroupId], references: [id], onDelete: SetNull)
   wordpress       WordpressConnection?
   personaSettings BlogPersonaSetting?
@@ -477,6 +483,9 @@ model Persona {
   blogs        Blog[]
   personaFacts PersonaFact[]
 
+  /// `blogs` からの複合外部キーの参照先（A-2-R-2c-schema）。
+  /// `id` 単独でも一意なので、制約としては冗長
+  @@unique([id, userId])
   @@index([userId, status])
   @@map("personas")
 }
