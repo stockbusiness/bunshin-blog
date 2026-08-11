@@ -459,8 +459,9 @@ model Persona {
   createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  blogs Blog[]
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  blogs        Blog[]
+  personaFacts PersonaFact[]
 
   @@index([userId, status])
   @@map("personas")
@@ -498,9 +499,18 @@ model BlogPersonaSetting {
   @@map("blog_persona_settings")
 }
 
+/// 分身の記憶（TASKS A-2-R-2）。
+///
+/// **記憶は媒体ではなく人格に溜まる。** 同じ分身が将来べつの媒体へ広がっても
+/// 記憶を引き継げるようにするため、所属を `personas` へ移す。
+///
+/// `user_id` と `blog_id` は **A-2-R-3 で落とす。** いま消すと参照している
+/// コードが一斉に壊れるため、移行のあいだだけ並存させる（Q-033）。
 model PersonaFact {
   id                String           @id @default(uuid()) @db.Uuid
   userId            String           @map("user_id") @db.Uuid
+  /// A-2-R-2 で nullable として追加し、A-2-R-3 で必須にする
+  personaId         String?          @map("persona_id") @db.Uuid
   blogId            String?          @map("blog_id") @db.Uuid
   factType          FactType         @map("fact_type")
   content           String
@@ -510,9 +520,11 @@ model PersonaFact {
   createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  blog Blog? @relation(fields: [blogId], references: [id], onDelete: SetNull)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  persona Persona? @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  blog    Blog?    @relation(fields: [blogId], references: [id], onDelete: SetNull)
 
+  @@index([personaId, verification])
   @@index([userId, verification])
   @@index([blogId])
   @@map("persona_facts")

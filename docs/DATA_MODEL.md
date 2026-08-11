@@ -83,6 +83,18 @@ business  = { revenuePolicy: string; monthlyGoalYen: number;
 
 `onDelete` は `Restrict`。**分身を消してもブログを道連れにしない。**
 
+#### `persona_facts` の所属
+
+**記憶は媒体ではなく人格に溜まる。** 同じ分身が将来べつの媒体（SNS・動画）へ広がっても引き継げるようにするため、`persona_facts` の所属を `personas` へ移す。
+
+| 列 | 扱い |
+|---|---|
+| `persona_id` | **A-2-R-2 で nullable として追加。** A-2-R-3 で必須にする |
+| `user_id` | A-2-R-3 で削除 |
+| `blog_id` | A-2-R-3 で削除（媒体に紐づけない） |
+
+`onDelete` は `Cascade`。**分身を消せばその記憶も消える** — 人格に属するものだから。
+
 #### `user_personas` との並存
 
 **A-2-R-3 まで両方が存在する。** 恒久的な二重管理ではなく、移行のあいだだけの状態である。新しく書くコードは `personas` を参照する。
