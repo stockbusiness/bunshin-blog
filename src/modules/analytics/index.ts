@@ -16,6 +16,22 @@ export {
 } from './repository';
 
 export {
+  connectSearchConsoleForUser,
+  findSearchConsoleConnectionForUser,
+  testSearchConsoleForUser,
+  disconnectSearchConsoleForUser,
+  createConfiguredSearchConsoleClient,
+  readServiceAccountEmail,
+  normalizePropertyUrl,
+  type AppSearchConsoleConnection,
+  type ConnectSearchConsoleResult,
+  type PropertyKind,
+  type SearchConsoleCheck,
+  type SearchConsoleDeps,
+  type SearchConsoleFailureCode,
+} from './search-console';
+
+export {
   isAiReferralHost,
   matchesDomain,
   resolveAiReferralDomains,

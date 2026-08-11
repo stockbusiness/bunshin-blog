@@ -853,6 +853,89 @@ describe('認証情報が越境しない（SPEC 14.2）', () => {
 });
 
 /**
+ * **Search Console の連携を他人のブログへ結びつけられない**（G-1）。
+ *
+ * 資格情報はサービスアカウント1つで共有される（Q-030）。**鍵が共有だからこそ、
+ * 「どのブログがどのプロパティを見るか」の書き換えを許すと、
+ * 他人のブログの計測先を差し替えられる。**
+ */
+describe('他人のブログの Search Console 連携', () => {
+  /** 実際には叩かない。**越境の判定は問い合わせより前で起きるはず** */
+  const client = {
+    getSite: () =>
+      Promise.resolve({
+        status: 'OK' as const,
+        permissionLevel: 'siteOwner' as const,
+      }),
+  };
+
+  beforeEach(async () => {
+    await analytics.connectSearchConsoleForUser(
+      {
+        userId: alice.userId,
+        blogId: alice.blogIds[0],
+        propertyUrl: 'sc-domain:alice.example.com',
+      },
+      { client },
+    );
+  });
+
+  it('他人のブログへ結びつけられない', async () => {
+    await expect(
+      analytics.connectSearchConsoleForUser(
+        {
+          userId: bob.userId,
+          blogId: alice.blogIds[0],
+          propertyUrl: 'sc-domain:bob.example.com',
+        },
+        { client },
+      ),
+    ).rejects.toMatchObject({ code: blogs.BLOG_ERROR_CODES.notFound });
+
+    // **相手の計測先が変わっていないこと**まで見る
+    const row = await prisma.searchConsoleConnection.findUnique({
+      where: { blogId: alice.blogIds[0] },
+    });
+
+    expect(row?.propertyUrl).toBe('sc-domain:alice.example.com');
+  });
+
+  it('他人の連携を読めない', async () => {
+    await expect(
+      analytics.findSearchConsoleConnectionForUser({
+        userId: bob.userId,
+        blogId: alice.blogIds[0],
+      }),
+    ).rejects.toMatchObject({ code: blogs.BLOG_ERROR_CODES.notFound });
+  });
+
+  it('他人の連携を確かめ直せない', async () => {
+    await expect(
+      analytics.testSearchConsoleForUser(
+        { userId: bob.userId, blogId: alice.blogIds[0] },
+        { client },
+      ),
+    ).rejects.toMatchObject({ code: blogs.BLOG_ERROR_CODES.notFound });
+  });
+
+  it('他人の連携を外せない', async () => {
+    await expect(
+      analytics.disconnectSearchConsoleForUser({
+        userId: bob.userId,
+        blogId: alice.blogIds[0],
+      }),
+    ).rejects.toMatchObject({ code: blogs.BLOG_ERROR_CODES.notFound });
+
+    // **消えていないこと**を確かめる
+    const row = await prisma.searchConsoleConnection.findUnique({
+      where: { blogId: alice.blogIds[0] },
+    });
+
+    expect(row).not.toBeNull();
+  });
+});
+
+/**
  * **入口が増えたらこのテストも増やす。**
  *
  * C-6 は「他タスクのついでに書かせると省略される」ため単独タスクに
@@ -945,7 +1028,14 @@ describe('入口の網羅', () => {
      */
     audit: [],
     /** クリックの記録は読者（未ログイン）なので `...ForUser` を持たない（D-8） */
-    analytics: ['saveWeeklyResultForUser', 'listWeeklyResultsForUser'],
+    analytics: [
+      'saveWeeklyResultForUser',
+      'listWeeklyResultsForUser',
+      'connectSearchConsoleForUser',
+      'findSearchConsoleConnectionForUser',
+      'testSearchConsoleForUser',
+      'disconnectSearchConsoleForUser',
+    ],
     approvals: [
       'refreshProposalsForUser',
       'listApprovalsForUser',

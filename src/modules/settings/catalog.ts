@@ -26,12 +26,13 @@
 
 import { z } from 'zod';
 
-export type SettingGroup = 'AI' | 'MAIL' | 'LINE';
+export type SettingGroup = 'AI' | 'MAIL' | 'LINE' | 'SEARCH_CONSOLE';
 
 export const SETTING_GROUP_LABELS: Readonly<Record<SettingGroup, string>> = {
   AI: 'AI（生成）',
   MAIL: 'メール送信',
   LINE: 'LINE通知',
+  SEARCH_CONSOLE: 'Search Console',
 };
 
 export interface SettingDefinition {
@@ -91,6 +92,41 @@ const httpsUrl = text.refine(
     }
   },
   { message: 'https:// のURLを入力してください' },
+);
+
+/**
+ * サービスアカウントの鍵（JSON）。
+ *
+ * **1つの値として保存する**（Q-030）。`client_email` と `private_key` を
+ * 別の設定に分けると、**片方だけ差し替えられて食い違う。**
+ * Google が配るのもこのJSONそのもので、貼るだけで済む。
+ *
+ * ここでは**形だけ**を見る。実際に読めるかは接続テスト（G-1）で確かめる。
+ */
+const serviceAccountKey = text.refine(
+  (value) => {
+    try {
+      const parsed: unknown = JSON.parse(value);
+
+      if (typeof parsed !== 'object' || parsed === null) {
+        return false;
+      }
+
+      const record = parsed as Record<string, unknown>;
+
+      return (
+        typeof record['client_email'] === 'string' &&
+        typeof record['private_key'] === 'string' &&
+        record['private_key'].includes('-----BEGIN')
+      );
+    } catch {
+      return false;
+    }
+  },
+  {
+    message:
+      'Google Cloud が配るJSONをそのまま貼ってください（client_email と private_key が要ります）',
+  },
 );
 
 /**
@@ -264,6 +300,15 @@ export const SETTING_DEFINITIONS: readonly SettingDefinition[] = [
     description: '予算が80% / 100% / 150%に達したときの送り先（E-15）',
     secret: false,
     schema: mailAddress,
+  },
+  {
+    key: 'GOOGLE_SERVICE_ACCOUNT_KEY',
+    group: 'SEARCH_CONSOLE',
+    label: 'サービスアカウントの鍵（JSON）',
+    description:
+      'Google Cloud が配るJSONをそのまま貼ります。読み返せません（Q-030）',
+    secret: true,
+    schema: serviceAccountKey,
   },
 ];
 
