@@ -85,6 +85,7 @@ export default defineConfig({
         // | lib/line/messaging.ts | — | line-notification.test.ts |
         // | line/alerts.ts | judgeConnectionAlert は同ファイルの純粋関数 | emergency-alerts.test.ts |
         // | analytics/weekly-result.ts | normalizeWeeklyResult は同ファイルの純粋関数 | weekly-results.test.ts |
+        // | analytics/search-console.ts | normalizePropertyUrl は同ファイルの純粋関数 | search-console-connect.test.ts |
         // | affiliate/link-check.ts | judgeLinkHealth は同ファイルの純粋関数 | emergency-alerts.test.ts |
         // | approvals/detail.ts | — | proposals.test.ts |
         // | approvals/decide.ts | — | approval-decisions.test.ts |
@@ -114,6 +115,7 @@ export default defineConfig({
         'src/lib/line/messaging.ts',
         'src/modules/line/alerts.ts',
         'src/modules/analytics/weekly-result.ts',
+        'src/modules/analytics/search-console.ts',
         'src/modules/affiliate/link-check.ts',
         'src/modules/approvals/detail.ts',
         'src/modules/approvals/decide.ts',
