@@ -918,6 +918,29 @@ describe('他人のブログの Search Console 連携', () => {
     ).rejects.toMatchObject({ code: blogs.BLOG_ERROR_CODES.notFound });
   });
 
+  /**
+   * **他人のブログの計測を回せない。** 回せると、こちらのAPI呼び出しの
+   * 上限を他人のブログのために使わせることができる
+   */
+  it('他人のブログの取り込みを回せない', async () => {
+    await expect(
+      analytics.fetchSearchMetricsForUser(
+        { userId: bob.userId, blogId: alice.blogIds[0] },
+        { client: { query: () => Promise.resolve([]) } },
+      ),
+    ).rejects.toMatchObject({ code: blogs.BLOG_ERROR_CODES.notFound });
+  });
+
+  /** **積むのは自分のブログのぶんだけ**（`userId` しか取らない） */
+  it('他人のブログのジョブを積まない', async () => {
+    const queued = await analytics.enqueueSearchMetricsForUser(bob.userId);
+
+    expect(queued).toBe(0);
+    expect(
+      await prisma.job.count({ where: { jobType: 'SEARCH_CONSOLE_FETCH' } }),
+    ).toBe(0);
+  });
+
   it('他人の連携を外せない', async () => {
     await expect(
       analytics.disconnectSearchConsoleForUser({
@@ -1035,6 +1058,8 @@ describe('入口の網羅', () => {
       'findSearchConsoleConnectionForUser',
       'testSearchConsoleForUser',
       'disconnectSearchConsoleForUser',
+      'fetchSearchMetricsForUser',
+      'enqueueSearchMetricsForUser',
     ],
     approvals: [
       'refreshProposalsForUser',

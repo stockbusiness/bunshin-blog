@@ -32,6 +32,18 @@ export {
 } from './search-console';
 
 export {
+  fetchSearchMetricsForUser,
+  enqueueSearchMetricsForUser,
+  createConfiguredSearchAnalyticsClient,
+  fetchWindow,
+  shiftDate,
+  normalizePageUrl,
+  LOOKBACK_DAYS,
+  type SearchMetricsDeps,
+  type SearchMetricsSummary,
+} from './search-metrics';
+
+export {
   isAiReferralHost,
   matchesDomain,
   resolveAiReferralDomains,
