@@ -186,9 +186,13 @@ TASKS E-5-schema。SPEC 9.2.3 の足切り「ブログ掲載禁止」（OPEN_QUE
 
 ### `article_versions.risk_flags` / `unverified_claims`
 
+**`unverified_claims` は実装に合わせた**（OPEN_QUESTIONS Q-023、2026-08-11）。当初の `matched: boolean` は**未確認の一覧では常に `false`** で情報を持たない。`type` は SPEC 9.7 の `WARNING` / `FAILED` の切り分けに、`reason` は「どこを見れば確かめられるか」に要る。
+
 ```ts
 risk_flags = { code: string; severity: "info"|"warning"|"error"; message: string; excerpt: string }[]
-unverified_claims = { claim: string; expectedSource: "offer_facts"|"persona_facts"; matched: boolean }[]
+unverified_claims = { text: string; type: ClaimType; excerpt: string; reason: UnverifiedReason }[]
+// ClaimType        = "PRICE" | "CONDITION" | "FEATURE" | "EXPERIENCE" | "GENERAL"
+// UnverifiedReason = "NO_SOURCE" | "NOT_IN_FACTS" | "NUMBER_NOT_IN_FACTS"
 ```
 
 ### `planning_runs.constraint_result`

@@ -180,6 +180,7 @@ B-1 が実装したのは**サーバー側のIDトークン検証**であり、�
 | C-6-schema | `wordpress_posts` と `content_items` のブログ一致を複合外部キーで強制 | C-5 | マイグレーションのみ。DATA_MODEL 4章 | `prisma/` |
 | C-6 | テナント越境の統合テスト | C-6-schema | 2ユーザー×2ブログで越境投稿が発生しない | `src/tests/integration/` |
 | C-7 | 外向きHTTPの共通クライアント（SSRF対策） | A-4 | private・loopback・link-local へ到達しない。リダイレクト先を再検証する。タイムアウト・最大サイズ・Content-Type を強制する（SPEC 14.3） | `src/lib/http/` |
+| C-9 | ブログごとの公開スケジュールとURL様式 | B-4 | `blogs` に公開曜日・時刻・ゆらぎ・週上限・パーマリンク様式・初期記事数を持ち、**登録時に既存ブログと重複しにくいよう分散して割り当てる**。**全ブログの投稿ジョブが同一時刻に集中しない**。パーマリンクは初回設定後に変更しない（作業指示書 W-8） | `prisma/` `src/modules/blogs/` |
 
 ### WordPress接続先は後から変えられない（Q-007）
 
@@ -220,7 +221,9 @@ B-1 が実装したのは**サーバー側のIDトークン検証**であり、�
 | D-6 | `persona_facts` | D-4 | `AI_INFERENCE` かつ `UNVERIFIED` が一人称利用不可のフラグを持つ | `src/modules/personas/` |
 | D-7 | LINE返信からのfacts保存 | D-6 | 返信が `persona_facts` または `revision_requests` に保存される。**着手前に Q-015 の決定が要る**（`revision_requests` 側は `approvals` が無いと書けない） | `src/modules/line/` |
 | D-8 | アフィリエイトリダイレクタとクリック計測 | D-1 | リンク方式に従って組み立てられ、**`REDIRECT` の案件でクリックが記録される**。`DIRECT` の案件は直リンクのまま（OPEN_QUESTIONS Q-001） | `src/app/go/` `src/modules/analytics/` |
-| D-12 | リダイレクタを各ブログのドメインへ移す | D-8 | 各WordPressのスニペットが `/go/{code}` を処理し、Bunshin の受信APIへ送る。**受信APIはブログ単位のトークンで認証し、他ブログのイベントを投入できない**。IPアドレスを保存せずUser-Agentはハッシュ化する。**WordPress側スニペットの導入手順が `docs/` に文書化されている**（Q-001 の再決定・2026-08-11） | `src/app/api/link-events/` `src/modules/analytics/` `docs/` |
+| D-12 | リダイレクタを各ブログのドメインへ移す | D-8 | 各WordPressのスニペットが `/go/{code}` を処理し、Bunshin の受信APIへ送る。**受信APIはブログ単位のトークンで認証し、他ブログのイベントを投入できない**。IPアドレスを保存せずUser-Agentはハッシュ化する。**バナーも同じ経路を通り、`metrics_daily.banner_clicks` が記録される**（Q-032）。**WordPress側スニペットの導入手順が `docs/` に文書化されている**（Q-001 の再決定・2026-08-11） | `src/app/api/link-events/` `src/modules/analytics/` `src/modules/banners/` `docs/` |
+| D-13-schema | `affiliate_offers.facts_updated_at` | D-1 | マイグレーションのみ。**行の `updated_at` とは別に、事実を確かめ直した時刻だけを持つ**（Q-022） | `prisma/` |
+| D-13 | 案件の事実の更新経路 | D-13-schema | `facts` を更新した経路だけが `facts_updated_at` を書く。E-12 の90日判定が実際に効く（**いま全収益記事が `WARNING`**） | `src/modules/affiliate/` |
 | D-9 | 案件のリンク方式のテーブル追加 | A-8 | `migrate deploy` が成功し、スキーマとの乖離が無い。既定が `DIRECT` になる | `prisma/`, `docs/DATA_MODEL.md` |
 | D-10 | サブIDのパラメータ名のテーブル追加 | A-8 | `migrate deploy` が成功し、スキーマとの乖離が無い。既定が `NULL`（サブIDを付けない）になる | `prisma/`, `docs/DATA_MODEL.md` |
 | D-11 | リンクの案件と記事を同じブログに縛る | A-2, E-6 | 他人の記事IDを紐づけたリンクが作れない（Q-020）。**マイグレーションと実装を分けられない** — `blog_id` は NOT NULL で、埋める側が同じ変更に要る | `prisma/`, `src/modules/affiliate/` |
@@ -286,6 +289,7 @@ B-1 が実装したのは**サーバー側のIDトークン検証**であり、�
 
 **判定は必ずコード側で行う。** AIに「制約を満たしているか」を判断させてはならない。
 各STEPのAI呼び出しは、入出力をJSONスキーマで定義し、`docs/CONTENT_PLANNING.md` に記載する。
+| E-16 | 構造化データから `Review` を外す | E-11 | `FAQPage` だけを出す。**評点の出どころが無く、作り出すことは SPEC 9.6 が禁じる「根拠のないランキング」になる**（Q-021）。`docs/CONTENT_PLANNING.md` 7.3 もあわせて直す | `src/modules/content-generation/` `docs/` |
 
 ---
 
@@ -296,6 +300,7 @@ B-1 が実装したのは**サーバー側のIDトークン検証**であり、�
 | F-1 | 提案の優先順位算出（3ブログ横断） | E-10 | 優先度と提案理由が保存される | `src/modules/approvals/` |
 | F-2 | LINE通知送信 | F-1 | 同一提案を連続通知しない | `src/modules/line/` |
 | F-3 | 通知数制御（既定1日1件・最大2件） | F-2 | 3ブログ合計で制限される。緊急通知は別枠 | `src/modules/line/` |
+| F-3b | 通知の曜日・時刻を効かせる | F-3 | `monitor_profiles.notification_days` / `notification_time` を読み、**JSTで指定の曜日・時刻にだけ送る**。**送れなかった提案は翌日へ持ち越す**（溜め続けない）。H-2 の前に要る（Q-025） | `src/modules/line/` |
 | F-4 | LIFF承認一覧 | F-1 | 他ユーザーの承認を開けない | `src/app/liff/approvals/` |
 | F-5 | LIFF承認詳細（記事全文・リスク表示） | F-4, E-12 | 未確認事実とリスク警告が表示される | `src/app/liff/approvals/` |
 | F-6 | 承認・修正依頼・見送りAPI | F-5 | トランザクションと冪等性を持つ | `src/modules/approvals/` |
@@ -316,6 +321,7 @@ B-1 が実装したのは**サーバー側のIDトークン検証**であり、�
 | G-7 | 管理ダッシュボード | G-6 | ジャンル別・戦略別・ブログ別の集計がSQLで取得できる | `src/app/admin/` |
 
 **実験グループの管理UIとAPIは作らない。** `experiment_groups` への登録はSQLまたはシードで行う（SPEC 10.3）。
+| G-8 | インデックス率による公開ペース調整 | G-3, C-9 | ブログ単位で2週間ごとに判定し、`weekly_post_cap` を上下させる（80%以上→+1・上限5、50%未満→0にしてADMINへ通知）。**公開後14日未満の記事は母数に含めない**。調整の履歴を管理画面で確認できる（作業指示書 W-8） | `src/modules/analytics/` `src/app/admin/` |
 
 ---
 
@@ -324,6 +330,9 @@ B-1 が実装したのは**サーバー側のIDトークン検証**であり、�
 | ID | タスク | 依存 | 完了条件 | 主な変更先 |
 |---|---|---|---|---|
 | H-1 | 招待フロー | B-7 | 招待〜ACTIVE化が管理画面で完結 | `src/modules/users/` |
+| H-3b-schema | リンク切れの状態を持つ列 | A-2 | マイグレーションのみ。`affiliate_offers` に `link_checked_at` / `link_broken_at`（Q-029） | `prisma/` |
+| H-3b | リンク切れの状態を保存して見せる | H-3b-schema, H-3 | 確認の結果を保存し、**いつから切れているか**が画面で分かる（SPEC 6.1「エラー」） | `src/modules/affiliate/` `src/app/liff/` |
+| H-12 | 監査ログを SPEC 14.4 に揃える | H-11 | **承認・公開・WordPress接続変更**が `audit_logs` に残る（Q-027）。残り4種類（ログイン・案件URL変更・ジョブ再実行・AIプロンプト変更）は後続 | `src/modules/approvals/` `src/modules/wordpress/` `src/app/api/jobs/` |
 | H-2 | オンボーディング（LIFF 10ステップ） | H-1, C-2, D-1, D-12 | 中断・再開ができる。**`/go/` 用スニペットの導入がステップに含まれる**（Q-001 の再決定） | `src/app/liff/onboarding/` |
 | H-3 | エラー通知とサポート依頼 | F-2 | 接続切れ・リンク切れ・案件終了が緊急通知される | `src/modules/line/` |
 | H-4 | 退会・停止処理 | B-2 | 物理削除せずCLOSED。データエクスポートができる | `src/modules/users/` |
