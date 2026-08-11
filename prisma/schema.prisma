@@ -913,17 +913,23 @@ model LinkClick {
   @@map("link_clicks")
 }
 
-/// Search Console の OAuth トークン（TASKS G-1）
+/// ブログと Search Console のプロパティの対応（TASKS G-1、OPEN_QUESTIONS Q-030）。
+///
+/// **トークンを持たない。** 読み取りはサービスアカウント1つで行い、
+/// その秘密鍵は `app_settings` の暗号化列に置く（Q-030）。モニターは
+/// Search Console の「ユーザーと権限」でそのアドレスに権限を渡すため、
+/// ブログごとの資格情報が存在しない。
+///
+/// ここが持つのは**どのプロパティを見るか**と、直近の取得の結果だけ。
 model SearchConsoleConnection {
-  id                    String           @id @default(uuid()) @db.Uuid
-  blogId                String           @unique @map("blog_id") @db.Uuid
-  propertyUrl           String           @map("property_url")
-  refreshTokenEncrypted String           @map("refresh_token_encrypted")
-  connectionStatus      ConnectionStatus @default(UNTESTED) @map("connection_status")
-  lastSyncedAt          DateTime?        @map("last_synced_at") @db.Timestamptz(6)
-  lastErrorCode         String?          @map("last_error_code")
-  createdAt             DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt             DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id               String           @id @default(uuid()) @db.Uuid
+  blogId           String           @unique @map("blog_id") @db.Uuid
+  propertyUrl      String           @map("property_url")
+  connectionStatus ConnectionStatus @default(UNTESTED) @map("connection_status")
+  lastSyncedAt     DateTime?        @map("last_synced_at") @db.Timestamptz(6)
+  lastErrorCode    String?          @map("last_error_code")
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   blog Blog @relation(fields: [blogId], references: [id], onDelete: Cascade)
 

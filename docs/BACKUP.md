@@ -16,8 +16,9 @@ TASKS H-5。完了条件は「**日次バックアップと復旧手順が文書
 | テーブル | 列 | 失うと何が起きるか |
 |---|---|---|
 | `wordpress_connections` | `wp_username_encrypted` / `app_password_encrypted` | **全モニターのWordPressへ投稿できなくなる。** 再接続には各モニターにアプリパスワードを再発行してもらう必要がある |
-| `search_console_connections` | `refresh_token_encrypted` | Search Console の再連携（OAuth）をやり直す |
-| `app_settings` | `value_encrypted` | AIのAPIキー等を入れ直す（管理画面から可能） |
+| `app_settings` | `value_encrypted` | AIのAPIキー、**Search Console のサービスアカウント秘密鍵**（Q-030）等を入れ直す（管理画面から可能） |
+
+**Search Console はブログごとの資格情報を持たない**（Q-030）。鍵を失っても、`app_settings` に秘密鍵を入れ直せば戻る。**モニターに作業を頼み直す必要は無い** — 権限は Search Console 側にサービスアカウントのアドレスとして残っている。
 
 **`ENCRYPTION_KEY` はDBのバックアップとは別の場所に、別の手段で保管する。**
 同じ場所に置くと、その場所を失ったときに両方が消える。
