@@ -271,7 +271,11 @@ TASKS D-8の自前リダイレクタ。**OPEN_QUESTIONS Q-001 で方式が確定
 
 ### `search_console_connections`
 
-TASKS G-1。ブログ単位のOAuthトークンを暗号化保存する。SPEC 11.3に「ブログ単位でOAuth連携」とあるが保存先が未定義。
+TASKS G-1。**ブログとSearch Consoleのプロパティの対応**を持つ。**OPEN_QUESTIONS Q-030 で連携方式が確定した**（2026-08-11、サービスアカウント）。
+
+**トークンを持たない。** 読み取りはサービスアカウント1つで行い、その秘密鍵は `app_settings` の暗号化列に置く。モニターは Search Console の「ユーザーと権限」でそのアドレスに権限を渡すため、**ブログごとの資格情報が存在しない**。`refresh_token_encrypted` は G-1-schema で落とした。
+
+SPEC 11.3 の「ブログ単位でOAuth連携」という文言とは食い違うが、**どのプロパティを見るかはブログごとに指定する**ため、ブログ単位で連携するという趣旨は保っている。
 
 ### `admin_login_tokens`
 
@@ -304,8 +308,9 @@ TASKS H-7-schema。**管理画面から変更できる設定**（OPEN_QUESTIONS 
 
 - `wordpress_connections.wp_username_encrypted`
 - `wordpress_connections.app_password_encrypted`
-- `search_console_connections.refresh_token_encrypted`
 - `app_settings.value_encrypted`（H-7-schema。`is_secret = true` の行だけが持つ）
+
+**`search_console_connections` は暗号化対象を持たない**（Q-030）。Search Console の資格情報はサービスアカウントの秘密鍵1つで、`app_settings.value_encrypted` に入る。
 
 **`wordpress_connections.site_url` はモニターからは変更できない**（OPEN_QUESTIONS Q-007）。同一 `site_url` のままの認証情報の入れ替えは許可する。`disconnect` で `connection_status` を `REVOKED` にしても `site_url` は保持し、再接続時に一致を確認する。
 
