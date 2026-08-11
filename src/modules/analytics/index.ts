@@ -44,6 +44,15 @@ export {
 } from './search-metrics';
 
 export {
+  fetchIndexStatusForUser,
+  enqueueIndexStatusForUser,
+  createConfiguredUrlInspectionClient,
+  URL_INSPECTION_PER_RUN,
+  type IndexStatusDeps,
+  type IndexStatusSummary,
+} from './index-status';
+
+export {
   isAiReferralHost,
   matchesDomain,
   resolveAiReferralDomains,

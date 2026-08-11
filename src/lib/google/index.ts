@@ -39,6 +39,18 @@ export {
 } from './search-analytics';
 
 export {
+  createUrlInspectionClient,
+  toIndexVerdict,
+  UrlInspectionError,
+  URL_INSPECTION_ENDPOINT,
+  URL_INSPECTION_DAILY_QUOTA,
+  type UrlInspectionClient,
+  type CreateUrlInspectionClientOptions,
+  type UrlInspectionResult,
+  type IndexVerdict,
+} from './url-inspection';
+
+export {
   GoogleNotConfiguredError,
   GoogleServiceAccountInvalidError,
   GoogleAuthError,

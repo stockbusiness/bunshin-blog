@@ -941,6 +941,27 @@ describe('他人のブログの Search Console 連携', () => {
     ).toBe(0);
   });
 
+  it('他人のブログのインデックス確認を回せない', async () => {
+    await expect(
+      analytics.fetchIndexStatusForUser(
+        { userId: bob.userId, blogId: alice.blogIds[0] },
+        {
+          client: {
+            inspect: () =>
+              Promise.resolve({
+                verdict: 'INDEXED' as const,
+                coverageState: null,
+              }),
+          },
+        },
+      ),
+    ).rejects.toMatchObject({ code: blogs.BLOG_ERROR_CODES.notFound });
+  });
+
+  it('他人のブログのインデックス確認ジョブを積まない', async () => {
+    expect(await analytics.enqueueIndexStatusForUser(bob.userId)).toBe(0);
+  });
+
   it('他人の連携を外せない', async () => {
     await expect(
       analytics.disconnectSearchConsoleForUser({
@@ -1060,6 +1081,8 @@ describe('入口の網羅', () => {
       'disconnectSearchConsoleForUser',
       'fetchSearchMetricsForUser',
       'enqueueSearchMetricsForUser',
+      'fetchIndexStatusForUser',
+      'enqueueIndexStatusForUser',
     ],
     approvals: [
       'refreshProposalsForUser',
