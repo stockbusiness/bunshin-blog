@@ -1026,6 +1026,16 @@ describe('入口の網羅', () => {
       'endBannerForUser',
     ],
     personas: [
+      // A-2-R-2 で足した分身のCRUD。**`user_id` が unique でなくなったので、
+      // `id` だけで引ける入口を作らないことが要点**
+      'createPersonaForUser',
+      'listPersonasForUser',
+      'findPersonaForUser',
+      'requirePersonaForUser',
+      'updatePersonaForUser',
+      'activatePersonaForUser',
+      'pausePersonaForUser',
+      'countActivePersonasForUser',
       'findUserPersonaForUser',
       'requireUserPersonaForUser',
       'saveUserPersonaForUser',

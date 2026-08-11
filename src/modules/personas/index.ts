@@ -108,3 +108,37 @@ export {
   type CreateUserPersonaInput,
   type UpdateUserPersonaInput,
 } from './types';
+
+export {
+  createPersonaForUser,
+  listPersonasForUser,
+  findPersonaForUser,
+  requirePersonaForUser,
+  updatePersonaForUser,
+  activatePersonaForUser,
+  pausePersonaForUser,
+  countActivePersonasForUser,
+} from './persona-repository';
+
+export {
+  normalizeCreatePersona,
+  normalizeUpdatePersona,
+  normalizeIdentity,
+  normalizeExpertise,
+  normalizeAudience,
+  normalizeBusiness,
+  maxActivePersonas,
+  PERSONA_TYPES,
+  PERSONA_STATUSES,
+  MAX_ACTIVE_PERSONAS,
+  PERSONA_NAME_MAX_LENGTH,
+  type AppPersona,
+  type CreatePersonaInput,
+  type UpdatePersonaInput,
+  type PersonaIdentity,
+  type PersonaExpertise,
+  type PersonaAudience,
+  type PersonaBusiness,
+  type PersonaType,
+  type PersonaStatus,
+} from './persona';
