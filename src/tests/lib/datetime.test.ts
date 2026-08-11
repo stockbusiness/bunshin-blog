@@ -8,6 +8,7 @@ import {
   jstWeekNumber,
   jstWeekRange,
   jstWeeksBetween,
+  jstDateColumn,
   startOfJstDay,
   startOfJstWeek,
   todayInJst,
@@ -61,6 +62,45 @@ describe('startOfJstDay', () => {
   it('不正な日付で例外を投げる', () => {
     for (const value of ['2026-13-01', '2026-02-30', '2026-8-6', 'abc', '']) {
       expect(() => startOfJstDay(value)).toThrow();
+    }
+  });
+});
+
+/**
+ * `date` 型の列へ入れる値（OPEN_QUESTIONS Q-031）。
+ *
+ * **`startOfJstDay` を `date` 型の列へ渡すと1日前が保存される。**
+ * ここはその取り違えを防ぐための関数で、両者が**別物であること**を
+ * 試験として固定しておく。
+ */
+describe('jstDateColumn', () => {
+  it('暦日そのもの（UTCの真夜中）を返す', () => {
+    expect(jstDateColumn('2026-08-11').toISOString()).toBe(
+      '2026-08-11T00:00:00.000Z',
+    );
+  });
+
+  /** **ここが Q-031 の中身。** 9時間ずれる */
+  it('startOfJstDay とは別の値になる', () => {
+    expect(jstDateColumn('2026-08-11').toISOString()).not.toBe(
+      startOfJstDay('2026-08-11').toISOString(),
+    );
+    expect(startOfJstDay('2026-08-11').toISOString()).toBe(
+      '2026-08-10T15:00:00.000Z',
+    );
+  });
+
+  /** **`date` 型の列が取るのはUTCの日付部分。** そこが暦日と一致すること */
+  it.each(['2026-01-01', '2026-08-11', '2028-02-29'])(
+    '%s のUTC日付部分が暦日と一致する',
+    (date) => {
+      expect(jstDateColumn(date).toISOString().slice(0, 10)).toBe(date);
+    },
+  );
+
+  it('不正な日付で例外を投げる', () => {
+    for (const value of ['2026-13-01', '2026-02-30', '2026-8-6', 'abc', '']) {
+      expect(() => jstDateColumn(value)).toThrow();
     }
   });
 });

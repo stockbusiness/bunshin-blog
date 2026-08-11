@@ -46,6 +46,46 @@ beforeEach(async () => {
   blogId = blog.id;
 });
 
+/**
+ * **保存される日付が指定した暦日と一致すること**（OPEN_QUESTIONS Q-031）。
+ *
+ * `metric_date` は `date` 型で、時刻を持たない。ここへ
+ * 「JSTの00:00を表すUTCの瞬間」を渡すと**UTCの日付部分が取られ、
+ * 1日前が保存される。** PostgreSQL が実際に何を持っているかで確かめる。
+ */
+describe('保存される日付', () => {
+  it('指定した週の月曜がそのまま入る', async () => {
+    await saveWeeklyResultForUser(
+      { userId, blogId, weekStart: '2026-08-10' },
+      { conversions: 1, revenueYen: 100 },
+    );
+
+    const rows = await prisma.$queryRawUnsafe<{ metric_date: string }[]>(
+      'select metric_date::text as metric_date from metrics_daily',
+    );
+
+    expect(rows[0]?.metric_date).toBe('2026-08-10');
+  });
+
+  it('読み出した週も同じ日付で返る', async () => {
+    await saveWeeklyResultForUser(
+      { userId, blogId, weekStart: '2026-08-10' },
+      { conversions: 1, revenueYen: 100 },
+    );
+
+    const rows = await listWeeklyResultsForUser(
+      { userId, blogId },
+      { weeks: 1, now: NOW },
+    );
+
+    expect(rows[0]).toMatchObject({
+      weekStart: '2026-08-10',
+      reported: true,
+      conversions: 1,
+    });
+  });
+});
+
 describe('0件を1操作で記録できる（完了条件）', () => {
   it('0件0円が保存される', async () => {
     const result = await saveWeeklyResultForUser(

@@ -43,7 +43,7 @@ import {
   type SearchAnalyticsClient,
   type SearchAnalyticsRow,
 } from '@/lib/google';
-import { todayInJst, startOfJstDay, type JstDate } from '@/lib/datetime';
+import { todayInJst, jstDateColumn, type JstDate } from '@/lib/datetime';
 import { requireBlogForUser } from '@/modules/blogs';
 import { enqueueJob } from '@/modules/jobs';
 import { getRuntimeEnv } from '@/modules/settings';
@@ -68,7 +68,9 @@ function toMetricDate(dateKey: string): Date | null {
     return null;
   }
 
-  return startOfJstDay(dateKey as JstDate);
+  // **`date` 型の列には暦日をそのまま渡す**（Q-031）。
+  // `startOfJstDay` を渡すと1日前が保存される
+  return jstDateColumn(dateKey as JstDate);
 }
 
 /** `YYYY-MM-DD` を日数だけ戻す */
