@@ -14,6 +14,7 @@ import { can } from '@/lib/entitlements';
 import { invalidPersonaError, personaNotFoundError } from './errors';
 import {
   MAX_ACTIVE_PERSONAS,
+  maxActivePersonas,
   normalizeCreatePersona,
   normalizeUpdatePersona,
   type AppPersona,
@@ -202,15 +203,49 @@ export async function countActivePersonasForUser(
 }
 
 /**
+ * 参加してから何日経ったか（ROADMAP 5章、Q-034）。
+ *
+ * **起点は `users.activated_at`。** ADMINが参加を認めた時刻で、
+ * 登録時刻（`created_at`）ではない。承認待ちの期間まで日数に含めると、
+ * **使い始める前に2体目が開く。**
+ *
+ * まだ認められていなければ `null`。
+ */
+async function elapsedDaysSinceJoin(
+  userId: string,
+  now: Date,
+): Promise<number | null> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { activatedAt: true },
+  });
+
+  if (user?.activatedAt == null) {
+    return null;
+  }
+
+  return Math.floor(
+    (now.getTime() - user.activatedAt.getTime()) / (24 * 60 * 60_000),
+  );
+}
+
+/**
  * 分身を使い始める。
  *
- * **上限を超えたら断る。** 数えてから入れるので、同時に2回来ると
- * 上限を1つ超えうる。Phase 0 は1人が自分の画面から操作するだけなので、
- * ここはアプリ層の判定で足りる（**超えたことが致命傷にならない** —
- * 使わない分身は `PAUSED` へ戻せる）。
+ * **上限は2つある。**
  *
- * **`activated_at` は最初の1回だけ入れる。** 段階解放の起点で、
- * 止めて再開するたびに更新すると、日数の数え方が変わってしまう。
+ * 1. 全体の上限（3体）
+ * 2. **経過日数による段階解放**（ROADMAP 5章）。1〜30日は1体、
+ *    31〜60日は2体、61〜90日は3体
+ *
+ * **習熟に合わせて開ける。** 最初から3体を渡すと、承認が溜まって止まる。
+ *
+ * 数えてから入れるので、同時に2回来ると上限を1つ超えうる。Phase 0 は
+ * 1人が自分の画面から操作するだけなので、アプリ層の判定で足りる
+ * （**超えたことが致命傷にならない** — 使わない分身は `PAUSED` へ戻せる）。
+ *
+ * **`activated_at` は最初の1回だけ入れる。** 止めて再開するたびに
+ * 更新すると、日数の数え方が変わってしまう。
  */
 export async function activatePersonaForUser(params: {
   userId: string;
@@ -224,6 +259,7 @@ export async function activatePersonaForUser(params: {
     return persona;
   }
 
+  const now = params.now ?? new Date();
   const active = await countActivePersonasForUser(params.userId);
 
   if (active >= MAX_ACTIVE_PERSONAS) {
@@ -232,13 +268,27 @@ export async function activatePersonaForUser(params: {
     );
   }
 
+  const elapsedDays = await elapsedDaysSinceJoin(params.userId, now);
+
+  // **まだ参加を認められていなければ、段階解放は効かせない。**
+  // ここで断ると「作れるのに使い始められない」状態になり、
+  // 原因が画面から読めない。参加前にアプリを使えないことは
+  // `isActiveUser`（H-1）が別に担保している
+  if (elapsedDays !== null) {
+    const allowed = maxActivePersonas(elapsedDays);
+
+    if (active >= allowed) {
+      throw invalidPersonaError(
+        `いまは分身を${allowed}体まで使えます（参加から${elapsedDays}日）`,
+      );
+    }
+  }
+
   const row = await prisma.persona.update({
     where: { id: params.personaId },
     data: {
       status: 'ACTIVE',
-      ...(persona.activatedAt === null
-        ? { activatedAt: params.now ?? new Date() }
-        : {}),
+      ...(persona.activatedAt === null ? { activatedAt: now } : {}),
     },
     select: SELECT,
   });

@@ -117,12 +117,14 @@ export async function updateMonitorStatusForAdmin(params: {
   action: MonitorAdminAction;
   /** 操作したADMIN。**誰が介入したかを残す**（H-11） */
   actorUserId: string | null;
+  /** 参加開始日として入れる時刻。試験のために渡せるようにする */
+  now?: Date;
 }): Promise<AppUser> {
   const transition = TRANSITIONS[params.action];
 
   const current = await prisma.user.findFirst({
     where: { id: params.userId, role: 'MONITOR' },
-    select: { status: true },
+    select: { status: true, activatedAt: true },
   });
 
   if (current === null) {
@@ -138,7 +140,15 @@ export async function updateMonitorStatusForAdmin(params: {
   const updated = await prisma.$transaction(async (tx) => {
     const user = await tx.user.update({
       where: { id: params.userId },
-      data: { status: transition.to as never },
+      data: {
+        status: transition.to as never,
+        // **参加開始日は最初に認めた1回だけ**（Q-034）。停止して再開しても
+        // 動かさない。動くと段階解放・90日検証・継続率の3つとも
+        // 数え方が変わる
+        ...(params.action === 'ACTIVATE' && current.activatedAt === null
+          ? { activatedAt: params.now ?? new Date() }
+          : {}),
+      },
       select: {
         id: true,
         role: true,

@@ -240,6 +240,88 @@ describe('使い始める', () => {
 });
 
 /**
+ * **習熟に合わせて開ける**（ROADMAP 5章、Q-034）。
+ *
+ * 起点は `users.activated_at`（ADMINが参加を認めた時刻）。
+ * **登録時刻ではない** — 承認待ちの期間まで日数に含めると、
+ * 使い始める前に2体目が開く。
+ */
+describe('段階解放', () => {
+  async function joinedDaysAgo(days: number): Promise<void> {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { activatedAt: new Date(NOW.getTime() - days * 86_400_000) },
+    });
+  }
+
+  async function activateMany(count: number): Promise<void> {
+    for (let index = 0; index < count; index += 1) {
+      const created = await createPersonaForUser(
+        userId,
+        input({ name: `分身${index}` }),
+      );
+      await activatePersonaForUser({
+        userId,
+        personaId: created.id,
+        now: NOW,
+      });
+    }
+  }
+
+  it.each([
+    { days: 10, allowed: 1 },
+    { days: 40, allowed: 2 },
+    { days: 70, allowed: 3 },
+  ])('参加から $days 日なら $allowed 体まで', async ({ days, allowed }) => {
+    await joinedDaysAgo(days);
+    await activateMany(allowed);
+
+    const extra = await createPersonaForUser(userId, input({ name: '超過' }));
+
+    await expect(
+      activatePersonaForUser({ userId, personaId: extra.id, now: NOW }),
+    ).rejects.toMatchObject({ code: PERSONA_ERROR_CODES.invalidPersona });
+
+    expect(await countActivePersonasForUser(userId)).toBe(allowed);
+  });
+
+  /** **断る理由に日数を出す。** 「上限です」だけでは、いつ開くのか分からない */
+  it('断る文言に経過日数を含める', async () => {
+    await joinedDaysAgo(10);
+    await activateMany(1);
+
+    const extra = await createPersonaForUser(userId, input({ name: '超過' }));
+
+    try {
+      await activatePersonaForUser({ userId, personaId: extra.id, now: NOW });
+      expect.unreachable();
+    } catch (error) {
+      expect((error as Error).message).toContain('10日');
+    }
+  });
+
+  /**
+   * **参加を認められる前は段階解放を効かせない。** ここで断ると
+   * 「作れるのに使い始められない」状態になり、原因が画面から読めない
+   */
+  it('参加前でも使い始められる（上限3件は効く）', async () => {
+    await activateMany(2);
+
+    expect(await countActivePersonasForUser(userId)).toBe(2);
+  });
+
+  /** **下書きは作れる。** 上限に当たっても作業が止まらない */
+  it('上限に当たっても下書きは作れる', async () => {
+    await joinedDaysAgo(10);
+    await activateMany(1);
+
+    const created = await createPersonaForUser(userId, input({ name: '次の' }));
+
+    expect(created.status).toBe('DRAFT');
+  });
+});
+
+/**
  * **`user_id` が unique でなくなったので、`id` だけで引けない。**
  * 旧 `user_personas` は条件に `userId` を入れるだけで越境の余地が無かった。
  */
