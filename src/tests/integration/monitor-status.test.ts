@@ -212,3 +212,78 @@ describe('ADMIN は対象にしない', () => {
     ).rejects.toMatchObject({ code: USER_ADMIN_ERROR_CODES.notFound });
   });
 });
+
+/**
+ * **参加開始日は最初に認めた1回だけ**（Q-034、ROADMAP 5章）。
+ *
+ * ここを起点に、分身の段階解放・90日検証の期間・8週間継続率の3つを数える。
+ * 停止して再開するたびに動くと、**3つとも数え方が変わる。**
+ */
+describe('参加開始日', () => {
+  const FIRST = new Date('2026-08-01T00:00:00.000Z');
+  const LATER = new Date('2026-09-01T00:00:00.000Z');
+
+  async function activatedAtOf(): Promise<Date | null | undefined> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { activatedAt: true },
+    });
+
+    return user?.activatedAt;
+  }
+
+  it('登録しただけでは入らない', async () => {
+    expect(await activatedAtOf()).toBeNull();
+  });
+
+  it('ADMINが認めた時刻が入る', async () => {
+    await updateMonitorStatusForAdmin({
+      userId,
+      action: 'ACTIVATE',
+      actorUserId: adminId,
+      now: FIRST,
+    });
+
+    expect(await activatedAtOf()).toEqual(FIRST);
+  });
+
+  it('二度目の承認では動かない', async () => {
+    await updateMonitorStatusForAdmin({
+      userId,
+      action: 'ACTIVATE',
+      actorUserId: adminId,
+      now: FIRST,
+    });
+    await updateMonitorStatusForAdmin({
+      userId,
+      action: 'ACTIVATE',
+      actorUserId: adminId,
+      now: LATER,
+    });
+
+    expect(await activatedAtOf()).toEqual(FIRST);
+  });
+
+  /** **停止して再開しても起点は最初のまま** */
+  it('停止・再開で動かない', async () => {
+    await updateMonitorStatusForAdmin({
+      userId,
+      action: 'ACTIVATE',
+      actorUserId: adminId,
+      now: FIRST,
+    });
+    await updateMonitorStatusForAdmin({
+      userId,
+      action: 'PAUSE',
+      actorUserId: adminId,
+    });
+    await updateMonitorStatusForAdmin({
+      userId,
+      action: 'RESUME',
+      actorUserId: adminId,
+      now: LATER,
+    });
+
+    expect(await activatedAtOf()).toEqual(FIRST);
+  });
+});
