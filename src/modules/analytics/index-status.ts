@@ -34,7 +34,7 @@ import {
   GoogleNotConfiguredError,
   type UrlInspectionClient,
 } from '@/lib/google';
-import { startOfJstDay, todayInJst } from '@/lib/datetime';
+import { jstDateColumn, todayInJst } from '@/lib/datetime';
 import { requireBlogForUser } from '@/modules/blogs';
 import { enqueueJob } from '@/modules/jobs';
 import { getRuntimeEnv } from '@/modules/settings';
@@ -102,7 +102,8 @@ export async function fetchIndexStatusForUser(
   }
 
   const now = params.now ?? new Date();
-  const metricDate = startOfJstDay(todayInJst(now));
+  // **`date` 型の列には暦日をそのまま渡す**（Q-031）
+  const metricDate = jstDateColumn(todayInJst(now));
   const limit = params.limit ?? URL_INSPECTION_PER_RUN;
 
   const posts = await prisma.wordpressPost.findMany({

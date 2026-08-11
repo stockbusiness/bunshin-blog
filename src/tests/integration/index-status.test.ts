@@ -32,14 +32,12 @@ let blogId: string;
 const NOW = new Date('2026-08-10T23:00:00.000Z');
 
 /**
- * `metric_date` に実際に入る値。
+ * `metric_date` に入る値。
  *
- * **JSTの暦日と1日ずれる。** `startOfJstDay('2026-08-11')` が返すのは
- * UTCの 2026-08-10T15:00Z で、`date` 型の列にはその日付部分が入る。
- * **G-5（手入力）も G-2（検索データ）も同じ関数を使っている**ため、
- * 同じ行に集まること自体は保たれている。ずれそのものは別途報告する。
+ * **JSTの暦日と一致する**（Q-031 を直したあと）。`jstDateColumn` が
+ * UTCの真夜中を返すため、`date` 型の列にそのまま暦日が入る。
  */
-const METRIC_DATE = new Date('2026-08-10T00:00:00.000Z');
+const METRIC_DATE = new Date('2026-08-11T00:00:00.000Z');
 
 const SITE = 'https://blog.example.com';
 

@@ -30,7 +30,8 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { AppError } from '@/lib/errors';
 import {
-  startOfJstDay,
+  addJstDays,
+  jstDateColumn,
   startOfJstWeek,
   todayInJst,
   type JstDate,
@@ -140,7 +141,8 @@ export async function saveWeeklyResultForUser(
   const blog = await requireBlogForUser(params);
   const normalized = normalizeWeeklyResult(input);
   const weekStart = params.weekStart ?? weekOf();
-  const metricDate = startOfJstDay(weekStart);
+  // **`date` 型の列には暦日をそのまま渡す**（Q-031）
+  const metricDate = jstDateColumn(weekStart);
 
   // **`upsert` を使えない。** Prisma は複合一意の `where` に `null` を
   // 受け付けない（DB側は `NULLS NOT DISTINCT` で一意。G-5-schema）。
@@ -249,16 +251,14 @@ export async function listWeeklyResultsForUser(
 
   for (let index = 0; index < weeks; index += 1) {
     starts.push(cursor);
-    cursor = startOfJstWeek(
-      todayInJst(new Date(startOfJstDay(cursor).getTime() - 24 * 60 * 60_000)),
-    );
+    cursor = startOfJstWeek(addJstDays(cursor, -1));
   }
 
   const rows = await prisma.metricDaily.findMany({
     where: {
       blogId: blog.id,
       contentItemId: null,
-      metricDate: { in: starts.map((start) => startOfJstDay(start)) },
+      metricDate: { in: starts.map((start) => jstDateColumn(start)) },
     },
     select: { metricDate: true, conversions: true, revenueYen: true },
   });
@@ -268,7 +268,7 @@ export async function listWeeklyResultsForUser(
   );
 
   return starts.map((start) => {
-    const found = byDate.get(startOfJstDay(start).toISOString().slice(0, 10));
+    const found = byDate.get(start);
 
     return {
       weekStart: start,

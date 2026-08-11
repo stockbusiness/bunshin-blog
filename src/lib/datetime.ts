@@ -111,6 +111,39 @@ export function startOfJstDay(date: JstDate): Date {
   return new Date(utcMidnight - JST_OFFSET_MS);
 }
 
+/**
+ * `date` 型の列へ入れる値を作る（OPEN_QUESTIONS Q-031）。
+ *
+ * **`startOfJstDay` を `date` 型の列へ渡してはならない。** あちらが返すのは
+ * 「JSTの暦日の00:00を表すUTCの瞬間」で、`2026-08-11` に対して
+ * `2026-08-10T15:00Z` になる。`date` 型の列はこの値の**UTCの日付部分**を
+ * 取るため、**1日前の日付が保存される。**
+ *
+ * ```
+ * startOfJstDay('2026-08-11')  → 2026-08-10T15:00Z → date 列には 2026-08-10
+ * jstDateColumn('2026-08-11')  → 2026-08-11T00:00Z → date 列には 2026-08-11
+ * ```
+ *
+ * `date` 型の列は時刻を持たない。**暦日そのものを渡す**のが正しく、
+ * タイムゾーンの変換をしてはいけない。
+ *
+ * 使い分け：
+ *
+ * | 用途 | 使う関数 |
+ * |---|---|
+ * | `date` 型の列（`metrics_daily.metric_date`） | **`jstDateColumn`** |
+ * | `timestamptz` の範囲検索 | `startOfJstDay` / `jstDayRange` |
+ */
+export function jstDateColumn(date: JstDate): Date {
+  assertJstDate(date);
+
+  const matched = DATE_PATTERN.exec(date) as RegExpExecArray;
+
+  return new Date(
+    Date.UTC(Number(matched[1]), Number(matched[2]) - 1, Number(matched[3])),
+  );
+}
+
 /** JSTの1日の区間を返す。日次集計の抽出条件に使う */
 export function jstDayRange(date: JstDate): InstantRange {
   const start = startOfJstDay(date);

@@ -197,6 +197,31 @@ describe('日次で表示回数・クリック・順位を保存する（完了�
     expect(rows[1]?.averagePosition?.toString()).toBe('7.5');
   });
 
+  /**
+   * **Search Console が返した日付がそのまま入ること**（Q-005 の決定、Q-031）。
+   * `date` 型の列に何が入っているかをPostgreSQLで直接確かめる
+   */
+  it('返ってきた日付がそのまま metric_date に入る', async () => {
+    await connect();
+
+    await fetchSearchMetricsForUser(
+      { userId, blogId, now: NOW },
+      {
+        client: client({
+          date: [
+            dateRow('2026-08-09', { clicks: 1, impressions: 1, position: 1 }),
+          ],
+        }),
+      },
+    );
+
+    const rows = await prisma.$queryRawUnsafe<{ metric_date: string }[]>(
+      'select metric_date::text as metric_date from metrics_daily',
+    );
+
+    expect(rows[0]?.metric_date).toBe('2026-08-09');
+  });
+
   it('記事ごとの行が入る', async () => {
     await connect();
     const itemId = await createPostedItem(`${SITE}/hello/`);
