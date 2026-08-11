@@ -46,7 +46,50 @@
 }
 ```
 
+### `personas.identity` / `expertise` / `audience` / `business`
+
+TASKS A-2-R-1。**1ユーザーが複数の分身を持つ**（ROADMAP 2章）。
+
+```ts
+identity  = { name: string; firstPerson: string; background: string;
+              tone: { style: string; emojiLevel: "none"|"low"|"mid";
+                      lineBreak: "short"|"normal"; politeness: string };
+              values: { priorities: string[]; avoid: string[] };
+              ngExpressions: string[] }
+expertise = { fields: string[]; sources: string[]; evaluationCriteria: string[] }
+audience  = { ageRange: string; situation: string;
+              knowledgeLevel: "beginner"|"intermediate"|"advanced";
+              problems: string[]; searchIntents: string[] }
+business  = { revenuePolicy: string; monthlyGoalYen: number;
+              kpis: string[]; exitCriteria: string }
+```
+
+**旧 `user_personas` の `base_profile` / `tone` / `values` / `ng_expressions` は `identity` に統合する。** 分けて持つと、分身を1つ作るのに4つのjsonbを埋めることになり、どれがどこに効くのか読めない。
+
+#### 6つの頭脳のうち作らないもの
+
+**記憶（Memory）と成長（Growth）の専用テーブルを作らない。** 記憶は `persona_facts` と記事履歴、成長は `metrics_daily` で代替する。**同じことを2か所に持つと、どちらが正か分からなくなる。**
+
+#### アプリ層の制約
+
+- **1ユーザーが持てる `ACTIVE` な分身は最大3件**
+- **段階解放は参加開始日を起点にする**（ROADMAP 5章）。1〜30日は1件、31〜60日は2件、61〜90日は3件。判定は `personas.activated_at` とJSTの日付境界で行う（本文書10章）
+- Phase 0 では**1分身につきブログ1件**とする。SNS・動画は別媒体として将来追加する
+- 上限判定は `src/lib/entitlements.ts` の `can()` を経由する（例：`can(userId, "persona.create")`）
+
+#### `blogs.persona_id` を段階的に必須へ
+
+**A-2-R-1 では nullable。** 既存のブログには分身がまだ無く、いきなり必須にすると作成の全経路とテストが落ちる（OPEN_QUESTIONS Q-033）。A-2-R-3 で `NOT NULL` にする。
+
+`onDelete` は `Restrict`。**分身を消してもブログを道連れにしない。**
+
+#### `user_personas` との並存
+
+**A-2-R-3 まで両方が存在する。** 恒久的な二重管理ではなく、移行のあいだだけの状態である。新しく書くコードは `personas` を参照する。
+
 ### `user_personas.base_profile` / `tone` / `values`
+
+**A-2-R-3 で削除する。** 以下は移行が済むまでの記録。
 
 ```ts
 base_profile = { ageRange: string; position: string; firstPerson: string; background: string }
