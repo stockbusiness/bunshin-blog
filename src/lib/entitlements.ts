@@ -21,6 +21,9 @@
  */
 export const CAPABILITIES = [
   'blog.create',
+  // 分身を作れるか（A-2-R-2）。**同時に使える数の上限は
+  // `personas` モジュールが持つ** — ここは課金の入口で、業務の上限ではない
+  'persona.create',
   'article.generate',
   'video.generate',
 ] as const;

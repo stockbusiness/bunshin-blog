@@ -89,6 +89,7 @@ export default defineConfig({
         // | analytics/search-metrics.ts | fetchWindow / normalizePageUrl は同ファイルの純粋関数 | search-metrics.test.ts |
         // | analytics/index-status.ts | 判定は lib/google/url-inspection.ts の toIndexVerdict | index-status.test.ts |
         // | analytics/daily-aggregate.ts | 数えるだけで判断を持たない | daily-aggregate.test.ts |
+        // | personas/persona-repository.ts | 検証と上限は persona.ts | personas-crud.test.ts |
         // | affiliate/link-check.ts | judgeLinkHealth は同ファイルの純粋関数 | emergency-alerts.test.ts |
         // | approvals/detail.ts | — | proposals.test.ts |
         // | approvals/decide.ts | — | approval-decisions.test.ts |
@@ -122,6 +123,7 @@ export default defineConfig({
         'src/modules/analytics/search-metrics.ts',
         'src/modules/analytics/index-status.ts',
         'src/modules/analytics/daily-aggregate.ts',
+        'src/modules/personas/persona-repository.ts',
         'src/modules/affiliate/link-check.ts',
         'src/modules/approvals/detail.ts',
         'src/modules/approvals/decide.ts',
