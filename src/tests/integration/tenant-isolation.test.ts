@@ -1136,6 +1136,10 @@ describe('入口の網羅', () => {
       'findMaxDailyProposalsForUser',
       // H-2a。通知の設定が済んでいるかをオンボーディングの判定が見る
       'findNotificationScheduleForUser',
+      // H-2b。同意の記録・通知の設定・進み具合の書き戻し
+      'acceptConsentForUser',
+      'saveNotificationScheduleForUser',
+      'syncOnboardingStatusForUser',
     ],
     'content-generation': [
       'factCheckArticleForUser',

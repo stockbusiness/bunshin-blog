@@ -6,6 +6,7 @@ import { countActivePersonasForUser } from '@/modules/personas';
 import {
   findNotificationScheduleForUser,
   resolveOnboardingProgress,
+  syncOnboardingStatusForUser,
   type OnboardingFacts,
 } from '@/modules/users';
 import { findWordpressConnectionForUser } from '@/modules/wordpress';
@@ -81,7 +82,18 @@ export async function GET(request: Request): Promise<Response> {
       ),
     };
 
-    return Response.json({ progress: resolveOnboardingProgress(facts) });
+    const progress = resolveOnboardingProgress(facts);
+
+    // **導いた値を書き戻す**（管理画面の一覧が読む・B-7）。
+    // 正はここで導いた結果で、列はその写し。
+    // **行が無ければ何もしない** — 段9まで来ていない人に空の行を作ると、
+    // 通知の設定が「未設定」なのか「行だけある」のか区別できなくなる
+    await syncOnboardingStatusForUser({
+      userId: user.id,
+      status: progress.status,
+    });
+
+    return Response.json({ progress });
   } catch (error) {
     return toErrorHttpResponse(error);
   }
