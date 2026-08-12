@@ -184,6 +184,7 @@ B-1 が実装したのは**サーバー側のIDトークン検証**であり、�
 | C-7 | 外向きHTTPの共通クライアント（SSRF対策） | A-4 | private・loopback・link-local へ到達しない。リダイレクト先を再検証する。タイムアウト・最大サイズ・Content-Type を強制する（SPEC 14.3） | `src/lib/http/` |
 | C-9-schema | ブログごとの公開スケジュールの列 | B-4 | `blogs` に公開曜日・時刻・ゆらぎ・パーマリンク様式・初期記事数が入る。**週の上限は足さない**（既存の `article_ratio.weeklyPublishCap`・Q-036）。migrate が成功 | `prisma/` |
 | C-9-schema-2 | 公開時刻を必須にする | C-9 | `blogs.publish_time` が **NOT NULL** になる。migrate が成功 | `prisma/` |
+| C-9-schema-3 | 公開曜日を空にできなくする | C-9-schema-2 | `blogs.publish_weekdays` が**空のまま保存できない**（CHECK）。マイグレーションのみ。**時刻だけあって曜日が空だと、結局いつも公開されない**（`publish_time` の NOT NULL だけでは塞がらない） | `prisma/` |
 | C-9 | ブログごとの公開スケジュールとURL様式 | C-9-schema | `blogs` に公開曜日・時刻・ゆらぎ・週上限・パーマリンク様式・初期記事数を持ち、**登録時に既存ブログと重複しにくいよう分散して割り当てる**。**全ブログの投稿ジョブが同一時刻に集中しない**。パーマリンクは初回設定後に変更しない（作業指示書 W-8） | `prisma/` `src/modules/blogs/` |
 
 ### WordPress接続先は後から変えられない（Q-007）

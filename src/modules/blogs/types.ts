@@ -56,8 +56,8 @@ export interface AppBlog {
    * （同一運営者による大量サイトの痕跡を残さない・W-8）。
    */
   publishWeekdays: number[];
-  /** `HH:MM`（JSTの壁掛け時計）。C-9 より前に作られたブログは `null` */
-  publishTime: string | null;
+  /** `HH:MM`（JSTの壁掛け時計）。**必ずある**（C-9-schema-2） */
+  publishTime: string;
   publishJitterMin: number;
   /** **初回設定後に変更しない**（変えるとURLが全部変わる） */
   permalinkPattern: PermalinkPattern;

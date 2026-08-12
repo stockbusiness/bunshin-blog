@@ -86,6 +86,10 @@ export async function createBlog(
       targetReader: 'テスト読者',
       articleRatio: { revenue: 7, traffic: 23, weeklyPublishCap: 4 },
       slotNumber: overrides.slotNumber ?? 1,
+      // **必須**（C-9-schema-2）。ここは `createBlogForUser` を通さないので
+      // 割り当て（`assignPublishSchedule`）も通らない。**固定値でよい** —
+      // 散らし方を確かめるのは `publish-schedule.test.ts`
+      publishTime: new Date(Date.UTC(1970, 0, 1, 9, 0, 0, 0)),
     },
   });
 
