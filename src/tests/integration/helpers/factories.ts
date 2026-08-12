@@ -90,6 +90,8 @@ export async function createBlog(
       // 割り当て（`assignPublishSchedule`）も通らない。**固定値でよい** —
       // 散らし方を確かめるのは `publish-schedule.test.ts`
       publishTime: new Date(Date.UTC(1970, 0, 1, 9, 0, 0, 0)),
+      // **空にできない**（C-9-schema-3）。空だと一度も公開されない
+      publishWeekdays: [1, 4],
     },
   });
 

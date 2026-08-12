@@ -402,8 +402,9 @@ model Blog {
   linkEventTokenIssuedAt DateTime?        @map("link_event_token_issued_at") @db.Timestamptz(6)
   /// 公開する曜日（0=日〜6=土）。**ブログごとに散らす**（C-9）。
   ///
-  /// **空は「まだ割り当てていない」。** 割り当てる処理は C-9（コード）で、
-  /// それまでは既存行も新規行も空になりうる
+  /// **空にできない**（`blogs_publish_weekdays_not_empty`・C-9-schema-3）。
+  /// 空の配列はどの曜日にも当たらないので、**時刻があっても一度も
+  /// 公開されない。** ブログは `ACTIVE` のまま記事だけが溜まる
   publishWeekdays        Int[]            @map("publish_weekdays")
   /// 公開時刻（JSTの壁掛け時計）。`time` 型にUTCへ直さずそのまま入れる。
   ///
