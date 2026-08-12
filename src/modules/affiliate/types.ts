@@ -52,6 +52,13 @@ export interface AppAffiliateOffer {
   rewardYen: number | null;
   conversionType: ConversionType;
   facts: unknown;
+  /**
+   * `facts` を**確かめ直した**時刻（D-13・Q-022）。
+   * **`null` は「一度も確かめていない」**（`updatedAt` とは別物）。
+   *
+   * 90日より古ければ、照合が一致しても `WARNING`（CONTENT_PLANNING 8.2）
+   */
+  factsUpdatedAt: Date | null;
   userExperience: UserExperience;
   userRating: number | null;
   denyConditions: string[];

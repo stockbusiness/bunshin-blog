@@ -234,30 +234,34 @@ export function verifyClaims(input: VerifyClaimsInput): UnverifiedClaim[] {
  * > `offer.facts.updatedAt` が90日より古い場合は、照合が一致しても
  * > `WARNING` とする
  *
- * **`updatedAt` が無ければ古い扱いにする。** 「いつ確かめたか分からない」を
- * 「新しい」に倒すと、**測っていないことが「問題なし」に化ける**。
- * 現状これを書き込む経路が無いため、実質すべての案件が該当する（Q-022）。
+ * ## 読むのは jsonb ではなく列
+ *
+ * 仕様の記述は `offer.facts.updatedAt` だが、**jsonb の中に書く規約は
+ * 書き忘れを防げない**（制約を置けない）。`affiliate_offers.facts_updated_at`
+ * を見る（D-13-schema・Q-022）。**同じ事実を2か所に持たない。**
+ *
+ * ## 無ければ古い扱い
+ *
+ * **「いつ確かめたか分からない」を「新しい」に倒さない。**
+ * 倒すと**測っていないことが「問題なし」に化ける。**
+ * 書くのは `facts` を渡した経路だけ（D-13）なので、**一度も確かめて
+ * いない案件は `null` のまま**で、ここに引っかかり続ける。
  */
-export function areFactsStale(params: { facts: unknown; now: Date }): boolean {
-  const updatedAt =
-    typeof params.facts === 'object' &&
-    params.facts !== null &&
-    !Array.isArray(params.facts)
-      ? (params.facts as Record<string, unknown>)['updatedAt']
-      : undefined;
-
-  if (typeof updatedAt !== 'string') {
+export function areFactsStale(params: {
+  factsUpdatedAt: Date | null;
+  now: Date;
+}): boolean {
+  if (params.factsUpdatedAt === null) {
     return true;
   }
 
-  const parsed = new Date(updatedAt);
+  const checkedAt = params.factsUpdatedAt.getTime();
 
-  if (Number.isNaN(parsed.getTime())) {
+  if (Number.isNaN(checkedAt)) {
     return true;
   }
 
-  const ageDays =
-    (params.now.getTime() - parsed.getTime()) / (24 * 60 * 60 * 1_000);
+  const ageDays = (params.now.getTime() - checkedAt) / (24 * 60 * 60 * 1_000);
 
   return ageDays > FACTS_STALE_DAYS;
 }

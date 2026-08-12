@@ -129,7 +129,10 @@ export async function factCheckArticleForUser(
     unverified,
     factsAreStale:
       offer !== null &&
-      areFactsStale({ facts: offer.facts, now: deps.now ?? new Date() }),
+      areFactsStale({
+        factsUpdatedAt: offer.factsUpdatedAt,
+        now: deps.now ?? new Date(),
+      }),
   });
 
   const version = await saveFactCheckResult({
