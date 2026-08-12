@@ -349,6 +349,7 @@ B-1 が実装したのは**サーバー側のIDトークン検証**であり、�
 | I-7 | デプロイ手順書 | — | Vercel の設定・環境変数・cron・DB・`ENCRYPTION_KEY` の作り方が文書化されている | `docs/` |
 | I-8 | WordPress接続の認可フロー | C-2 | モニターが**アプリケーションパスワードを手で発行せず**にブログをつなげる（SPEC 7.1・v2.3）。**手で貼る経路も残る** | `src/app/api/blogs/[id]/wordpress/` `src/modules/wordpress/` |
 | I-9 | スニペットが設定を取りに来る | D-12, I-8 | `bunshin-go.php` の導入が**ファイルを1つ置くだけ**になる。トークンの貼り付けとパーマリンクの保存し直しが要らない | `docs/WORDPRESS_SNIPPET.md` `src/app/api/link-events/` |
+| I-10 | 初期構成表を積む経路 | E-9, H-2a | オンボーディングが終わったブログの `PLAN_GENERATION` が積まれる。**整っていないブログは飛ばす** | `src/app/api/onboarding/` |
 
 **I-1 と I-3 を先に行う。** 前者が無いと本番に出しても何も動かず、後者が無いとモニターが最初の設定を終えられない。
 

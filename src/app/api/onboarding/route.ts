@@ -1,4 +1,5 @@
 import { toErrorHttpResponse } from '@/lib/errors';
+import { logger } from '@/lib/logger';
 import { listOffersForUser } from '@/modules/affiliate';
 import { requireUser } from '@/modules/auth';
 import { listBlogsForUser } from '@/modules/blogs';
@@ -10,6 +11,7 @@ import {
   type OnboardingFacts,
 } from '@/modules/users';
 import { findWordpressConnectionForUser } from '@/modules/wordpress';
+import { enqueueInitialPlansForUser } from './initial-plan';
 
 /**
  * `GET /api/onboarding` オンボーディングの現在地（TASKS H-2a、SPEC 6.1）。
@@ -92,6 +94,28 @@ export async function GET(request: Request): Promise<Response> {
       userId: user.id,
       status: progress.status,
     });
+
+    // **終わったら構成表を積む**（I-10、Q-039 の (a)）。`genreName` と
+    // `adoptedOfferIds` が揃っているのはここだけで、日次の積み込み（I-1）が
+    // 推測で埋めてよい値ではない。
+    //
+    // **GET で積むことになる。** この画面は現在地を毎回データから導く形
+    // なので、「終わった瞬間」を知れるのはここしかない（`syncOnboarding
+    // StatusForUser` が既に同じ理由で書いている）。**冪等キーがブログごとに
+    // 1件なので、何度通っても増えない。**
+    //
+    // **積めなくても現在地は返す。** 現在地が見えないほうが困る
+    if (progress.completed) {
+      try {
+        const plans = await enqueueInitialPlansForUser(user.id);
+
+        if (plans.queued > 0) {
+          logger.info('初期構成表を積んだ', { ...plans });
+        }
+      } catch (error) {
+        logger.error('初期構成表を積めなかった', { cause: error });
+      }
+    }
 
     return Response.json({ progress });
   } catch (error) {
