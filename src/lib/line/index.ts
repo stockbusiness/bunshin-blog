@@ -1,5 +1,5 @@
 /**
- * LINE メッセージ送信（TASKS F-2、SPEC 8）。
+ * LINE メッセージ送信（TASKS F-2、SPEC 8）と Webhook の署名検証（D-7b）。
  *
  * `src/lib/mailer/` と同じ形。**呼び出し側は `LineClient` だけを見る。**
  */
@@ -23,3 +23,5 @@ export {
   type LineConfig,
   type CreateLineClientOptions,
 } from './messaging';
+
+export { verifyLineSignature, readLineChannelSecret } from './signature';

@@ -1,8 +1,8 @@
 /**
  * line モジュールの公開インターフェース（MODULE_RULES 2）。
  *
- * LINE への通知を行うのはこのモジュールだけ。本タスク（F-2）で
- * 実装したのは提案の送信のみ。件数制御は F-3、返信の受け口は D-7。
+ * LINE への通知を行うのはこのモジュールだけ。送信は F-2、件数制御は F-3、
+ * 返信の分類は D-7a、返信の取り込みは D-7b。
  *
  * **`approvals` の行は `approvals` モジュールを通して触る**（MODULE_RULES 1）。
  */
@@ -45,6 +45,20 @@ export {
   type BlogAlert,
   type CollectAlertsDeps,
 } from './alerts';
+
+export {
+  parseLineWebhook,
+  REPLY_TEXT_MAX_LENGTH,
+  type LineTextReply,
+  type ParsedWebhook,
+} from './webhook-payload';
+
+export {
+  recordLineReplyForUser,
+  type ReplyOutcome,
+  type ReplyIntakeResult,
+  type ReplyIntakeDeps,
+} from './reply-intake';
 
 export {
   REPLY_KINDS,

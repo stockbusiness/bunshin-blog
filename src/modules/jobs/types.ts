@@ -31,6 +31,10 @@ export const JOB_TYPES = [
   'GA4_FETCH',
   'PROPOSAL_SELECTION',
   'LINE_NOTIFY',
+  // **LINE返信の取り込みはジョブに載せる**（D-7b、MODULE_RULES 3）。
+  // Webhook のハンドラで直接処理すると、保存に時間がかかったときに
+  // LINE 側が時間切れと見なして**同じ電文を再送**する
+  'LINE_REPLY',
   'LINK_CHECK',
 ] as const;
 

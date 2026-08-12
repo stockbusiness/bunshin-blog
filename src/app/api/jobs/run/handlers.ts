@@ -15,6 +15,7 @@ import {
 } from '@/modules/analytics';
 import {
   enqueueAlertsForUser,
+  recordLineReplyForUser,
   sendEmergencyNotificationForUser,
   type EmergencyKind,
 } from '@/modules/line';
@@ -46,6 +47,7 @@ import type {
  * | `URL_INSPECTION` | **G-3（登録済み）** |
  * | `METRICS_AGGREGATE` | **G-6（登録済み）** |
  * | `LINE_NOTIFY` | **H-3（登録済み）** |
+ * | `LINE_REPLY` | **D-7b（登録済み）** |
  */
 
 /**
@@ -210,6 +212,38 @@ export interface JobHandlerDeps {
 }
 
 /**
+ * LINE返信の入力を読む。
+ *
+ * **`user_id` はジョブの列から取り、入力からは取らない。** 入力を信じると、
+ * 他人の分身に記憶を書き込める（`readPlanInput` と同じ判断）。
+ */
+function readReplyInput(job: AppJob): {
+  userId: string;
+  text: string;
+  eventId: string;
+} {
+  if (job.userId === null) {
+    throw new AppError(
+      'BAD_REQUEST',
+      400,
+      'LINE_REPLY には user_id が要ります',
+    );
+  }
+
+  const input =
+    typeof job.input === 'object' && job.input !== null ? job.input : {};
+  const record = input as Record<string, unknown>;
+  const text = record['text'];
+  const eventId = record['eventId'];
+
+  if (typeof text !== 'string' || typeof eventId !== 'string') {
+    throw new AppError('BAD_REQUEST', 400, 'text と eventId が要ります');
+  }
+
+  return { userId: job.userId, text, eventId };
+}
+
+/**
  * ハンドラを組み立てる。
  *
  * **登録の一覧そのものは1箇所**（`JOB_HANDLERS`）。差し替えるのは
@@ -330,6 +364,32 @@ export function createJobHandlers(
       });
 
       return { kind: input.kind };
+    },
+
+    /**
+     * LINE返信を取り込む（D-7b、SPEC 8.4）。
+     *
+     * **Webhook のハンドラで直接処理しない。** 保存に時間がかかると
+     * LINE 側が時間切れと見なして**同じ電文を再送**する。
+     *
+     * **返信の本文は `job.input` に入っている。** 分類も保存も
+     * `line` モジュールが行い、ここは形を確かめて渡すだけ。
+     */
+    LINE_REPLY: async (job) => {
+      const input = readReplyInput(job);
+
+      const result = await recordLineReplyForUser({
+        userId: input.userId,
+        text: input.text,
+        eventId: input.eventId,
+      });
+
+      // **返信の本文は残さない**（`output_json` は管理画面に出る。SPEC 14.2）
+      return {
+        kind: result.kind,
+        outcome: result.outcome,
+        guided: result.guided,
+      };
     },
 
     /**
