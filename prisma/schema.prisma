@@ -1000,6 +1000,15 @@ model AffiliateLink {
 /// 両方 NULL の行は何のクリックか分からず、両方入った行は二重に数えられる。
 model LinkClick {
   id              String   @id @default(uuid()) @db.Uuid
+  /// 送信元（WordPressのスニペット）が付ける識別子（D-12）。
+  ///
+  /// **再送で二重に数えないための鍵。** 送信に失敗したらWordPress側で保持し
+  /// 次回まとめて送る（Q-001 再決定）ため、**応答だけが失われた場合に
+  /// 同じクリックが2回届く。**
+  ///
+  /// `@unique` にして、2回目を落とす。D-8 の経路（Bunshin 側の
+  /// リダイレクタ）で入った行は持たないので nullable
+  eventId         String?  @unique @map("event_id")
   affiliateLinkId String?  @map("affiliate_link_id") @db.Uuid
   bannerId        String?  @map("banner_id") @db.Uuid
   referrerHost    String?  @map("referrer_host")
