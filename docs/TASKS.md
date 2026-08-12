@@ -223,7 +223,8 @@ B-1 が実装したのは**サーバー側のIDトークン検証**であり、�
 | D-6 | `persona_facts` | D-4 | `AI_INFERENCE` かつ `UNVERIFIED` が一人称利用不可のフラグを持つ | `src/modules/personas/` |
 | D-7 | LINE返信からのfacts保存 | D-6 | 返信が `persona_facts` または `revision_requests` に保存される。**着手前に Q-015 の決定が要る**（`revision_requests` 側は `approvals` が無いと書けない） | `src/modules/line/` |
 | D-8 | アフィリエイトリダイレクタとクリック計測 | D-1 | リンク方式に従って組み立てられ、**`REDIRECT` の案件でクリックが記録される**。`DIRECT` の案件は直リンクのまま（OPEN_QUESTIONS Q-001） | `src/app/go/` `src/modules/analytics/` |
-| D-12 | リダイレクタを各ブログのドメインへ移す | D-8 | 各WordPressのスニペットが `/go/{code}` を処理し、Bunshin の受信APIへ送る。**受信APIはブログ単位のトークンで認証し、他ブログのイベントを投入できない**。IPアドレスを保存せずUser-Agentはハッシュ化する。**バナーも同じ経路を通り、`metrics_daily.banner_clicks` が記録される**（Q-032）。**WordPress側スニペットの導入手順が `docs/` に文書化されている**（Q-001 の再決定・2026-08-11） | `src/app/api/link-events/` `src/modules/analytics/` `src/modules/banners/` `docs/` |
+| D-12-schema | クリック受信APIのための列 | D-8 | `blogs.link_event_token_hash` と `banners.code` が入り、`link_clicks` がバナーのクリックも受けられる（**どちらか片方だけ**をDBが強制する）。migrate が成功 | `prisma/` |
+| D-12 | リダイレクタを各ブログのドメインへ移す | D-12-schema | 各WordPressのスニペットが `/go/{code}` を処理し、Bunshin の受信APIへ送る。**受信APIはブログ単位のトークンで認証し、他ブログのイベントを投入できない**。IPアドレスを保存せずUser-Agentはハッシュ化する。**バナーも同じ経路を通り、`metrics_daily.banner_clicks` が記録される**（Q-032）。**WordPress側スニペットの導入手順が `docs/` に文書化されている**（Q-001 の再決定・2026-08-11） | `src/app/api/link-events/` `src/modules/analytics/` `src/modules/banners/` `docs/` |
 | D-13-schema | `affiliate_offers.facts_updated_at` | D-1 | マイグレーションのみ。**行の `updated_at` とは別に、事実を確かめ直した時刻だけを持つ**（Q-022） | `prisma/` |
 | D-13 | 案件の事実の更新経路 | D-13-schema | `facts` を更新した経路だけが `facts_updated_at` を書く。E-12 の90日判定が実際に効く（**いま全収益記事が `WARNING`**） | `src/modules/affiliate/` |
 | D-9 | 案件のリンク方式のテーブル追加 | A-8 | `migrate deploy` が成功し、スキーマとの乖離が無い。既定が `DIRECT` になる | `prisma/`, `docs/DATA_MODEL.md` |
