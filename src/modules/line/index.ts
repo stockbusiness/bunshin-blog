@@ -45,3 +45,10 @@ export {
   type BlogAlert,
   type CollectAlertsDeps,
 } from './alerts';
+
+export {
+  NOTIFICATION_WINDOW_MINUTES,
+  UNSENT_PROPOSAL_TTL_DAYS,
+  isWithinNotificationWindow,
+  type NotificationSchedule,
+} from './schedule';

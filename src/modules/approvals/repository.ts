@@ -172,6 +172,36 @@ export interface UnsentApproval {
  * **`sent_at` が空のものだけ。** SPEC 8.3 の「同一提案を連続通知しない」は
  * ここと `claimApprovalForSending` の2段で守る。
  */
+/**
+ * 送れないまま古くなった提案を期限切れにする（TASKS F-3b、Q-025）。
+ *
+ * **溜め続けない。** 曜日を絞った人ほど未送信が積み上がり、
+ * **通知が届いた瞬間に何件も溜まっている**状態になる。1日に送れるのは
+ * 1〜2件（SPEC 8.3）なので、古いものは結局いつまでも送られない。
+ *
+ * **消さずに `EXPIRED` にする。** 提案が出たこと自体は実験の記録で、
+ * 「出したが送れなかった」と「そもそも出なかった」は別の事実。
+ *
+ * **送信済みのものは触らない**（`sent_at IS NULL` に限る）。届いた提案は
+ * 承認一覧（F-4）で答えを待っている。
+ */
+export async function expireStaleUnsentApprovalsForUser(params: {
+  userId: string;
+  before: Date;
+}): Promise<number> {
+  const result = await prisma.approval.updateMany({
+    where: {
+      userId: params.userId,
+      status: 'PENDING',
+      sentAt: null,
+      createdAt: { lt: params.before },
+    },
+    data: { status: 'EXPIRED' },
+  });
+
+  return result.count;
+}
+
 export async function listUnsentApprovalsForUser(
   userId: string,
 ): Promise<UnsentApproval[]> {
