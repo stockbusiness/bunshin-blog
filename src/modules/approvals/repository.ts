@@ -6,6 +6,7 @@
 
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
+import { ACTIVITY_WINDOW_DAYS } from './activity';
 
 export interface AppApproval {
   id: string;
@@ -403,4 +404,56 @@ export async function findApprovalForUser(params: {
     slotNumber: blog.slotNumber,
     offerId: contentItem.affiliateOfferId,
   };
+}
+
+/**
+ * モニターごとの反応の具合を数える（TASKS J-5）。
+ *
+ * **`...ForAdmin`。** 利用者を横断して読む（MODULE_RULES 5）。
+ *
+ * **数えるのは「送った提案」だけ。** 作ったが送れていないものを
+ * 分母に入れると、**通知が止まっているだけの人が「反応が悪い」に見える。**
+ *
+ * **`EXPIRED` は送れなかったもの**（F-3b の期限切れ）なので、
+ * `sent_at` が入っていない限り分母に入らない。
+ */
+export async function countApprovalActivityForAdmin(
+  params: { windowDays?: number | undefined; now?: Date | undefined } = {},
+): Promise<Map<string, { sent: number; responded: number }>> {
+  // **期間の起点はここで作る。** 画面（Server Component）で現在時刻を
+  // 読むと、描画中の副作用として弾かれる（`react-hooks/purity`）
+  const now = params.now ?? new Date();
+  const since = new Date(
+    now.getTime() - (params.windowDays ?? ACTIVITY_WINDOW_DAYS) * 86_400_000,
+  );
+
+  const rows = await prisma.approval.groupBy({
+    by: ['userId', 'status'],
+    where: { sentAt: { gte: since } },
+    _count: { _all: true },
+  });
+
+  const counts = new Map<string, { sent: number; responded: number }>();
+
+  for (const row of rows) {
+    const current = counts.get(row.userId) ?? { sent: 0, responded: 0 };
+    const amount = row._count._all;
+
+    current.sent += amount;
+
+    // **判断されたもの。** `PENDING` と `VIEWED` は「まだ押していない」、
+    // `EXPIRED` は「押されないまま期限が来た」なので数えない。
+    // **見ただけを反応に数えない** — 開いて閉じたのは判断ではない
+    if (
+      row.status === 'APPROVED' ||
+      row.status === 'SKIPPED' ||
+      row.status === 'REVISION_REQUESTED'
+    ) {
+      current.responded += amount;
+    }
+
+    counts.set(row.userId, current);
+  }
+
+  return counts;
 }

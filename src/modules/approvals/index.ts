@@ -65,3 +65,16 @@ export {
   type DecideInput,
   type RevisionInput,
 } from './decide';
+
+export { countApprovalActivityForAdmin } from './repository';
+
+export {
+  judgeApprovalActivity,
+  ACTIVITY_WINDOW_DAYS,
+  ACTIVITY_LABELS,
+  MIN_SENT_FOR_JUDGEMENT,
+  LOW_RESPONSE_RATE,
+  type ActivityVerdict,
+  type ActivityCounts,
+  type ActivityJudgement,
+} from './activity';
