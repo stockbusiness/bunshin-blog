@@ -37,6 +37,7 @@ let server: Server;
 let baseUrl: string;
 let userId: string;
 let blogId: string;
+let personaId: string;
 let planId: string;
 let revenueItemId: string;
 let trafficItemId: string;
@@ -141,6 +142,7 @@ beforeEach(async () => {
   userId = user.id;
   const blog = await createBlog(prisma, user.id);
   blogId = blog.id;
+  personaId = blog.personaId;
 
   // **人格が無いと生成できない**（SPEC 5。D-4）。実際の運用でも
   // オンボーディングで必ず登録される。
@@ -753,6 +755,8 @@ describe('事実チェック（E-12）', () => {
     await prisma.personaFact.create({
       data: {
         userId,
+        // **記憶は分身に溜まる**（A-2-R-4）。ブログを書く分身に紐づける
+        personaId,
         factType: 'EXPERIENCE',
         content: '格安SIMへ乗り換えました',
         source: 'AI_INFERENCE',
@@ -783,6 +787,8 @@ describe('事実チェック（E-12）', () => {
     await prisma.personaFact.create({
       data: {
         userId,
+        // **記憶は分身に溜まる**（A-2-R-4）。ブログを書く分身に紐づける
+        personaId,
         factType: 'EXPERIENCE',
         content: '格安SIMへ乗り換えました',
         source: 'USER_INPUT',

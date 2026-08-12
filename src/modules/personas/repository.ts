@@ -210,16 +210,17 @@ export async function resolveEffectivePersonaForUser(params: {
 }
 
 /**
- * `persona_facts` テーブルへのアクセス（TASKS D-6、SPEC 5.7）。
+ * `persona_facts` テーブルへのアクセス（TASKS D-6・A-2-R-4、SPEC 5.7）。
  *
- * **`user_id` で絞る。** 事実は人に紐づく（ブログではない）。ブログ固有の
- * 事実は `blog_id` を持つが、所有者は常に `user_id`。
+ * **記憶は分身に溜まる。** 所有は `persona` を辿って確かめる
+ * （`persona_facts.user_id` と `blog_id` は A-2-R-4-schema で落とす）。
+ * **`persona.userId` を必ず条件に入れる** — 他人の分身の記憶を引かせない
+ * （SPEC 14.1）。
  */
 
 interface FactRow {
   id: string;
-  userId: string;
-  blogId: string | null;
+  personaId: string | null;
   factType: string;
   content: string;
   source: string;
@@ -231,8 +232,7 @@ interface FactRow {
 
 const FACT_SELECT = {
   id: true,
-  userId: true,
-  blogId: true,
+  personaId: true,
   factType: true,
   content: true,
   source: true,
@@ -245,8 +245,10 @@ const FACT_SELECT = {
 function toAppFact(row: FactRow): AppPersonaFact {
   return {
     id: row.id,
-    userId: row.userId,
-    blogId: row.blogId,
+    // **列はまだ nullable**（NOT NULL 化は A-2-R-4-schema）。作成時に必ず
+    // 入れるので、ここでは型の主張だけに留めて例外は投げない —
+    // 読み出しで落ちると、直す画面にも入れなくなる（`toAppBlogSetting` と同じ方針）
+    personaId: row.personaId as string,
     factType: row.factType as FactType,
     content: row.content,
     source: row.source as FactSource,
@@ -260,8 +262,16 @@ function toAppFact(row: FactRow): AppPersonaFact {
 /**
  * 事実を一覧する。
  *
- * `blogId` を渡すと、**そのブログ固有の事実と全ブログ共通の事実**を返す。
- * 記事生成（E-8）が使う形。
+ * `blogId` を渡すと、**そのブログを書く分身の記憶**を返す。記事生成（E-8）が
+ * 使う形。ブログと分身は1対1なので、媒体から辿れば書き手の記憶が決まる。
+ *
+ * A-2-R-4 より前は「そのブログ固有の事実 + 全ブログ共通の事実」だった。
+ * **記憶が分身に溜まるようになり、その分身の媒体は1件なので、
+ * 「共通」と「固有」を分ける意味が無くなった。**
+ *
+ * 所有は `persona` 経由で絞る（`persona_facts.user_id` は A-2-R-4-schema で
+ * 落とす）。**`persona.userId` を必ず条件に入れる** — 他人の分身の記憶を
+ * 引かせない（SPEC 14.1）。
  */
 export async function listPersonaFactsForUser(
   userId: string,
@@ -270,12 +280,16 @@ export async function listPersonaFactsForUser(
     usableFirstPersonOnly?: boolean | undefined;
   } = {},
 ): Promise<AppPersonaFact[]> {
+  const personaId =
+    options.blogId === undefined
+      ? undefined
+      : (await requireBlogForUser({ userId, blogId: options.blogId }))
+          .personaId;
+
   const rows = await prisma.personaFact.findMany({
     where: {
-      userId,
-      ...(options.blogId === undefined
-        ? {}
-        : { OR: [{ blogId: options.blogId }, { blogId: null }] }),
+      persona: { userId },
+      ...(personaId === undefined ? {} : { personaId }),
       ...(options.usableFirstPersonOnly === true
         ? { usableFirstPerson: true }
         : {}),
@@ -295,7 +309,7 @@ export async function findPersonaFactForUser(params: {
   factId: string;
 }): Promise<AppPersonaFact | null> {
   const row = await prisma.personaFact.findFirst({
-    where: { id: params.factId, userId: params.userId },
+    where: { id: params.factId, persona: { userId: params.userId } },
     select: FACT_SELECT,
   });
 
@@ -319,22 +333,23 @@ export async function requirePersonaFactForUser(params: {
 /**
  * 事実を登録する。
  *
- * **`blogId` を渡す場合は所有権を確かめる。** 他人のブログに紐づく事実を
- * 作られると、そのブログの記事生成へ混ざる。
+ * **`personaId` の所有権を確かめる。** 他人の分身に記憶を足されると、
+ * その分身の記事生成へ混ざる（C-6 で見つけたのと同じ形）。
  */
 export async function createPersonaFactForUser(
   userId: string,
   input: CreatePersonaFactInput,
 ): Promise<AppPersonaFact> {
   const data = normalizeCreatePersonaFact(input);
-
-  const blogId =
-    input.blogId === undefined
-      ? null
-      : await requireOpenBlogId({ userId, blogId: input.blogId });
+  const persona = await requirePersonaForUser({
+    userId,
+    personaId: input.personaId,
+  });
 
   const row = await prisma.personaFact.create({
-    data: { userId, blogId, ...data },
+    // `user_id` は A-2-R-4-schema で落とすまで NOT NULL なので入れておく。
+    // **読むのは `persona` 経由だけ**（この列で絞らない）
+    data: { userId, personaId: persona.id, ...data },
     select: FACT_SELECT,
   });
 
@@ -359,7 +374,7 @@ export async function updatePersonaFactForUser(
   }
 
   const result = await prisma.personaFact.updateMany({
-    where: { id: params.factId, userId: params.userId },
+    where: { id: params.factId, persona: { userId: params.userId } },
     data,
   });
 
@@ -387,6 +402,6 @@ export async function deletePersonaFactForUser(params: {
   await requirePersonaFactForUser(params);
 
   await prisma.personaFact.deleteMany({
-    where: { id: params.factId, userId: params.userId },
+    where: { id: params.factId, persona: { userId: params.userId } },
   });
 }

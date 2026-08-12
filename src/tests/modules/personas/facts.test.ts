@@ -28,6 +28,7 @@ function input(
   overrides: Partial<CreatePersonaFactInput> = {},
 ): CreatePersonaFactInput {
   return {
+    personaId: '00000000-0000-4000-8000-0000000000a1',
     factType: 'EXPERIENCE',
     content: '半年ほど使いました',
     source: 'USER_INPUT',
