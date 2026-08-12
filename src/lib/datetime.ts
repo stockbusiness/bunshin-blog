@@ -247,3 +247,20 @@ export function jstWeekNumber(baseDate: JstDate, target: JstDate): number {
 export function todayInJst(now: Date = new Date()): JstDate {
   return toJstDate(now);
 }
+
+/**
+ * その瞬間のJSTの「時」（`00`〜`23`、2桁）。
+ *
+ * **1時間ごとの冪等キーに使う**（I-2）。`YYYY-MM-DD` と組にすれば、
+ * 「その日のその時間に一度だけ」が一意制約で表せる。
+ *
+ * **JSTのオフセットは1時間単位**（+09:00）なので、UTCの時と食い違うのは
+ * 数字だけで、**区切りの位置は同じ**。それでもここを通すのは、
+ * JSTの暦日と組で使うため — 日付だけJSTにして時をUTCで取ると、
+ * 日付が変わる時刻に**同じ組が2回現れる**。
+ */
+export function jstHour(now: Date = new Date()): string {
+  assertValidInstant(now);
+
+  return pad(new Date(now.getTime() + JST_OFFSET_MS).getUTCHours());
+}

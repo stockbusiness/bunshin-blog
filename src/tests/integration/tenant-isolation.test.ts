@@ -1109,6 +1109,8 @@ describe('入口の網羅', () => {
     ],
     approvals: [
       'refreshProposalsForUser',
+      // I-2。選定を1日1回積む（`jobs` に user_id を渡すだけ）
+      'enqueueProposalSelectionForUser',
       'listApprovalsForUser',
       'listUnsentApprovalsForUser',
       // F-3b。溜め続けないための期限切れ（Q-025）
