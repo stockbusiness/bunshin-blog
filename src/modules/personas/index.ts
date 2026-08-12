@@ -8,10 +8,6 @@
  */
 
 export {
-  findUserPersonaForUser,
-  requireUserPersonaForUser,
-  saveUserPersonaForUser,
-  updateUserPersonaForUser,
   findBlogPersonaSettingForUser,
   saveBlogPersonaSettingForUser,
   updateBlogPersonaSettingForUser,
@@ -53,18 +49,12 @@ export {
 } from './blog-settings';
 
 export {
-  normalizeCreateUserPersona,
-  normalizeUpdateUserPersona,
-  normalizeBaseProfile,
   normalizeTone,
   normalizeValues,
   isEmojiLevel,
   isLineBreakStyle,
   PERSONA_TEXT_MAX_LENGTH,
-  PERSONA_BACKGROUND_MAX_LENGTH,
-  FIRST_PERSON_MAX_LENGTH,
   PERSONA_LIST_MAX,
-  type NormalizedUserPersona,
 } from './validate';
 
 export {
@@ -95,14 +85,10 @@ export {
   type BulletFrequency,
   type SaveBlogPersonaSettingInput,
   type UpdateBlogPersonaSettingInput,
-  type AppUserPersona,
-  type BaseProfile,
   type Tone,
   type PersonaValues,
   type EmojiLevel,
   type LineBreakStyle,
-  type CreateUserPersonaInput,
-  type UpdateUserPersonaInput,
 } from './types';
 
 export {

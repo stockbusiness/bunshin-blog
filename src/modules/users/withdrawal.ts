@@ -25,7 +25,7 @@ import { AppError } from '@/lib/errors';
 import { recordAuditInTx } from '@/modules/audit';
 import { listBlogsForUser } from '@/modules/blogs';
 import {
-  findUserPersonaForUser,
+  listPersonasForUser,
   listPersonaFactsForUser,
 } from '@/modules/personas';
 import { listApprovalSummariesForUser } from '@/modules/approvals';
@@ -153,7 +153,21 @@ export interface UserDataExport {
       versions: { versionNo: number; title: string; bodyHtml: string }[];
     }[];
   }[];
-  persona: unknown;
+  /**
+   * 分身（A-2-R-2f）。**`ARCHIVED` も含めて全部返す** — 途中でやめた分身が
+   * あること自体が本人の記録で、抜くと「最初から作らなかった」と区別できない
+   */
+  personas: {
+    id: string;
+    name: string;
+    personaType: string;
+    status: string;
+    identity: unknown;
+    expertise: unknown;
+    audience: unknown;
+    business: unknown;
+    createdAt: string;
+  }[];
   personaFacts: { id: string; factType: string; content: string }[];
   approvals: {
     id: string;
@@ -204,8 +218,8 @@ export async function exportUserDataForAdmin(
   // **閉じたブログも含める**（退会後に持ち出すため）
   const blogs = await listBlogsForUser(userId, { includeClosed: true });
 
-  const [persona, facts, approvals] = await Promise.all([
-    findUserPersonaForUser(userId),
+  const [personas, facts, approvals] = await Promise.all([
+    listPersonasForUser(userId),
     listPersonaFactsForUser(userId),
     listApprovalSummariesForUser(userId),
   ]);
@@ -234,7 +248,17 @@ export async function exportUserDataForAdmin(
       dataUseConsentAt: user.dataUseConsentAt?.toISOString() ?? null,
     },
     blogs: exportedBlogs,
-    persona,
+    personas: personas.map((persona) => ({
+      id: persona.id,
+      name: persona.name,
+      personaType: persona.personaType,
+      status: persona.status,
+      identity: persona.identity,
+      expertise: persona.expertise,
+      audience: persona.audience,
+      business: persona.business,
+      createdAt: persona.createdAt.toISOString(),
+    })),
     personaFacts: facts.map((fact) => ({
       id: fact.id,
       factType: fact.factType,
