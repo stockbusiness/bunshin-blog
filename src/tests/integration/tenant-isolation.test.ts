@@ -1051,7 +1051,6 @@ describe('入口の網羅', () => {
       'createPersonaFactForUser',
       'updatePersonaFactForUser',
       'deletePersonaFactForUser',
-      'setAllowedExperiencesForUser',
     ],
     blogs: [
       'listBlogsForUser',

@@ -83,7 +83,6 @@ function setting(
     blogId: 'blog-1',
     penName: 'あおい',
     toneOverride: {},
-    allowedExperiences: [],
     ngTopics: ['医療行為'],
     writingRules: WRITING_RULES,
     createdAt: new Date('2026-08-01T00:00:00Z'),

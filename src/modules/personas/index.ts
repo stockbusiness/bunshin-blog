@@ -22,7 +22,6 @@ export {
   createPersonaFactForUser,
   updatePersonaFactForUser,
   deletePersonaFactForUser,
-  setAllowedExperiencesForUser,
 } from './repository';
 
 export {

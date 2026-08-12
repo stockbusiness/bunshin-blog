@@ -7,8 +7,6 @@ import {
   findPersonaFactForUser,
   listPersonaFactsForUser,
   requirePersonaFactForUser,
-  saveBlogPersonaSettingForUser,
-  setAllowedExperiencesForUser,
   updatePersonaFactForUser,
   type CreatePersonaFactInput,
 } from '@/modules/personas';
@@ -27,20 +25,6 @@ import { createPersona, createUser } from './helpers/factories';
  * `src/tests/modules/personas/facts.test.ts` の担当で、ここで見るのは
  * **保存された値**と**所有権**。
  */
-
-const SETTING = {
-  penName: 'あおい',
-  targetReader: {
-    ageRange: '20代',
-    situation: '初めて選ぶ',
-    knowledgeLevel: 'beginner' as const,
-  },
-  writingRules: {
-    headingDepth: 3,
-    leadLength: 120,
-    bulletFrequency: 'mid' as const,
-  },
-};
 
 let prisma: PrismaClient;
 let owner: { id: string };
@@ -308,109 +292,31 @@ describe('所有権（SPEC 14.1）', () => {
 });
 
 /**
- * **D-5 で保留した入口。** 参照先の `persona_facts` が無い間は、所有権を
- * 確かめられないIDを保存することになるため出さなかった。
+ * **消しても掃除する相手がもう無い**（A-2-R-2e）。
+ *
+ * D-6 では `blog_persona_settings.allowed_experiences` から外していたが、
+ * その列を使うのをやめた。**記憶は分身に溜まり**（A-2-R-2-schema）、
+ * その分身の媒体は1つ（A-2-R-2c）なので、媒体ごとに選び直す意味が無い。
  */
-describe('使ってよい体験の設定', () => {
-  let factId: string;
-
-  beforeEach(async () => {
-    await saveBlogPersonaSettingForUser(
-      { userId: owner.id, blogId: blog1 },
-      SETTING,
-    );
-    factId = (await createPersonaFactForUser(owner.id, input())).id;
-  });
-
-  it('自分の事実を設定できる', async () => {
-    const setting = await setAllowedExperiencesForUser(
-      { userId: owner.id, blogId: blog1 },
-      [factId],
-    );
-
-    expect(setting.allowedExperiences).toEqual([factId]);
-  });
-
-  /** **C-6 で見つけたのと同じ形の穴を作らない** */
-  it('他人の事実は設定できない', async () => {
-    const theirFact = (await createPersonaFactForUser(other.id, input())).id;
-
-    await expect(
-      setAllowedExperiencesForUser({ userId: owner.id, blogId: blog1 }, [
-        theirFact,
-      ]),
-    ).rejects.toMatchObject({ status: 404 });
-
-    const setting = await prisma.blogPersonaSetting.findFirstOrThrow({
-      where: { blogId: blog1 },
-      select: { allowedExperiences: true },
-    });
-    expect(setting.allowedExperiences).toEqual([]);
-  });
-
-  it('存在しない事実は設定できない', async () => {
-    await expect(
-      setAllowedExperiencesForUser({ userId: owner.id, blogId: blog1 }, [
-        '00000000-0000-4000-8000-000000000000',
-      ]),
-    ).rejects.toMatchObject({ status: 404 });
-  });
-
-  it('自分と他人が混ざっていれば丸ごと拒否する', async () => {
-    const theirFact = (await createPersonaFactForUser(other.id, input())).id;
-
-    await expect(
-      setAllowedExperiencesForUser({ userId: owner.id, blogId: blog1 }, [
-        factId,
-        theirFact,
-      ]),
-    ).rejects.toMatchObject({ status: 404 });
-  });
-
-  it('重複を落とす', async () => {
-    const setting = await setAllowedExperiencesForUser(
-      { userId: owner.id, blogId: blog1 },
-      [factId, factId],
-    );
-
-    expect(setting.allowedExperiences).toEqual([factId]);
-  });
-
-  it('空にできる', async () => {
-    await setAllowedExperiencesForUser({ userId: owner.id, blogId: blog1 }, [
-      factId,
-    ]);
-
-    const setting = await setAllowedExperiencesForUser(
-      { userId: owner.id, blogId: blog1 },
-      [],
-    );
-
-    expect(setting.allowedExperiences).toEqual([]);
-  });
-
-  /**
-   * **消した事実へのIDが残ると、記事生成が引けない参照を掴む。**
-   */
-  it('事実を消すと参照からも外れる', async () => {
-    await setAllowedExperiencesForUser({ userId: owner.id, blogId: blog1 }, [
-      factId,
-    ]);
+describe('事実の削除', () => {
+  it('消すと一覧から消える', async () => {
+    const factId = (await createPersonaFactForUser(owner.id, input())).id;
 
     await deletePersonaFactForUser({ userId: owner.id, factId });
 
-    const setting = await prisma.blogPersonaSetting.findFirstOrThrow({
-      where: { blogId: blog1 },
-      select: { allowedExperiences: true },
-    });
-    expect(setting.allowedExperiences).toEqual([]);
+    expect(await prisma.personaFact.count({ where: { id: factId } })).toBe(0);
   });
 
-  it('未設定のブログには設定できない', async () => {
+  it('他人の事実は消せない', async () => {
+    const theirFact = (await createPersonaFactForUser(other.id, input())).id;
+
     await expect(
-      setAllowedExperiencesForUser({ userId: owner.id, blogId: blog2 }, [
-        factId,
-      ]),
+      deletePersonaFactForUser({ userId: owner.id, factId: theirFact }),
     ).rejects.toMatchObject({ status: 404 });
+
+    // **相手のデータが消えていないこと**まで見る
+    expect(await prisma.personaFact.count({ where: { id: theirFact } })).toBe(
+      1,
+    );
   });
 });

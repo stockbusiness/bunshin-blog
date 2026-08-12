@@ -116,22 +116,6 @@ describe('保存（完了条件）', () => {
     expect(saved.writingRules).toEqual(SETTING.writingRules);
   });
 
-  /**
-   * **参照先の `persona_facts` は D-6 で作る。** 所有権を確かめられない
-   * IDを受け取ると、他人の体験を引き当てられる（C-6 と同じ形）。
-   */
-  it('allowed_experiences は入力から設定できない', async () => {
-    const saved = await saveBlogPersonaSettingForUser(
-      { userId: owner.id, blogId: blog1 },
-      {
-        ...SETTING,
-        allowedExperiences: ['3f2504e0-4f89-11d3-9a0c-0305e82c3301'],
-      } as SaveBlogPersonaSettingInput,
-    );
-
-    expect(saved.allowedExperiences).toEqual([]);
-  });
-
   it('2回保存しても行は増えない', async () => {
     await saveBlogPersonaSettingForUser(
       { userId: owner.id, blogId: blog1 },
