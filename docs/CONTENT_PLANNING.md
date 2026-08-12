@@ -397,14 +397,19 @@ async function buildPlan(ctx: PlanningContext): Promise<PlanResult> {
 
 ### 7.3 JSON-LD
 
-**AIに生成させない。** `faq` と記事種別から**コードで組み立てる**。
+**AIに生成させない。** `faq` から**コードで組み立てる**。
 
 ```ts
-// contentType === "AFFILIATE" → FAQPage + Review
-// それ以外 → FAQPage
+// 記事種別によらず FAQPage のみ
 ```
 
 生成後に `JSON.parse` で構文を検証し、失敗したら記事を `READY_FOR_REVIEW` にせずジョブを失敗させる。
+
+**`Review` は出さない**（E-16・OPEN_QUESTIONS Q-021）。当初は収益記事に `FAQPage` と `Review` を出す想定だったが、**評点の出どころが無い。** 分身は案件の `facts` の範囲でしか書けず（SPEC 9.6）、「5段階で4.5」という数字はどこにも存在しない。作り出せば SPEC 9.6 が禁じる「根拠のないランキング」そのものになる。
+
+一方 Google の `Review` は `reviewRating` を必須としており、**評点なしで出してもリッチリザルトの対象にならない。** 目的を果たさないまま、根拠のない申告の形だけが残る。
+
+承認画面でモニターに評点を入力させる案は、短期KPIが「承認率」と「1記事当たり確認時間」（SPEC 11.1）である以上、**承認1回あたりの負担を増やすので採らない。**
 
 ---
 

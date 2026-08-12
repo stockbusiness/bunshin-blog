@@ -7,11 +7,11 @@ import {
 } from '@/modules/content-generation';
 
 /**
- * JSON-LD の組み立て（TASKS E-11、CONTENT_PLANNING 7.3）。
+ * JSON-LD の組み立て（TASKS E-11・E-16、CONTENT_PLANNING 7.3）。
  *
- * > **AIに生成させない。** `faq` と記事種別から**コードで組み立てる**
+ * > **AIに生成させない。** `faq` から**コードで組み立てる**
  *
- * 完了条件は「JSON-LDが構文的に妥当」。
+ * 完了条件は「JSON-LDが構文的に妥当」。**出すのは `FAQPage` だけ**（E-16）。
  */
 
 const faq = [
@@ -20,39 +20,35 @@ const faq = [
   { question: '対応端末は？', answer: '主要な機種に対応しています' },
 ];
 
-const capsule = 'この記事の結論です';
-
 function build(overrides: Partial<Parameters<typeof buildStructuredData>[0]>) {
-  return buildStructuredData({
-    contentType: 'INFORMATIONAL',
-    faq,
-    answerCapsule: capsule,
-    offerName: null,
-    authorName: 'たなか',
-    ...overrides,
-  });
+  return buildStructuredData({ faq, ...overrides });
 }
 
-describe('記事種別で組み立てが変わる（CONTENT_PLANNING 7.3）', () => {
-  it('集客記事は FAQPage だけ', () => {
-    const blocks = build({});
+/**
+ * **`Review` を出さない**（E-16・Q-021）。
+ *
+ * 評点の出どころが無く、作り出せば SPEC 9.6 が禁じる
+ * 「根拠のないランキング」そのものになる。Google の `Review` は
+ * `reviewRating` を必須とするため、**評点なしで出しても
+ * リッチリザルトの対象にならない** — 目的を果たさないまま、
+ * 根拠のない申告の形だけが残る
+ */
+describe('出すのは FAQPage だけ（E-16）', () => {
+  it.each(['INFORMATIONAL', 'AFFILIATE', 'COMPARISON', 'EXPERIENCE', 'FAQ'])(
+    '%s でも FAQPage だけ',
+    () => {
+      const blocks = build({});
 
-    expect(blocks.map((block) => block['@type'])).toEqual(['FAQPage']);
-  });
+      expect(blocks.map((block) => block['@type'])).toEqual(['FAQPage']);
+    },
+  );
 
-  it('収益記事は FAQPage と Review', () => {
-    const blocks = build({ contentType: 'AFFILIATE', offerName: '案件A' });
+  /** 評点そのものが、どこにも出ない */
+  it('Review も reviewRating も出さない', () => {
+    const serialized = JSON.stringify(build({}));
 
-    expect(blocks.map((block) => block['@type'])).toEqual([
-      'FAQPage',
-      'Review',
-    ]);
-  });
-
-  it('比較記事は FAQPage だけ（AFFILIATE ではない）', () => {
-    const blocks = build({ contentType: 'COMPARISON' });
-
-    expect(blocks.map((block) => block['@type'])).toEqual(['FAQPage']);
+    expect(serialized).not.toContain('Review');
+    expect(serialized).not.toContain('reviewRating');
   });
 });
 
@@ -80,68 +76,9 @@ describe('FAQPage の中身は faq から取る', () => {
   });
 });
 
-describe('Review（収益記事）', () => {
-  function review(): Record<string, unknown> {
-    return build({ contentType: 'AFFILIATE', offerName: '案件A' })[1] as Record<
-      string,
-      unknown
-    >;
-  }
-
-  it('案件名が itemReviewed になる', () => {
-    expect(review()['itemReviewed']).toEqual({
-      '@type': 'Product',
-      name: '案件A',
-    });
-  });
-
-  it('ペンネームが author になる', () => {
-    expect(review()['author']).toEqual({ '@type': 'Person', name: 'たなか' });
-  });
-
-  it('ペンネームが無ければ author を入れない', () => {
-    const blocks = build({
-      contentType: 'AFFILIATE',
-      offerName: '案件A',
-      authorName: null,
-    });
-
-    expect(blocks[1]).not.toHaveProperty('author');
-  });
-
-  /**
-   * **評点を作らない。** 出どころが無い数字を入れると
-   * 「根拠のないランキング」（SPEC 9.6）と同じことになる。Q-021
-   */
-  it('reviewRating を入れない', () => {
-    expect(review()).not.toHaveProperty('reviewRating');
-  });
-
-  /** **黙って Review を省かない。** 案件が無いのは構成表の側の異常 */
-  it('収益記事なのに案件名が無ければ落ちる', () => {
-    expect(() =>
-      build({ contentType: 'AFFILIATE', offerName: null }),
-    ).toThrowError(
-      expect.objectContaining({
-        code: PROMPT_ERROR_CODES.invalidStructuredData,
-      }),
-    );
-  });
-
-  it('案件名が空白だけでも落ちる', () => {
-    expect(() =>
-      build({ contentType: 'AFFILIATE', offerName: '   ' }),
-    ).toThrowError(
-      expect.objectContaining({
-        code: PROMPT_ERROR_CODES.invalidStructuredData,
-      }),
-    );
-  });
-});
-
 describe('構文の検証（完了条件）', () => {
   it('組み立てた結果は JSON にできる', () => {
-    const blocks = build({ contentType: 'AFFILIATE', offerName: '案件A' });
+    const blocks = build({});
 
     expect(JSON.parse(JSON.stringify(blocks))).toEqual(blocks);
   });

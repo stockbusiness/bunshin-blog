@@ -224,14 +224,9 @@ export async function generateArticleForUser(
   });
 
   // **JSON-LD はコードで組み立てる**（CONTENT_PLANNING 7.3）。
-  // 組み立てに失敗したらここで落ち、記事は保存されない
-  const structuredData = buildStructuredData({
-    contentType: item.contentType,
-    faq: generated.article.faq,
-    answerCapsule: generated.article.answerCapsule,
-    offerName: offer?.name ?? null,
-    authorName: persona.penName,
-  });
+  // 組み立てに失敗したらここで落ち、記事は保存されない。
+  // **出すのは `FAQPage` だけ**（E-16・Q-021）
+  const structuredData = buildStructuredData({ faq: generated.article.faq });
 
   const saved = await saveArticleVersion({
     contentItemId: item.id,
