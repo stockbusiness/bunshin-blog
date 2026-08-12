@@ -17,7 +17,7 @@ import {
   createTestPrisma,
   resetDatabase,
 } from './helpers/db';
-import { createUser } from './helpers/factories';
+import { createPersona, createUser } from './helpers/factories';
 
 /**
  * 接続テストの結果が**実PostgreSQLへ保存される**ことを確かめる（C-2）。
@@ -53,12 +53,14 @@ beforeEach(async () => {
   other = await createUser(prisma, { displayName: '別ユーザー' });
 
   const ownerBlog = await createBlogForUser(owner.id, {
+    personaId: (await createPersona(prisma, owner.id)).id,
     name: '自分のブログ',
     slug: 'mine',
     targetReader: '読者',
     slotNumber: 1,
   });
   const otherBlog = await createBlogForUser(other.id, {
+    personaId: (await createPersona(prisma, other.id)).id,
     name: '他人のブログ',
     slug: 'theirs',
     targetReader: '読者',
@@ -249,6 +251,7 @@ describe('接続テストの結果を保存する', () => {
 describe('前提が整っていない場合', () => {
   it('未接続のブログは 404', async () => {
     const second = await createBlogForUser(owner.id, {
+      personaId: (await createPersona(prisma, owner.id)).id,
       name: '未接続',
       slug: 'not-connected',
       targetReader: '読者',

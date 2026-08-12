@@ -19,7 +19,7 @@ import {
   createTestPrisma,
   resetDatabase,
 } from './helpers/db';
-import { createUser } from './helpers/factories';
+import { createPersona, createUser } from './helpers/factories';
 
 /**
  * WordPress 側の状態の取り込みが**実PostgreSQLへ記録される**（C-5）。
@@ -190,12 +190,14 @@ beforeEach(async () => {
   other = await createUser(prisma, { displayName: '別ユーザー' });
 
   const ownerBlog = await createBlogForUser(owner.id, {
+    personaId: (await createPersona(prisma, owner.id)).id,
     name: '自分のブログ',
     slug: 'mine',
     targetReader: '読者',
     slotNumber: 1,
   });
   const otherBlog = await createBlogForUser(other.id, {
+    personaId: (await createPersona(prisma, other.id)).id,
     name: '他人のブログ',
     slug: 'theirs',
     targetReader: '読者',

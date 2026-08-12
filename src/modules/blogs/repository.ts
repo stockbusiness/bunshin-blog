@@ -29,6 +29,7 @@ import type { AppBlog, CreateBlogInput, UpdateBlogInput } from './types';
 interface BlogRecord {
   id: string;
   userId: string;
+  personaId: string | null;
   name: string;
   slug: string;
   targetReader: string;
@@ -56,6 +57,7 @@ function toAppBlog(record: BlogRecord): AppBlog {
   return {
     id: record.id,
     userId: record.userId,
+    personaId: record.personaId,
     name: record.name,
     slug: record.slug,
     targetReader: record.targetReader,
@@ -170,6 +172,15 @@ function toConflictError(
     if (error.code === 'P2002') {
       return slotTakenError({ slotNumber, closed: false });
     }
+    // P2003: 外部キー違反。`(persona_id, user_id)` の複合外部キー
+    // （A-2-R-2c-schema）に当たる場合が本命で、**他人の分身IDか、
+    // 存在しないID**のどちらか。
+    //
+    // **どちらかを文言で区別しない**（SPEC 14.1）。区別すると
+    // 「そのIDの分身は存在する」ことを他人に教えることになる
+    if (error.code === 'P2003') {
+      return AppError.validationFailed('指定された分身が見つかりません');
+    }
     // P2010 / P2000 系: CHECK 制約（blogs_slot_range）など
     if (error.code === 'P2010' || error.code === 'P2000') {
       return AppError.validationFailed('ブログの内容を確認してください');
@@ -197,6 +208,12 @@ function toConflictError(
  * `CHECK(slot_number BETWEEN 1 AND 3)` は同時実行に対する最後の砦として残す。
  *
  * `input.slotNumber` を省略すると空いている最小の番号を割り当てる。
+ *
+ * **`personaId` の持ち主はここでは確かめない。** 依存の向きが
+ * `personas → blogs`（MODULE_RULES）で、`personas` を import すると循環する。
+ * 他人の分身IDは **DBの複合外部キー**が拒む（A-2-R-2c-schema）。
+ * 分身が使える状態か（`ACTIVE` か）の判定は呼び出し側（`src/app/`）が行う
+ * — こちらは実験の運用方針であって、越境の防止ではない。
  */
 export async function createBlogForUser(
   userId: string,
@@ -208,10 +225,24 @@ export async function createBlogForUser(
     requested: input.slotNumber,
   });
 
+  // **1分身につきブログ1件**（DATA_MODEL 2章「アプリ層の制約」）。
+  //
+  // `CLOSED` も数える。閉じたブログがスロットを保持し続ける（Q-008）のと
+  // 同じ扱いにする — **閉じれば作り直せる**にすると、分身を替えずに
+  // media を作り直せてしまい、実験の一次データが繋がらなくなる
+  if (
+    (await prisma.blog.count({
+      where: { userId, personaId: input.personaId },
+    })) > 0
+  ) {
+    throw AppError.validationFailed('この分身のブログはすでにあります');
+  }
+
   try {
     const record = await prisma.blog.create({
       data: {
         userId,
+        personaId: input.personaId,
         name: input.name,
         slug: input.slug,
         targetReader: input.targetReader,

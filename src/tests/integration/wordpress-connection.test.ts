@@ -14,7 +14,7 @@ import {
   createTestPrisma,
   resetDatabase,
 } from './helpers/db';
-import { createUser } from './helpers/factories';
+import { createPersona, createUser } from './helpers/factories';
 
 /**
  * WordPress接続情報の保存を**実PostgreSQLで**検証する（TASKS C-1）。
@@ -53,12 +53,14 @@ beforeEach(async () => {
   other = await createUser(prisma, { displayName: '別ユーザー' });
 
   const ownerBlog = await createBlogForUser(owner.id, {
+    personaId: (await createPersona(prisma, owner.id)).id,
     name: '自分のブログ',
     slug: 'mine',
     targetReader: '読者',
     slotNumber: 1,
   });
   const otherBlog = await createBlogForUser(other.id, {
+    personaId: (await createPersona(prisma, other.id)).id,
     name: '他人のブログ',
     slug: 'theirs',
     targetReader: '読者',
@@ -281,6 +283,7 @@ describe('切断', () => {
 
   it('未接続のブログを切断しようとすると 404', async () => {
     const second = await createBlogForUser(owner.id, {
+      personaId: (await createPersona(prisma, owner.id)).id,
       name: '未接続',
       slug: 'not-connected',
       targetReader: '読者',

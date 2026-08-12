@@ -14,7 +14,7 @@ import {
   createTestPrisma,
   resetDatabase,
 } from './helpers/db';
-import { createUser } from './helpers/factories';
+import { createPersona, createUser } from './helpers/factories';
 
 /**
  * 所有権検証を**実PostgreSQLで**検証する（TASKS B-3）。
@@ -48,12 +48,14 @@ beforeEach(async () => {
   other = await createUser(prisma, { displayName: '別ユーザー' });
 
   const ownerBlog = await createBlogForUser(owner.id, {
+    personaId: (await createPersona(prisma, owner.id)).id,
     name: '自分のブログ',
     slug: 'mine',
     targetReader: '読者',
     slotNumber: 1,
   });
   const otherBlog = await createBlogForUser(other.id, {
+    personaId: (await createPersona(prisma, other.id)).id,
     name: '他人のブログ',
     slug: 'theirs',
     targetReader: '読者',
@@ -190,6 +192,7 @@ describe('削除', () => {
 describe('作成', () => {
   it('作ったブログは自分のものになる', async () => {
     const blog = await createBlogForUser(owner.id, {
+      personaId: (await createPersona(prisma, owner.id)).id,
       name: '2つ目',
       slug: 'second',
       targetReader: '読者',
@@ -203,6 +206,7 @@ describe('作成', () => {
   it('同じスロットの重複は409になる', async () => {
     await expect(
       createBlogForUser(owner.id, {
+        personaId: (await createPersona(prisma, owner.id)).id,
         name: '重複',
         slug: 'dup',
         targetReader: '読者',

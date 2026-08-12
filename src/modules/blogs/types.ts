@@ -26,6 +26,13 @@ export interface AppGenre extends AppBlogGenre {
 export interface AppBlog {
   id: string;
   userId: string;
+  /**
+   * どの分身の媒体か（A-2-R-2c）。
+   *
+   * **A-2-R-3 で `NOT NULL` になる。** それまでは A-2-R-2c 以前に
+   * 作られたブログが `null` を持ちうる。
+   */
+  personaId: string | null;
   name: string;
   slug: string;
   targetReader: string;
@@ -49,6 +56,14 @@ export interface AppBlog {
  * 自力で空きを決められない。
  */
 export interface CreateBlogInput {
+  /**
+   * どの分身の媒体か（A-2-R-2c）。**必須。**
+   *
+   * **持ち主の確認は `blogs` からはできない。** 依存の向きが
+   * `personas → blogs`（MODULE_RULES）で循環するため。
+   * 他人の分身IDは**DBの複合外部キー**が拒む（A-2-R-2c-schema）。
+   */
+  personaId: string;
   name: string;
   slug: string;
   targetReader: string;
@@ -62,6 +77,11 @@ export interface CreateBlogInput {
  *
  * **`genre` と `article_ratio.revenue` / `traffic` は含めない。**
  * 前者は E-4 の審査で決まり（Q-009）、後者は算出値（Q-011）。
+ *
+ * **`personaId` も含めない**（A-2-R-2c）。付け替えると、
+ * それまでに書いた記事の書き手が後から変わる。**同じブログの記事が
+ * 途中で別人になったのか、同じ人が変わったのかを区別できなくなり、
+ * 実験の一次データが読めなくなる。** 別の分身で書くなら別のブログを作る。
  */
 export interface UpdateBlogInput {
   name?: string | undefined;

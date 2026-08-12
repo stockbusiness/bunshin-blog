@@ -6,6 +6,7 @@ import {
   getSlotUsageForUser,
   listBlogsForUser,
 } from '@/modules/blogs';
+import { requirePersonaForUser } from '@/modules/personas';
 
 /**
  * `GET /api/blogs` / `POST /api/blogs`（SPEC 13.2、TASKS B-3）
@@ -17,6 +18,8 @@ import {
 export const runtime = 'nodejs';
 
 const createSchema = z.object({
+  // どの分身の媒体か（A-2-R-2c）。**必須**
+  personaId: z.string().uuid(),
   name: z.string().min(1).max(100),
   slug: z
     .string()
@@ -69,6 +72,26 @@ export async function POST(request: Request): Promise<Response> {
     const parsed = createSchema.safeParse(body);
     if (!parsed.success) {
       throw AppError.validationFailed('ブログの内容を確認してください');
+    }
+
+    // **分身が使える状態かはここで見る**（MODULE_RULES 3「上位へ寄せる」）。
+    //
+    // `blogs` から `personas` を import すると循環する。**越境の防止は
+    // DBの複合外部キーが担う**（A-2-R-2c-schema）ので、ここで確かめるのは
+    // 「使い始めた分身か」という運用方針だけ。
+    //
+    // **`DRAFT` の分身でブログを作らせない。** 段階解放（ROADMAP 5章）は
+    // `ACTIVE` の数を制限するもので、下書きのまま媒体を持てると
+    // **初日に3ブログを立てられて制限が意味を失う**
+    const persona = await requirePersonaForUser({
+      userId: user.id,
+      personaId: parsed.data.personaId,
+    });
+
+    if (persona.status !== 'ACTIVE') {
+      throw AppError.validationFailed(
+        '使い始めた分身を選んでください（下書きのままではブログを作れません）',
+      );
     }
 
     // userId は入力からではなくセッションから取る
