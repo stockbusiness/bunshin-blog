@@ -609,6 +609,19 @@ model AffiliateOffer {
   userExperience        UserExperience @default(UNKNOWN) @map("user_experience")
   userRating            Int?           @map("user_rating")
   denyConditions        String[]       @map("deny_conditions")
+  /// リンクを最後に確かめた時刻（H-3b-schema・Q-029）。**通っていても入る。**
+  ///
+  /// **`NULL` は「一度も確かめていない」。** 古ければ
+  /// 「確認できていない」であって「問題なし」ではない
+  linkCheckedAt         DateTime?      @map("link_checked_at") @db.Timestamptz(6)
+  /// **切れていると分かった最初の時刻**（H-3b-schema・Q-029）。
+  ///
+  /// 切れている間は**動かさない** — 動かすと「いつからか」が毎回今日になり、
+  /// モニターが直す優先度を決められない。直ったら `NULL` に戻す。
+  ///
+  /// **一時的な失敗（401/403/5xx）では入れない。** 404/410 だけを
+  /// 「消えた」とする（H-3 と同じ扱い）
+  linkBrokenAt          DateTime?      @map("link_broken_at") @db.Timestamptz(6)
   lpFormFields          Int?           @map("lp_form_fields")
   lpMobileReady         Boolean?       @map("lp_mobile_ready")
   /// LPのページ長（取得したHTMLのバイト数・D-2）。
