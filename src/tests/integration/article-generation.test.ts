@@ -565,7 +565,14 @@ describe('アンサーカプセルとJSON-LD（E-11）', () => {
     expect(blocks[0]?.['mainEntity']).toHaveLength(FAQ.length);
   });
 
-  it('収益記事の JSON-LD は FAQPage と Review', async () => {
+  /**
+   * **収益記事でも `FAQPage` だけ**（E-16・Q-021）。
+   *
+   * 評点の出どころが無く、作り出せば SPEC 9.6 が禁じる
+   * 「根拠のないランキング」になる。評点なしの `Review` は
+   * リッチリザルトの対象にもならない
+   */
+  it('収益記事の JSON-LD も FAQPage だけ', async () => {
     const version = await generateArticleForUser(
       { userId, blogId, contentItemId: revenueItemId },
       { provider: provider() },
@@ -578,15 +585,9 @@ describe('アンサーカプセルとJSON-LD（E-11）', () => {
 
     const blocks = row?.structuredDataJson as Record<string, unknown>[];
 
-    expect(blocks.map((block) => block['@type'])).toEqual([
-      'FAQPage',
-      'Review',
-    ]);
-    // **案件名は `affiliate_offers.name` から取る。** AIの申告ではない
-    expect(blocks[1]?.['itemReviewed']).toEqual({
-      '@type': 'Product',
-      name: '案件',
-    });
+    expect(blocks.map((block) => block['@type'])).toEqual(['FAQPage']);
+    // 保存された値のどこにも評点が出ない
+    expect(JSON.stringify(blocks)).not.toContain('reviewRating');
   });
 
   /** 保存された値がそのまま JSON として読めること（完了条件） */
