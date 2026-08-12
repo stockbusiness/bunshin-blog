@@ -7,7 +7,11 @@ import {
   MAX_BACKOFF_SECONDS,
 } from './backoff';
 import { CHECKPOINT_FIELD, type JobCheckpoint } from './checkpoint';
-import { unknownJobTypeError } from './errors';
+import {
+  jobNotFoundError,
+  jobNotRetryableError,
+  unknownJobTypeError,
+} from './errors';
 import { assertIdempotencyKey } from './idempotency';
 import {
   isJobType,
@@ -407,4 +411,128 @@ export async function enqueueJobInTx(
   });
 
   return { created: true };
+}
+
+/**
+ * 失敗したジョブを積み直す（TASKS H-14、SPEC 13.7）。
+ *
+ * ## 新しい行を作らない
+ *
+ * **同じ冪等キーでは積めない**（C-4。`idempotency_key` は unique）。
+ * かといってキーに通番を足すと、**キーの意味が「この対象の処理」から
+ * 「この対象の何回目の処理」に変わり**、二重実行を止める働きが弱くなる。
+ *
+ * 代わりに**元の行を `QUEUED` へ戻す。** 冪等キーの意味は変わらず、
+ * `attempt_count` を0に戻すだけで `claimNextJob` が拾えるようになる
+ * （拾う条件が `attempt_count < MAX_ATTEMPTS` なので、
+ * 上限に達した行はそのままでは二度と拾われない）。
+ *
+ * ## `FAILED` だけを積み直す
+ *
+ * `QUEUED` は放っておけば動く。`RUNNING` を戻すと**同じジョブが二重に
+ * 走る**（動いている実行はこの操作を知らない）。`SUCCEEDED` を戻すのは
+ * 「もう一度やる」であって再実行ではない。
+ *
+ * ## 中断の印を消す
+ *
+ * `output_json` の印（`performOnce`・C-4）が残っていると、**再実行しても
+ * 毎回同じ理由で失敗する。** 印は「外部に副作用が残っているかもしれない」
+ * という意味なので、**消すのは人が確かめた後だけ。**
+ *
+ * この操作そのものが「人が確かめた」の表明である。**消したことを
+ * 監査ログに残す**のは呼び出し側（H-14 のAPI）。
+ *
+ * @returns 積み直した後のジョブ。**印が残っていたかも返す**
+ * @throws {AppError} 見つからない・`FAILED` でない
+ */
+export async function retryJobForAdmin(jobId: string): Promise<{
+  job: AppJob;
+  /** 中断の印を消したか。**消したなら、外部の副作用が二重になりうる** */
+  clearedCheckpoint: boolean;
+}> {
+  const current = await prisma.job.findUnique({
+    where: { id: jobId },
+    select: { id: true, status: true, outputJson: true },
+  });
+
+  if (current === null) {
+    throw jobNotFoundError();
+  }
+
+  if (current.status !== 'FAILED') {
+    throw jobNotRetryableError(current.status);
+  }
+
+  const clearedCheckpoint =
+    typeof current.outputJson === 'object' &&
+    current.outputJson !== null &&
+    !Array.isArray(current.outputJson) &&
+    CHECKPOINT_FIELD in current.outputJson;
+
+  const updated = await prisma.job.update({
+    where: { id: jobId },
+    data: {
+      status: 'QUEUED',
+      // **0に戻す。** `claimNextJob` は上限に達した行を拾わない
+      attemptCount: 0,
+      // **前回の理由を残さない。** 直っていないのに古い理由が出ると、
+      // 何度目の失敗なのか分からなくなる
+      errorCode: null,
+      errorMessage: null,
+      startedAt: null,
+      completedAt: null,
+      // 中断の印ごと消す（上記）
+      outputJson: Prisma.DbNull,
+    },
+    select: SELECT,
+  });
+
+  return { job: toAppJob(updated), clearedCheckpoint };
+}
+
+/**
+ * 失敗したジョブを新しい順に返す（H-14、SPEC 13.7）。
+ *
+ * **ADMIN 専用**（MODULE_RULES 5）。名前で横断参照であることを示す。
+ *
+ * **`FAILED` だけを返す。** 積み直せるのはこれだけで、
+ * 動いているジョブを並べても押せるボタンが無い。
+ *
+ * **入力と出力は返さない。** 記事本文も認証情報も入りうる（SPEC 14.2）。
+ * どのジョブが、いつ、どんな理由で落ちたかが分かれば足りる。
+ */
+export async function listFailedJobsForAdmin(
+  options: { limit?: number } = {},
+): Promise<
+  {
+    id: string;
+    jobType: string;
+    userId: string | null;
+    blogId: string | null;
+    targetId: string | null;
+    attemptCount: number;
+    errorCode: string | null;
+    errorMessage: string | null;
+    completedAt: Date | null;
+    createdAt: Date;
+  }[]
+> {
+  return prisma.job.findMany({
+    where: { status: 'FAILED' },
+    orderBy: [{ completedAt: 'desc' }, { id: 'asc' }],
+    // **際限なく返さない**（`listAuditLogsForAdmin` と同じ）
+    take: Math.min(Math.max(options.limit ?? 50, 1), 200),
+    select: {
+      id: true,
+      jobType: true,
+      userId: true,
+      blogId: true,
+      targetId: true,
+      attemptCount: true,
+      errorCode: true,
+      errorMessage: true,
+      completedAt: true,
+      createdAt: true,
+    },
+  });
 }

@@ -67,6 +67,8 @@ export {
   type ReplyClassification,
 } from './reply-classification';
 
+export { enqueueLinkCheckForUser } from './notify';
+
 export {
   NOTIFICATION_WINDOW_MINUTES,
   UNSENT_PROPOSAL_TTL_DAYS,

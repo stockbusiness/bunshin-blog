@@ -21,6 +21,7 @@ import {
 } from '@/modules/line';
 import { publishDraftForUser } from '@/modules/wordpress';
 import type { AppJob, JobHandlerRegistry } from '@/modules/jobs';
+import { runDailySchedule } from './schedule';
 import type {
   WordpressClient,
   WordpressCredentials,
@@ -47,6 +48,7 @@ import type {
  * | `URL_INSPECTION` | **G-3（登録済み）** |
  * | `METRICS_AGGREGATE` | **G-6（登録済み）** |
  * | `LINE_NOTIFY` | **H-3（登録済み）** |
+ * | `DAILY_SCHEDULE` | **I-1（登録済み）** |
  * | `LINE_REPLY` | **D-7b（登録済み）** |
  */
 
@@ -364,6 +366,17 @@ export function createJobHandlers(
       });
 
       return { kind: input.kind };
+    },
+
+    /**
+     * 日次ジョブを積む（I-1）。
+     *
+     * **全利用者を横断する**ので `user_id` を取らない。積むのは
+     * `DAILY_SCHEDULE:<JSTの暦日>` の1件で、cron が毎分呼んでも
+     * その日は一度しか走らない（C-4）。
+     */
+    DAILY_SCHEDULE: async () => {
+      return runDailySchedule();
     },
 
     /**

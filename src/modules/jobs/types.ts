@@ -30,6 +30,8 @@ export const JOB_TYPES = [
   'METRICS_AGGREGATE',
   'GA4_FETCH',
   'PROPOSAL_SELECTION',
+  // **1日1回の積み込み**（I-1）。日次のジョブをここから配る
+  'DAILY_SCHEDULE',
   'LINE_NOTIFY',
   // **LINE返信の取り込みはジョブに載せる**（D-7b、MODULE_RULES 3）。
   // Webhook のハンドラで直接処理すると、保存に時間がかかったときに
