@@ -11,6 +11,7 @@ export {
   findOrCreateByLineUserId,
   findNotificationTargetForUser,
   findMaxDailyProposalsForUser,
+  findNotificationScheduleForUser,
   recordConsent,
   type UsersDb,
   type UsersDeps,
@@ -47,3 +48,12 @@ export {
   type AppUser,
   type ConsentKind,
 } from './types';
+
+export {
+  ONBOARDING_STEPS,
+  resolveOnboardingProgress,
+  type OnboardingStep,
+  type OnboardingStepState,
+  type OnboardingFacts,
+  type OnboardingProgress,
+} from './onboarding';

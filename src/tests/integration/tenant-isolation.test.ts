@@ -1131,7 +1131,12 @@ describe('入口の網羅', () => {
     /**
      * **`line_user_id` を返す唯一の経路**（F-2）。`AppUser` には載せない
      */
-    users: ['findNotificationTargetForUser', 'findMaxDailyProposalsForUser'],
+    users: [
+      'findNotificationTargetForUser',
+      'findMaxDailyProposalsForUser',
+      // H-2a。通知の設定が済んでいるかをオンボーディングの判定が見る
+      'findNotificationScheduleForUser',
+    ],
     'content-generation': [
       'factCheckArticleForUser',
       'generateArticleForUser',
