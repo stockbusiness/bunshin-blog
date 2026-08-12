@@ -1037,6 +1037,8 @@ describe('入口の網羅', () => {
       'activatePersonaForUser',
       'pausePersonaForUser',
       'countActivePersonasForUser',
+      // D-14。**上限の内訳を画面に出すために足した**（「上限です」だけにしない）
+      'getPersonaLimitsForUser',
       'findBlogPersonaSettingForUser',
       'saveBlogPersonaSettingForUser',
       'updateBlogPersonaSettingForUser',
