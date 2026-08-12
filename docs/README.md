@@ -30,6 +30,7 @@ BUNSHIN BLOG のドキュメント一覧。
 | `CONSENT.md` | **同意していただくこと**（H-6）。画面の文言と食い違わないことをテストが見張る |
 | `WORDPRESS_SNIPPET.md` | **モニターに渡す手順書。** 各ブログに `/go/` の処理を入れる（D-12） |
 | `BACKUP.md` | **障害の最中に読む手順書。** バックアップと復旧（H-5） |
+| `DEPLOY.md` | **本番へ出すときに上から順に実行する手順書**（I-7）。Vercel・環境変数・cron・DB・鍵 |
 | `IMPLEMENTATION_STATUS.md` | タスク別の進捗（状態 / PR / 完了日 / 残課題） |
 | `IMPLEMENTATION_HISTORY.md` | 決定と変更の履歴 |
 | `OPEN_QUESTIONS.md` | 未解決の論点。**推測で実装しない** |
