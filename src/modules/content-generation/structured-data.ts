@@ -1,5 +1,22 @@
 /**
- * JSON-LD の組み立て（TASKS E-11、CONTENT_PLANNING 7.3）。
+ * JSON-LD の組み立て（TASKS E-11・E-16、CONTENT_PLANNING 7.3）。
+ *
+ * ## `Review` を出さない（E-16・Q-021）
+ *
+ * CONTENT_PLANNING 7.3 は当初「収益記事には `FAQPage` と `Review`」と
+ * していたが、**評点の出どころが無い。**
+ *
+ * 分身は案件の `facts` の範囲でしか書けず（SPEC 9.6）、
+ * 「5段階で4.5」という数字はどこにも存在しない。作り出せば、
+ * **SPEC 9.6 が禁じる「根拠のないランキング」そのもの**になる。
+ *
+ * 一方 Google の `Review` は `reviewRating` を必須としており、
+ * **評点なしで出してもリッチリザルトの対象にならない。**
+ * つまり「出す」ことの目的は果たせないまま、根拠のない申告の形だけが残る。
+ *
+ * **出さない。** 承認画面でモニターに評点を入力させる案は、
+ * 短期KPIが「承認率」と「1記事当たり確認時間」（SPEC 11.1）である以上、
+ * **承認1回あたりの負担を増やすので採らない**（Q-021 の (a)）。
  *
  * ## AIに生成させない
  *
@@ -25,14 +42,15 @@ export interface StructuredDataFaq {
   answer: string;
 }
 
+/**
+ * 組み立ての入力。
+ *
+ * **記事種別・案件名・ペンネームを受け取らない**（E-16）。`Review` を
+ * 出さなくなり、収益記事とそれ以外で出すものが変わらなくなったため。
+ * **使わない値を受け取り続けると、「渡せば何かに使われる」と読める。**
+ */
 export interface BuildStructuredDataInput {
-  contentType: string;
   faq: readonly StructuredDataFaq[];
-  answerCapsule: string;
-  /** 収益記事（`AFFILIATE`）の案件名。`Review.itemReviewed` になる */
-  offerName: string | null;
-  /** 分身のペンネーム。`Review.author` になる */
-  authorName: string | null;
 }
 
 /**
@@ -65,40 +83,10 @@ function buildFaqPage(faq: readonly StructuredDataFaq[]): JsonLdBlock {
 }
 
 /**
- * `Review` を組み立てる。
+ * FAQ から JSON-LD を組み立てる（CONTENT_PLANNING 7.3、E-16）。
  *
- * **`reviewRating` を入れない。** 評点の出どころが無いためで、
- * ここで適当な数字を入れると「根拠のないランキング」（SPEC 9.6 の禁止事項）
- * と同じことになる。Google の Review 構造化データは `reviewRating` を
- * 必須としているため、**このままではリッチリザルトの対象にならない** —
- * どう扱うかは Q-021 で未解決。
- */
-function buildReview(params: {
-  offerName: string;
-  authorName: string | null;
-  answerCapsule: string;
-}): JsonLdBlock {
-  return {
-    '@context': SCHEMA_CONTEXT,
-    '@type': 'Review',
-    itemReviewed: {
-      '@type': 'Product',
-      name: params.offerName,
-    },
-    reviewBody: params.answerCapsule.trim(),
-    ...(params.authorName === null
-      ? {}
-      : { author: { '@type': 'Person', name: params.authorName } }),
-  };
-}
-
-/**
- * 記事種別と FAQ から JSON-LD を組み立てる（CONTENT_PLANNING 7.3）。
- *
- * ```ts
- * // contentType === "AFFILIATE" → FAQPage + Review
- * // それ以外 → FAQPage
- * ```
+ * **出すのは `FAQPage` だけ。** 記事種別によらない（`Review` は Q-021 で
+ * 出さないと決めた。理由はこのファイルの冒頭）。
  *
  * @throws {AppError} 組み立てに必要な材料が足りない
  */
@@ -110,24 +98,6 @@ export function buildStructuredData(
   }
 
   const blocks: JsonLdBlock[] = [buildFaqPage(input.faq)];
-
-  if (input.contentType === 'AFFILIATE') {
-    // **黙って Review を省かない。** 収益記事に案件が紐づいていないのは
-    // 構成表の側の異常で、ここで見なかったことにすると原因が消える
-    if (input.offerName === null || input.offerName.trim() === '') {
-      throw invalidStructuredDataError(
-        '収益記事に案件が紐づいていません（Review を組み立てられません）',
-      );
-    }
-
-    blocks.push(
-      buildReview({
-        offerName: input.offerName.trim(),
-        authorName: input.authorName,
-        answerCapsule: input.answerCapsule,
-      }),
-    );
-  }
 
   assertValidJsonLd(blocks);
 
