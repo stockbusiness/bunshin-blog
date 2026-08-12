@@ -15,6 +15,7 @@
 
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
+import { recordAudit } from '@/modules/audit';
 import {
   duplicateVersionError,
   noActiveVersionError,
@@ -140,6 +141,22 @@ export async function createPromptVersionForAdmin(
     throw error;
   }
 
+  // **版を作ったことを残す**（SPEC 14.4「AIプロンプト変更」、H-13）。
+  //
+  // **本文は入れない。** `prompt_versions` に残っており、
+  // 監査ログに写すと同じものが2か所になる。残すのは鍵と版だけ。
+  //
+  // **行為者は残せない。** この関数は ADMIN の操作としてしか呼ばれないが、
+  // 誰が呼んだかを引数に持たない（`...ForAdmin` は横断参照の印で、
+  // 行為者を伴わない）。**ここで嘘の行為者を入れない**
+  await recordAudit({
+    actorUserId: null,
+    action: 'PROMPT_VERSION_CREATED',
+    entityType: 'prompt_version',
+    entityId: created.id,
+    metadata: { key: data.key, version: data.version },
+  });
+
   if (input.activate !== true) {
     return created;
   }
@@ -202,6 +219,16 @@ export async function activatePromptVersionForAdmin(params: {
   if (activated === null) {
     throw promptNotFoundError();
   }
+
+  // **有効化も「プロンプト変更」**（SPEC 14.4、H-13）。
+  // 版を作っただけでは生成は変わらない。**実際に効き始めたのはここ**
+  await recordAudit({
+    actorUserId: null,
+    action: 'PROMPT_VERSION_ACTIVATED',
+    entityType: 'prompt_version',
+    entityId: activated.id,
+    metadata: { key, version },
+  });
 
   return activated;
 }

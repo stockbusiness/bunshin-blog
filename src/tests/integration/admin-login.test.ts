@@ -8,6 +8,7 @@ import {
   requestAdminLoginLink,
   verifySessionToken,
 } from '@/modules/auth';
+import { listAuditLogsForAdmin } from '@/modules/audit';
 import { findAdminByEmail } from '@/modules/users';
 import {
   assertMigrationsApplied,
@@ -260,5 +261,54 @@ describe('発行数の制限', () => {
 
     expect(sent).toHaveLength(3);
     expect(await prisma.adminLoginToken.count()).toBe(3);
+  });
+});
+
+/**
+ * ログインの記録（TASKS H-13、SPEC 14.4「ログイン」、Q-027）。
+ */
+describe('ログインの記録', () => {
+  it('ログインすると残る', async () => {
+    const admin = await createAdmin('admin@example.test');
+    const { token } = await issueFor('admin@example.test');
+
+    await consumeAdminLoginLink(token, { secret: SECRET });
+
+    const logs = await listAuditLogsForAdmin({ entityType: 'user' });
+
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toMatchObject({
+      actorUserId: admin.id,
+      action: 'ADMIN_LOGGED_IN',
+      entityId: admin.id,
+    });
+  });
+
+  /** **トークンもメールアドレスも入れない**（SPEC 14.2） */
+  it('トークンとメールアドレスを入れない', async () => {
+    await createAdmin('admin@example.test');
+    const { token } = await issueFor('admin@example.test');
+
+    await consumeAdminLoginLink(token, { secret: SECRET });
+
+    const serialized = JSON.stringify(
+      await listAuditLogsForAdmin({ entityType: 'user' }),
+    );
+
+    expect(serialized).not.toContain(token);
+    expect(serialized).not.toContain('admin@example.test');
+  });
+
+  /** **失敗したログインは「ログイン」ではない。** 使用済みリンクなど */
+  it('失敗したら残さない', async () => {
+    await createAdmin('admin@example.test');
+    const { token } = await issueFor('admin@example.test');
+
+    await consumeAdminLoginLink(token, { secret: SECRET });
+    await expect(
+      consumeAdminLoginLink(token, { secret: SECRET }),
+    ).rejects.toBeInstanceOf(AppError);
+
+    expect(await listAuditLogsForAdmin({ entityType: 'user' })).toHaveLength(1);
   });
 });

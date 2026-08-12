@@ -1,6 +1,7 @@
 import { AppError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 import { getMailer, type Mailer } from '@/lib/mailer';
+import { recordAudit } from '@/modules/audit';
 import { getRuntimeEnv } from '@/modules/settings';
 import { findAdminByEmail, isActiveUser, type AppUser } from '@/modules/users';
 import { AUTH_ERROR_CODES } from '../errors';
@@ -191,6 +192,16 @@ export async function consumeAdminLoginLink(
     // 発行後に権限を落とされた場合。トークンは使用済みのままにする
     throw invalidLinkError('not-admin');
   }
+
+  // **ADMIN のログインを残す**（SPEC 14.4、H-13）。
+  // **トークンもメールアドレスも入れない**（SPEC 14.2）
+  await recordAudit({
+    actorUserId: user.id,
+    action: 'ADMIN_LOGGED_IN',
+    entityType: 'user',
+    entityId: user.id,
+    metadata: { method: 'LOGIN_LINK' },
+  });
 
   return {
     user,

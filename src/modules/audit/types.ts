@@ -5,14 +5,18 @@
  *
  * | 項目 | 状態 |
  * |---|---|
- * | ログイン | 未（後続） |
- * | WordPress接続変更 | **H-12** |
- * | 案件URL変更 | 未（後続） |
- * | 承認 | **H-12** |
- * | 公開 | **H-12** |
+ * | ログイン | **H-13** |
+ * | WordPress接続変更 | H-12 |
+ * | 案件URL変更 | **H-13** |
+ * | 承認 | H-12 |
+ * | 公開 | H-12 |
  * | 管理者介入 | H-1 |
- * | ジョブ再実行 | 未（後続） |
- * | AIプロンプト変更 | 未（後続） |
+ * | ジョブ再実行 | **機能が無い**（下記） |
+ * | AIプロンプト変更 | **H-13** |
+ *
+ * **ジョブ再実行の機能そのものが存在しない**（H-13 で判明）。ジョブは
+ * cron が消化するだけで、手で積み直す入口がどこにも無い。
+ * **無い操作は記録できない** — 作るタスクと一緒に足す。
  *
  * 加えて SPEC 9.2.2 の「承知で進める」（14.4 の一覧には無い）。
  *
@@ -59,6 +63,21 @@ export const AUDIT_ACTIONS = [
   'WORDPRESS_CONNECTED',
   /** WordPress の接続を切った（H-12、SPEC 14.4） */
   'WORDPRESS_DISCONNECTED',
+  /** モニターが LIFF でログインした（H-13、SPEC 14.4「ログイン」） */
+  'USER_LOGGED_IN',
+  /** ADMIN がログインリンクでログインした（H-13、SPEC 14.4） */
+  'ADMIN_LOGGED_IN',
+  /**
+   * 案件のURLが変わった（H-13、SPEC 14.4「案件URL変更」）。
+   *
+   * **リンク先が変われば、記事から読者が行く先が変わる。**
+   * 成果の計上にも関わるので、いつ誰が変えたかを残す
+   */
+  'OFFER_URL_CHANGED',
+  /** AIプロンプトの版を作った（H-13、SPEC 14.4「AIプロンプト変更」） */
+  'PROMPT_VERSION_CREATED',
+  /** AIプロンプトの版を有効化した（H-13、SPEC 14.4） */
+  'PROMPT_VERSION_ACTIVATED',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -72,6 +91,10 @@ export const AUDIT_ENTITY_TYPES = [
   'approval',
   /** 記事（H-12。投稿の対象） */
   'content_item',
+  /** 案件（H-13） */
+  'affiliate_offer',
+  /** AIプロンプトの版（H-13） */
+  'prompt_version',
 ] as const;
 
 export type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number];

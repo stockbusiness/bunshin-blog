@@ -1,3 +1,4 @@
+import { recordAudit } from '@/modules/audit';
 import { findOrCreateByLineUserId, type AppUser } from '@/modules/users';
 import type { UsersDeps } from '@/modules/users';
 import { createSessionToken, type SessionOptions } from '../session';
@@ -41,6 +42,22 @@ export async function authenticateWithLiff(
     displayName,
     options,
   );
+
+  // **ログインを残す**（SPEC 14.4、H-13）。
+  //
+  // **`line_user_id` も表示名も入れない。** 身元そのもので、
+  // `AppUser` にすら載せていない値（SPEC 14.2）。
+  // 残すのは「どの内部ユーザーが、いつ、どの経路で入ったか」だけ。
+  //
+  // **記録に失敗してもログインを止めない**（`recordAudit` は投げない）
+  await recordAudit({
+    actorUserId: user.id,
+    action: 'USER_LOGGED_IN',
+    entityType: 'user',
+    entityId: user.id,
+    // 初回かどうかは、後から参加の流れを追うのに要る
+    metadata: { method: 'LIFF', created },
+  });
 
   return {
     user,
