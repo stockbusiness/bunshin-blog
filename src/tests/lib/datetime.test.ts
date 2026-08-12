@@ -5,6 +5,7 @@ import {
   isJstDate,
   JST_OFFSET_MINUTES,
   jstDayRange,
+  jstHour,
   jstWeekNumber,
   jstWeekRange,
   jstWeeksBetween,
@@ -286,6 +287,36 @@ describe('isJstDate', () => {
 describe('todayInJst', () => {
   it('渡した瞬間のJST暦日を返す', () => {
     expect(todayInJst(new Date('2026-08-05T15:00:00Z'))).toBe('2026-08-06');
+  });
+});
+
+describe('jstHour', () => {
+  it('JSTの時を2桁で返す', () => {
+    // 2026-08-06 12:00 JST
+    expect(jstHour(new Date('2026-08-06T03:00:00Z'))).toBe('12');
+  });
+
+  it('1桁の時も0で埋める', () => {
+    // 2026-08-06 09:00 JST
+    expect(jstHour(new Date('2026-08-06T00:00:00Z'))).toBe('09');
+  });
+
+  /**
+   * **暦日と組で使う**（I-2 の冪等キー）。日付だけJSTにして時をUTCで
+   * 取ると、日付が変わる時刻に**同じ組が2回現れる**
+   */
+  it('JSTの日付が変わる瞬間は00時になる', () => {
+    // 2026-08-06 00:00 JST = 2026-08-05 15:00 UTC
+    expect(jstHour(new Date('2026-08-05T15:00:00Z'))).toBe('00');
+    expect(todayInJst(new Date('2026-08-05T15:00:00Z'))).toBe('2026-08-06');
+
+    // その1分前はまだ前日の23時
+    expect(jstHour(new Date('2026-08-05T14:59:00Z'))).toBe('23');
+    expect(todayInJst(new Date('2026-08-05T14:59:00Z'))).toBe('2026-08-05');
+  });
+
+  it('Invalid Date を拒む', () => {
+    expect(() => jstHour(new Date('x'))).toThrow();
   });
 });
 

@@ -30,6 +30,10 @@ export const JOB_TYPES = [
   'METRICS_AGGREGATE',
   'GA4_FETCH',
   'PROPOSAL_SELECTION',
+  // **提案の送信は選定と別のジョブ**（I-2）。送れる時間帯が決まっており
+  // （F-3b）、選定した時刻とは限らない。同じジョブにすると、
+  // **深夜に選定した提案がその日は一度も送られない**
+  'PROPOSAL_NOTIFY',
   // **2週間ごとの見直し**（G-8b）。インデックス率で公開ペースを上下させる
   'PUBLISH_PACE_REVIEW',
   // **1日1回の積み込み**（I-1）。日次のジョブをここから配る

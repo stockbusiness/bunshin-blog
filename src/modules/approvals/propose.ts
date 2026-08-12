@@ -10,9 +10,11 @@
  * 送信に失敗した提案が消えないようにするため。
  */
 
+import { todayInJst } from '@/lib/datetime';
 import { listBlogsForUser } from '@/modules/blogs';
 import { listApprovableArticlesForUser } from '@/modules/content-generation';
 import { markItemsReadyForReview } from '@/modules/content-planning';
+import { enqueueJob } from '@/modules/jobs';
 import { rankProposals, type BlogProposalState } from './priority';
 import {
   createApproval,
@@ -98,4 +100,31 @@ export async function refreshProposalsForUser(
   );
 
   return { created, skipped };
+}
+
+/**
+ * 提案の選定を積む（TASKS I-2、SPEC 4.3）。
+ *
+ * **1日1回。** 冪等キーにJSTの暦日を入れるので、cron が何度呼んでも
+ * その日は1件しか積まれない（C-4）。
+ *
+ * **ブログ単位で積まない。** 3ブログ横断で順位を付ける（SPEC 9.1）ので、
+ * ブログごとに積むと**それぞれのブログの中でしか比べられなくなる。**
+ *
+ * @returns 新しく積んだなら `true`
+ */
+export async function enqueueProposalSelectionForUser(
+  userId: string,
+  deps: RefreshProposalsDeps = {},
+): Promise<boolean> {
+  const date = todayInJst(deps.now ?? new Date());
+
+  const result = await enqueueJob({
+    jobType: 'PROPOSAL_SELECTION',
+    idempotencyKey: `PROPOSAL_SELECTION:${userId}:${date}`,
+    input: {},
+    userId,
+  });
+
+  return result.created;
 }

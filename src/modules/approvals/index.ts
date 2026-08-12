@@ -9,6 +9,7 @@
 
 export {
   refreshProposalsForUser,
+  enqueueProposalSelectionForUser,
   type RefreshProposalsDeps,
   type RefreshProposalsResult,
 } from './propose';

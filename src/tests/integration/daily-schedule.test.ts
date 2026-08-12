@@ -96,7 +96,12 @@ describe('利用者ごとの積み込み', () => {
     // 検索データとインデックスは Search Console 未連携なので積まれない
     expect(result.queued.dailyAggregate).toBe(1);
     expect(result.queued.linkCheck).toBe(1);
-    expect(await jobTypes()).toEqual(['LINK_CHECK', 'METRICS_AGGREGATE']);
+    expect(result.queued.proposalSelection).toBe(1);
+    expect(await jobTypes()).toEqual([
+      'LINK_CHECK',
+      'METRICS_AGGREGATE',
+      'PROPOSAL_SELECTION',
+    ]);
   });
 
   /**
@@ -125,7 +130,8 @@ describe('利用者ごとの積み込み', () => {
 
     expect(second.queued.dailyAggregate).toBe(0);
     expect(second.queued.linkCheck).toBe(0);
-    expect(await prisma.job.count()).toBe(2);
+    expect(second.queued.proposalSelection).toBe(0);
+    expect(await prisma.job.count()).toBe(3);
   });
 
   it('日が変われば積み直す', async () => {
@@ -136,6 +142,7 @@ describe('利用者ごとの積み込み', () => {
 
     expect(next.queued.dailyAggregate).toBe(1);
     expect(next.queued.linkCheck).toBe(1);
+    expect(next.queued.proposalSelection).toBe(1);
   });
 
   /** **利用者が1人もいなくても落ちない**（実験開始前は普通にある） */
@@ -153,6 +160,7 @@ describe('利用者ごとの積み込み', () => {
 
     expect(result.users).toBe(1);
     expect(result.failed).toBe(0);
-    expect(await prisma.job.count()).toBe(1); // リンク確認は利用者単位
+    // リンク確認と提案の選定は利用者単位（ブログが無くても積まれる）
+    expect(await prisma.job.count()).toBe(2);
   });
 });

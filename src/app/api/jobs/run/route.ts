@@ -4,7 +4,7 @@ import { logger } from '@/lib/logger';
 import { enqueuePublishPaceReview } from '@/modules/analytics';
 import { drainJobs, runnerUnauthorizedError } from '@/modules/jobs';
 import { JOB_HANDLERS } from './handlers';
-import { enqueueDailySchedule } from './schedule';
+import { enqueueDailySchedule, enqueueProposalNotify } from './schedule';
 
 /**
  * `GET /api/jobs/run` — キューの消化（TASKS E-1、SPEC 4.3）
@@ -23,8 +23,14 @@ import { enqueueDailySchedule } from './schedule';
  *
  * **cron はこの1つだけ**（`vercel.json`）。間隔ごとに cron を増やすより、
  * **間隔を冪等キーに持たせて**ここから積むほうが、設定が1か所で済む
- * （G-8b）。毎分呼ばれても、同じ回のジョブは1件しか積まれない（C-4）。
- * （I-1）。毎分呼ばれても、同じ日のものは1件しか積まれない（C-4）。
+ * （G-8b・I-1・I-2）。毎分呼ばれても、**同じ回のジョブは1件しか
+ * 積まれない**（C-4）。
+ *
+ * | ジョブ | 間隔 | 冪等キー |
+ * |---|---|---|
+ * | `DAILY_SCHEDULE` | 1日1回 | JSTの暦日 |
+ * | `PUBLISH_PACE_REVIEW` | 2週間に1回 | 基準時刻からの回 |
+ * | `PROPOSAL_NOTIFY` | 1時間に1回 | JSTの暦日＋時 |
  *
  * **積めなくても消化は続ける。** 積むのは次の分でもできる。
  */
@@ -87,6 +93,10 @@ export async function GET(request: Request): Promise<Response> {
 
       if (await enqueuePublishPaceReview()) {
         logger.info('公開ペースの見直しを積んだ');
+      }
+
+      if (await enqueueProposalNotify()) {
+        logger.info('提案の送信を積んだ');
       }
     } catch (error) {
       // **積めなくても消化は続ける。** 次の分で積める

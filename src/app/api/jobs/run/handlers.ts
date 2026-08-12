@@ -20,9 +20,10 @@ import {
   sendEmergencyNotificationForUser,
   type EmergencyKind,
 } from '@/modules/line';
+import { refreshProposalsForUser } from '@/modules/approvals';
 import { publishDraftForUser } from '@/modules/wordpress';
 import type { AppJob, JobHandlerRegistry } from '@/modules/jobs';
-import { runDailySchedule } from './schedule';
+import { runDailySchedule, runProposalNotify } from './schedule';
 import type {
   WordpressClient,
   WordpressCredentials,
@@ -401,6 +402,40 @@ export function createJobHandlers(
      */
     DAILY_SCHEDULE: async () => {
       return runDailySchedule();
+    },
+
+    /**
+     * 提案を選ぶ（I-2、SPEC 9.1）。
+     *
+     * **3ブログ横断で順位を付ける**ので、`blog_id` は取らない。
+     *
+     * **ここでは送らない。** 送れる時間帯が決まっており（F-3b）、
+     * 選定した時刻とは限らない（`PROPOSAL_NOTIFY`）。
+     */
+    PROPOSAL_SELECTION: async (job) => {
+      if (job.userId === null) {
+        throw new AppError(
+          'BAD_REQUEST',
+          400,
+          'PROPOSAL_SELECTION には user_id が要ります',
+        );
+      }
+
+      const result = await refreshProposalsForUser(job.userId);
+
+      // **提案の中身は残さない。** 記事の題名が `output_json` に入ると、
+      // 管理画面のジョブ一覧から他人の記事が読める（SPEC 14.2）
+      return { created: result.created.length, skipped: result.skipped };
+    },
+
+    /**
+     * 溜まっている提案を送る（I-2、SPEC 8.3）。
+     *
+     * **全利用者を横断する**ので `user_id` を取らない。1時間に1回積まれ、
+     * **送ってよい時間帯の人にだけ**届く（判定は `line` モジュール）。
+     */
+    PROPOSAL_NOTIFY: async () => {
+      return runProposalNotify();
     },
 
     /**
