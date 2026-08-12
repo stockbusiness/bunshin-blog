@@ -1,4 +1,5 @@
 import type { ArticleRatio } from './article-ratio';
+import type { PermalinkPattern } from './publish-schedule';
 
 /** ブログに割り当てられたジャンル。決まるのは E-4 の審査（Q-009） */
 export interface AppBlogGenre {
@@ -48,6 +49,19 @@ export interface AppBlog {
    * 画面はこの値で「発行済みか」だけを示す
    */
   linkEventTokenIssuedAt: Date | null;
+  /**
+   * 公開スケジュール（C-9）。**ブログごとに散らして割り当てる。**
+   *
+   * 全ブログの投稿ジョブが同一時刻に集中しないようにする
+   * （同一運営者による大量サイトの痕跡を残さない・W-8）。
+   */
+  publishWeekdays: number[];
+  /** `HH:MM`（JSTの壁掛け時計）。C-9 より前に作られたブログは `null` */
+  publishTime: string | null;
+  publishJitterMin: number;
+  /** **初回設定後に変更しない**（変えるとURLが全部変わる） */
+  permalinkPattern: PermalinkPattern;
+  initialArticleCount: number;
 }
 
 /**
