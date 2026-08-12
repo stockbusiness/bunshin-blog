@@ -31,6 +31,7 @@ import { logger } from '@/lib/logger';
 import {
   claimUnsentApprovalForUser,
   countProposalsSentInRangeForUser,
+  expireStaleUnsentApprovalsForUser,
   listUnsentApprovalsForUser,
   type UnsentApproval,
 } from '@/modules/approvals';
@@ -38,7 +39,9 @@ import { enqueueJob } from '@/modules/jobs';
 import { getRuntimeEnv } from '@/modules/settings';
 import {
   findMaxDailyProposalsForUser,
+  findNotificationScheduleForUser,
   findNotificationTargetForUser,
+  fromNotificationTimeColumn,
 } from '@/modules/users';
 import {
   alertIdempotencyKey,
@@ -46,6 +49,10 @@ import {
   type BlogAlert,
 } from './alerts';
 import { dailyNotificationLimit, remainingNotificationSlots } from './limit';
+import {
+  UNSENT_PROPOSAL_TTL_DAYS,
+  isWithinNotificationWindow,
+} from './schedule';
 import { buildProposalMessages } from './message';
 import {
   lineNotConfiguredError,
@@ -64,6 +71,15 @@ export interface SendProposalsResult {
   skipped: number;
   /** その日に送ってよい残り枠（送信前の値。SPEC 8.3） */
   remaining: number;
+  /**
+   * いま送ってよい時間帯だったか（F-3b・Q-025）。
+   *
+   * **`false` と「送るものが無い」を呼び出し側が区別できるようにする。**
+   * どちらも `sent` が空になるが、原因も次にすべきことも違う
+   */
+  inWindow: boolean;
+  /** 古くなって期限切れにした件数（F-3b） */
+  expired: number;
 }
 
 /**
@@ -78,14 +94,40 @@ export async function sendPendingProposalsForUser(
 ): Promise<SendProposalsResult> {
   const now = deps.now ?? new Date();
 
+  // **古いものを先に落とす**（F-3b・Q-025）。時間帯の判定より前に置く —
+  // 通知日でない日にも掃除が進み、**通知日に溜まった山を見せない**
+  const expired = await expireStaleUnsentApprovalsForUser({
+    userId,
+    before: new Date(now.getTime() - UNSENT_PROPOSAL_TTL_DAYS * 86_400_000),
+  });
+
   // **枠を先に数える。** 提案が無くても残り枠は返す（呼び出し側が
   // 「今日はもう送れない」と「送るものが無い」を区別できるように）
   const remaining = await remainingSlotsForUser(userId, now);
 
+  // **指定の曜日・時刻にだけ送る**（F-3b・SPEC 8.3）。
+  // 押さえる前に判定する — `sent_at` を立ててから弾くと、
+  // **送っていない提案が送信済みとして残る**
+  const saved = await findNotificationScheduleForUser(userId);
+  const inWindow = isWithinNotificationWindow({
+    schedule:
+      saved === null
+        ? null
+        : {
+            days: saved.days,
+            time: fromNotificationTimeColumn(saved.time),
+          },
+    now,
+  });
+
+  if (!inWindow) {
+    return { sent: [], skipped: 0, remaining, inWindow: false, expired };
+  }
+
   const pending = await listUnsentApprovalsForUser(userId);
 
   if (pending.length === 0 || remaining === 0) {
-    return { sent: [], skipped: 0, remaining };
+    return { sent: [], skipped: 0, remaining, inWindow: true, expired };
   }
 
   const env = deps.env ?? (await getRuntimeEnv());
@@ -130,7 +172,7 @@ export async function sendPendingProposalsForUser(
     sent.push(approval.id);
   }
 
-  return { sent, skipped, remaining };
+  return { sent, skipped, remaining, inWindow: true, expired };
 }
 
 /**

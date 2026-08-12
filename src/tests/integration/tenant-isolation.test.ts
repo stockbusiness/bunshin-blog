@@ -1109,6 +1109,8 @@ describe('入口の網羅', () => {
       'refreshProposalsForUser',
       'listApprovalsForUser',
       'listUnsentApprovalsForUser',
+      // F-3b。溜め続けないための期限切れ（Q-025）
+      'expireStaleUnsentApprovalsForUser',
       'claimUnsentApprovalForUser',
       'countProposalsSentInRangeForUser',
       'listApprovalSummariesForUser',

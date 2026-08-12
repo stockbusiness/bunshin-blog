@@ -166,15 +166,22 @@ async function createProposal(
   return approval.id;
 }
 
-/** `monitor_profiles.max_daily_proposals` を設定する */
+/**
+ * `monitor_profiles.max_daily_proposals` を設定する。
+ *
+ * **曜日は空にする。** ここで見るのは件数の制御（F-3）で、曜日・時刻の
+ * 判定（F-3b）ではない。曜日を入れると、**テストを走らせた日次第で
+ * 送れたり送れなかったりする。** 空は「未設定」の扱いで、時間帯の判定を
+ * 素通しする（`isWithinNotificationWindow`）。
+ */
 async function setMaxDailyProposals(value: number): Promise<void> {
   await prisma.monitorProfile.upsert({
     where: { userId },
-    update: { maxDailyProposals: value },
+    update: { maxDailyProposals: value, notificationDays: [] },
     create: {
       userId,
       primaryAspNames: [],
-      notificationDays: [1],
+      notificationDays: [],
       notificationTime: new Date('1970-01-01T09:00:00.000Z'),
       maxDailyProposals: value,
     },
@@ -651,5 +658,191 @@ describe('他人の提案は送らない', () => {
 
     expect(result.sent).toEqual([]);
     expect(received).toEqual([]);
+  });
+});
+
+/**
+ * 指定の曜日・時刻にだけ送る（TASKS F-3b、Q-025）。
+ *
+ * **判定はJST。** UTCで曜日を見ると、日本の朝が前日として判定される。
+ */
+describe('通知の曜日・時刻（F-3b）', () => {
+  /** 2026-08-12 は水曜（JST）。UTCでは 2026-08-11 の夜 */
+  const WED_0700_JST = new Date('2026-08-11T22:00:00.000Z');
+  const WEDNESDAY = 3;
+  const THURSDAY = 4;
+
+  async function setSchedule(days: number[], time: string): Promise<void> {
+    await prisma.monitorProfile.upsert({
+      where: { userId },
+      update: {
+        notificationDays: days,
+        notificationTime: new Date(`1970-01-01T${time}:00.000Z`),
+      },
+      create: {
+        userId,
+        primaryAspNames: [],
+        notificationDays: days,
+        notificationTime: new Date(`1970-01-01T${time}:00.000Z`),
+      },
+    });
+  }
+
+  it('指定の曜日・時刻なら送る', async () => {
+    await setSchedule([WEDNESDAY], '07:00');
+    const approvalId = await createProposal();
+
+    const result = await sendPendingProposalsForUser(
+      userId,
+      {},
+      { client: client(), env: ENV, now: WED_0700_JST },
+    );
+
+    expect(result.inWindow).toBe(true);
+    expect(result.sent).toEqual([approvalId]);
+  });
+
+  /**
+   * **押さえる前に弾く。** `sent_at` を立ててから弾くと、
+   * 送っていない提案が送信済みとして残る
+   */
+  it('違う曜日なら送らず、sent_at も立てない', async () => {
+    await setSchedule([THURSDAY], '07:00');
+    const approvalId = await createProposal();
+
+    const result = await sendPendingProposalsForUser(
+      userId,
+      {},
+      { client: client(), env: ENV, now: WED_0700_JST },
+    );
+
+    expect(result.inWindow).toBe(false);
+    expect(result.sent).toEqual([]);
+    expect(received).toHaveLength(0);
+
+    const row = await prisma.approval.findUniqueOrThrow({
+      where: { id: approvalId },
+      select: { sentAt: true, status: true },
+    });
+    expect(row.sentAt).toBeNull();
+    expect(row.status).toBe('PENDING');
+  });
+
+  it('時刻の幅を過ぎたら送らない', async () => {
+    await setSchedule([WEDNESDAY], '07:00');
+    await createProposal();
+
+    const result = await sendPendingProposalsForUser(
+      userId,
+      {},
+      {
+        client: client(),
+        env: ENV,
+        // 幅（3時間）を過ぎた JST 11:00
+        now: new Date('2026-08-12T02:00:00.000Z'),
+      },
+    );
+
+    expect(result.inWindow).toBe(false);
+    expect(received).toHaveLength(0);
+  });
+
+  /** **未設定なら止めない**（設定の有無で挙動を黙って変えない） */
+  it('設定が無ければ従来どおり送る', async () => {
+    const approvalId = await createProposal();
+
+    const result = await sendPendingProposalsForUser(
+      userId,
+      {},
+      { client: client(), env: ENV, now: WED_0700_JST },
+    );
+
+    expect(result.inWindow).toBe(true);
+    expect(result.sent).toEqual([approvalId]);
+  });
+});
+
+/**
+ * 溜め続けない（TASKS F-3b、Q-025）。
+ *
+ * 曜日を絞った人ほど未送信が積み上がり、**通知が届いた瞬間に何件も
+ * 溜まっている**状態になる。1日に送れるのは1〜2件なので、古いものは
+ * 結局いつまでも送られない。
+ */
+describe('古い提案の期限切れ（F-3b）', () => {
+  const NOW = new Date('2026-08-12T02:00:00.000Z');
+
+  it('7日を過ぎた未送信は EXPIRED になる', async () => {
+    const stale = await createProposal();
+    await prisma.approval.update({
+      where: { id: stale },
+      data: { createdAt: new Date(NOW.getTime() - 8 * 86_400_000) },
+    });
+
+    const result = await sendPendingProposalsForUser(
+      userId,
+      {},
+      { client: client(), env: ENV, now: NOW },
+    );
+
+    expect(result.expired).toBe(1);
+
+    const row = await prisma.approval.findUniqueOrThrow({
+      where: { id: stale },
+      select: { status: true },
+    });
+    // **消さずに残す。** 出したが送れなかったことも実験の記録
+    expect(row.status).toBe('EXPIRED');
+  });
+
+  it('7日以内のものは残る', async () => {
+    const recent = await createProposal();
+    await prisma.approval.update({
+      where: { id: recent },
+      data: { createdAt: new Date(NOW.getTime() - 6 * 86_400_000) },
+    });
+
+    const result = await sendPendingProposalsForUser(
+      userId,
+      {},
+      { client: client(), env: ENV, now: NOW },
+    );
+
+    expect(result.expired).toBe(0);
+    expect(
+      (
+        await prisma.approval.findUniqueOrThrow({
+          where: { id: recent },
+          select: { status: true },
+        })
+      ).status,
+    ).toBe('PENDING');
+  });
+
+  /** **届いた提案は触らない。** 承認一覧（F-4）で答えを待っている */
+  it('送信済みのものは期限切れにしない', async () => {
+    const sent = await createProposal({
+      sentAt: new Date(NOW.getTime() - 30 * 86_400_000),
+    });
+    await prisma.approval.update({
+      where: { id: sent },
+      data: { createdAt: new Date(NOW.getTime() - 30 * 86_400_000) },
+    });
+
+    const result = await sendPendingProposalsForUser(
+      userId,
+      {},
+      { client: client(), env: ENV, now: NOW },
+    );
+
+    expect(result.expired).toBe(0);
+    expect(
+      (
+        await prisma.approval.findUniqueOrThrow({
+          where: { id: sent },
+          select: { status: true },
+        })
+      ).status,
+    ).toBe('PENDING');
   });
 });

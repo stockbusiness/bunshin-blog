@@ -16,6 +16,7 @@ export {
 export {
   listApprovalsForUser,
   listUnsentApprovalsForUser,
+  expireStaleUnsentApprovalsForUser,
   claimUnsentApprovalForUser,
   countProposalsSentInRangeForUser,
   listApprovalSummariesForUser,
