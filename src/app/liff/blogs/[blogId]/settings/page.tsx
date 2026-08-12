@@ -30,8 +30,15 @@ import {
  *   後者はサーバーが決める（B-4）
  */
 
-/** 週の公開上限。SPEC 2.2「週4本を超えて公開する処理を実装してはならない」 */
-const PUBLISH_CAP_CHOICES = [1, 2, 3, 4];
+/**
+ * 週の公開上限（SPEC 2.2。2026-08-12 に週4本固定から改めた・Q-036）。
+ *
+ * **0本を選べるようにしない。** 公開の停止はインデックス率が
+ * 50%未満のときの**異常時の処理**（G-8）で、設定として選ぶものではない。
+ * 選べるようにすると、**止まっているのが異常なのか設定なのか
+ * 区別できなくなる。**
+ */
+const PUBLISH_CAP_CHOICES = [3, 4, 5];
 
 type FormState = BlogSettingsInput;
 
@@ -209,22 +216,36 @@ export default function BlogSettingsPage({
           )}
         </Field>
 
-        <Field label="投稿頻度" hint="週の公開本数の上限（最大4本）">
+        <Field label="投稿頻度" hint="週の公開本数の上限（3〜5本）">
           {(fieldProps) => (
-            <select
-              {...fieldProps}
-              value={form.weeklyPublishCap}
-              onChange={(e) =>
-                update('weeklyPublishCap', Number(e.target.value))
-              }
-              className="w-full rounded border p-3 text-base"
-            >
-              {PUBLISH_CAP_CHOICES.map((value) => (
-                <option key={value} value={value}>
-                  週 {value} 本
-                </option>
-              ))}
-            </select>
+            <>
+              <select
+                {...fieldProps}
+                value={form.weeklyPublishCap}
+                onChange={(e) =>
+                  update('weeklyPublishCap', Number(e.target.value))
+                }
+                className="w-full rounded border p-3 text-base"
+              >
+                {PUBLISH_CAP_CHOICES.map((value) => (
+                  <option key={value} value={value}>
+                    週 {value} 本
+                  </option>
+                ))}
+              </select>
+
+              {/* **黙って選べる値へ丸めない。** いまの値が選べる範囲の外
+                  （公開を止めている・古い設定）なら、そう書く。
+                  丸めると、保存した覚えのない値になる */}
+              {PUBLISH_CAP_CHOICES.includes(
+                blog.articleRatio.weeklyPublishCap,
+              ) ? null : (
+                <p className="mt-1 text-xs leading-relaxed">
+                  いまの設定は週 {blog.articleRatio.weeklyPublishCap}{' '}
+                  本です。保存すると 3〜5本のいずれかに変わります。
+                </p>
+              )}
+            </>
           )}
         </Field>
 

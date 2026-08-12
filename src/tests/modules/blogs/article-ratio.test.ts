@@ -4,6 +4,7 @@ import {
   ARTICLE_RATIO_ERROR_CODES,
   DEFAULT_ARTICLE_RATIO,
   WEEKLY_PUBLISH_CAP_MAX,
+  WEEKLY_PUBLISH_CAP_MIN,
   parseArticleRatio,
   withWeeklyPublishCap,
   type ArticleRatio,
@@ -45,8 +46,14 @@ describe('既定値', () => {
     );
   });
 
-  it('週の上限は4（SPEC 2.2）', () => {
-    expect(WEEKLY_PUBLISH_CAP_MAX).toBe(4);
+  /**
+   * **既定を上限と同じにしない**（Q-036）。上限を5へ広げたのは
+   * G-8 が実測で上げるためで、最初から5本で始めるためではない
+   */
+  it('範囲は3〜5、既定は4（SPEC 2.2・Q-036）', () => {
+    expect(WEEKLY_PUBLISH_CAP_MIN).toBe(3);
+    expect(WEEKLY_PUBLISH_CAP_MAX).toBe(5);
+    expect(DEFAULT_ARTICLE_RATIO.weeklyPublishCap).toBe(4);
   });
 });
 
@@ -97,7 +104,7 @@ describe('parseArticleRatio', () => {
 });
 
 describe('withWeeklyPublishCap', () => {
-  it.each([1, 2, 3, 4])('週 %s 本を受け入れる', (cap) => {
+  it.each([3, 4, 5])('週 %s 本を受け入れる', (cap) => {
     expect(withWeeklyPublishCap(CURRENT, cap).weeklyPublishCap).toBe(cap);
   });
 
@@ -114,7 +121,12 @@ describe('withWeeklyPublishCap', () => {
     expect(CURRENT.weeklyPublishCap).toBe(2);
   });
 
-  it.each([0, 5, -1, 1.5, Number.NaN])('%s を 422 で拒否する', (cap) => {
+  /**
+   * **0を通さない**（Q-036）。公開の停止はインデックス率が50%未満の
+   * ときの**異常時の処理**（G-8）で、設定として選ぶものではない。
+   * 通すと、止まっているのが異常なのか設定なのか区別できなくなる
+   */
+  it.each([0, 1, 2, 6, -1, 3.5, Number.NaN])('%s を 422 で拒否する', (cap) => {
     const error = catchError(() => withWeeklyPublishCap(CURRENT, cap));
 
     expect(error).toBeInstanceOf(AppError);
@@ -122,9 +134,9 @@ describe('withWeeklyPublishCap', () => {
     expect(error.code).toBe(ARTICLE_RATIO_ERROR_CODES.invalidPublishCap);
   });
 
-  it('週5本を拒否する（SPEC 2.2 の上限）', () => {
-    const error = catchError(() => withWeeklyPublishCap(CURRENT, 5));
+  it('週6本を拒否する（SPEC 2.2 の上限）', () => {
+    const error = catchError(() => withWeeklyPublishCap(CURRENT, 6));
 
-    expect(error.details).toEqual({ requested: 5, max: 4 });
+    expect(error.details).toEqual({ requested: 6, max: 5 });
   });
 });

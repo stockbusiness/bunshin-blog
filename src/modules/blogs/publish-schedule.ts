@@ -40,7 +40,7 @@ import { createHash } from 'node:crypto';
 /**
  * 公開する曜日の組。
  *
- * **週2日。** 週の上限（`article_ratio.weeklyPublishCap`）は1〜4本なので、
+ * **週2日。** 週の上限（`article_ratio.weeklyPublishCap`）は3〜5本なので、
  * 2日あれば足りる。**連続しない2日**にして、片方が失敗しても
  * その週のうちにもう一度機会があるようにする。
  */
