@@ -1131,6 +1131,8 @@ describe('入口の網羅', () => {
       'remainingSlotsForUser',
       'enqueueAlertsForUser',
       'collectAlertsForUser',
+      // I-1。日次のリンク確認を積む（利用者単位。冪等キーにJSTの暦日を持つ）
+      'enqueueLinkCheckForUser',
       // D-7b。返信を取り込む。**分身は `userId` で絞って数える**ので、
       // 他人の分身へ記憶を書き込めない（`line-reply.test.ts`）
       'recordLineReplyForUser',

@@ -344,3 +344,30 @@ export async function enqueueAlertsForUser(
 
   return queued;
 }
+
+/**
+ * リンク切れの確認を積む（TASKS I-1、SPEC 4「リンク切れ確認」ジョブ）。
+ *
+ * **1日1回。** 冪等キーにJSTの暦日を入れるので、cron が何度呼んでも
+ * その日は1件しか積まれない（C-4）。
+ *
+ * **利用者単位で積む。** 確認そのものはブログごとだが、通知は利用者へ
+ * まとめて出す（`enqueueAlertsForUser` が同じ日の同じ指摘を1回にする）。
+ *
+ * @returns 新しく積んだなら `true`
+ */
+export async function enqueueLinkCheckForUser(
+  userId: string,
+  deps: { now?: Date | undefined } = {},
+): Promise<boolean> {
+  const date = todayInJst(deps.now ?? new Date());
+
+  const result = await enqueueJob({
+    jobType: 'LINK_CHECK',
+    idempotencyKey: `LINK_CHECK:${userId}:${date}`,
+    input: {},
+    userId,
+  });
+
+  return result.created;
+}
