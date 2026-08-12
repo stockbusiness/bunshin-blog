@@ -110,7 +110,7 @@ describe('投稿頻度（article_ratio.weeklyPublishCap）', () => {
     expect(blog.articleRatio).toEqual(DEFAULT_ARTICLE_RATIO);
   });
 
-  it.each([1, 2, 3, 4])('週 %s 本を保存できる', async (cap) => {
+  it.each([3, 4, 5])('週 %s 本を保存できる', async (cap) => {
     const updated = await updateBlogForUser(
       { userId: user.id, blogId },
       { weeklyPublishCap: cap },
@@ -128,13 +128,13 @@ describe('投稿頻度（article_ratio.weeklyPublishCap）', () => {
 
     const updated = await updateBlogForUser(
       { userId: user.id, blogId },
-      { weeklyPublishCap: 2 },
+      { weeklyPublishCap: 3 },
     );
 
     expect(updated.articleRatio).toEqual({
       revenue: 11,
       traffic: 19,
-      weeklyPublishCap: 2,
+      weeklyPublishCap: 3,
     });
   });
 
@@ -146,28 +146,38 @@ describe('投稿頻度（article_ratio.weeklyPublishCap）', () => {
 
     const updated = await updateBlogForUser(
       { userId: user.id, blogId },
-      { name: '同時更新', weeklyPublishCap: 1 },
+      { name: '同時更新', weeklyPublishCap: 3 },
     );
 
     expect(updated.name).toBe('同時更新');
     expect(updated.articleRatio).toEqual({
       revenue: 5,
       traffic: 25,
-      weeklyPublishCap: 1,
+      weeklyPublishCap: 3,
     });
   });
 
-  it.each([0, 5, 10])('週 %s 本は 422 で拒否し、DBを変えない', async (cap) => {
-    const error = await catchError(
-      updateBlogForUser({ userId: user.id, blogId }, { weeklyPublishCap: cap }),
-    );
+  /**
+   * **0を通さない**（Q-036）。公開の停止は G-8b の異常時の処理で、
+   * 利用者が設定する値ではない
+   */
+  it.each([0, 1, 2, 6, 10])(
+    '週 %s 本は 422 で拒否し、DBを変えない',
+    async (cap) => {
+      const error = await catchError(
+        updateBlogForUser(
+          { userId: user.id, blogId },
+          { weeklyPublishCap: cap },
+        ),
+      );
 
-    expect(error.status).toBe(422);
-    expect(error.code).toBe(ARTICLE_RATIO_ERROR_CODES.invalidPublishCap);
+      expect(error.status).toBe(422);
+      expect(error.code).toBe(ARTICLE_RATIO_ERROR_CODES.invalidPublishCap);
 
-    const blog = await requireBlogForUser({ userId: user.id, blogId });
-    expect(blog.articleRatio).toEqual(DEFAULT_ARTICLE_RATIO);
-  });
+      const blog = await requireBlogForUser({ userId: user.id, blogId });
+      expect(blog.articleRatio).toEqual(DEFAULT_ARTICLE_RATIO);
+    },
+  );
 
   it('壊れた jsonb でも読めて、上限を保存できる', async () => {
     await prisma.blog.update({
@@ -243,7 +253,7 @@ describe('ジャンル（表示のみ・Q-009）', () => {
 describe('所有権（B-3 の方針を維持する）', () => {
   it('他人のブログは投稿頻度も変えられず 404', async () => {
     const error = await catchError(
-      updateBlogForUser({ userId: other.id, blogId }, { weeklyPublishCap: 1 }),
+      updateBlogForUser({ userId: other.id, blogId }, { weeklyPublishCap: 3 }),
     );
 
     expect(error.status).toBe(404);
