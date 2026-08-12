@@ -26,6 +26,8 @@ BUNSHIN BLOG のドキュメント一覧。
 | `MODULE_RULES.md` | モジュール境界の3ルールと依存の向き。テーブルの所有 |
 | `DATA_MODEL.md` | スキーマ補足。jsonb構造、onDelete、暗号化、日時とタイムゾーン、記事本文の正本 |
 | `CONTENT_PLANNING.md` | 構成表生成のAI/コード境界とプロンプト入出力仕様 |
+| `WORDPRESS_SNIPPET.md` | **モニターに渡す手順書。** 各ブログに `/go/` の処理を入れる（D-12） |
+| `BACKUP.md` | **障害の最中に読む手順書。** バックアップと復旧（H-5） |
 | `IMPLEMENTATION_STATUS.md` | タスク別の進捗（状態 / PR / 完了日 / 残課題） |
 | `IMPLEMENTATION_HISTORY.md` | 決定と変更の履歴 |
 | `OPEN_QUESTIONS.md` | 未解決の論点。**推測で実装しない** |

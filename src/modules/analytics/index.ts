@@ -92,3 +92,19 @@ export {
 } from './errors';
 
 export type { AppLinkClick, RecordClickInput } from './types';
+
+export {
+  MAX_EVENTS_PER_REQUEST,
+  EVENT_ID_MAX_LENGTH,
+  MAX_FUTURE_MS,
+  MAX_AGE_MS,
+  parseLinkEvents,
+  type ParsedLinkEvent,
+  type ParsedLinkEvents,
+} from './link-event-payload';
+
+export {
+  recordLinkEvents,
+  type ResolvedLinkEvent,
+  type RecordLinkEventsResult,
+} from './link-events';

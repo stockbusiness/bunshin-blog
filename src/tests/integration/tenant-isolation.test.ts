@@ -1058,6 +1058,8 @@ describe('入口の網羅', () => {
       'updateBlogForUser',
       'closeBlogForUser',
       'getSlotUsageForUser',
+      // D-12。受信APIのトークンを発行する（原文を返すのはここだけ）
+      'issueLinkEventTokenForUser',
     ],
     wordpress: [
       'connectWordpressForUser',

@@ -63,3 +63,10 @@ export type {
   CreateBlogInput,
   UpdateBlogInput,
 } from './types';
+
+export {
+  generateLinkEventToken,
+  hashLinkEventToken,
+  issueLinkEventTokenForUser,
+  findBlogIdByLinkEventToken,
+} from './link-event-token';

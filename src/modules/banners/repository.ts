@@ -19,7 +19,11 @@
  */
 
 import { prisma } from '@/lib/db';
-import { findOfferForUser, generateRedirectCode } from '@/modules/affiliate';
+import {
+  findOfferForUser,
+  generateRedirectCode,
+  isRedirectCode,
+} from '@/modules/affiliate';
 import { notFoundError, requireBlogForUser } from '@/modules/blogs';
 import type {
   AppBanner,
@@ -180,6 +184,32 @@ export async function requireBannerForUser(params: {
   }
 
   return banner;
+}
+
+/**
+ * ブログの中でコードを引く（D-12）。
+ *
+ * **`blogId` を必ず条件に入れる。** 受信APIはトークンでブログを決めており、
+ * **他ブログのコードを混ぜて送られても取り違えない**ようにする。
+ *
+ * `userId` を取らないのは、送信元が各ブログのWordPressでセッションが
+ * 無いため（`affiliate` の `findLinkIdByCodeInBlog` と同じ性格）。
+ *
+ * **`ENDED` のバナーのクリックも受ける。** 終了の直前に踏まれたものが
+ * 遅れて届くことがあり、落とすと**実際に起きたクリックが記録から消える。**
+ */
+export async function findBannerByCodeInBlog(params: {
+  blogId: string;
+  code: string;
+}): Promise<{ id: string; destinationUrl: string } | null> {
+  if (!isRedirectCode(params.code)) {
+    return null;
+  }
+
+  return prisma.banner.findFirst({
+    where: { code: params.code, blogId: params.blogId },
+    select: { id: true, destinationUrl: true },
+  });
 }
 
 /** バナーを登録する。完了条件の「表示位置・対象カテゴリ・有効期間」を保存する */

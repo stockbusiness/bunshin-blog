@@ -13,6 +13,7 @@
 export {
   listBannersForUser,
   findBannerForUser,
+  findBannerByCodeInBlog,
   requireBannerForUser,
   createBannerForUser,
   updateBannerForUser,
