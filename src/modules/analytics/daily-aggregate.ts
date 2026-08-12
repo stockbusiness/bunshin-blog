@@ -64,10 +64,18 @@ export interface DailyAggregateSummary {
 interface Counts {
   affiliateClicks: number;
   aiReferrals: number;
+  /**
+   * バナーのクリック（D-12・Q-032）。
+   *
+   * **ブログ全体にだけ数える。** バナーは記事に紐づかない
+   * （`banners.blog_id` はあるが `content_item_id` は無い）ので、
+   * 記事別の行へ割り当てられない
+   */
+  bannerClicks: number;
 }
 
 function emptyCounts(): Counts {
-  return { affiliateClicks: 0, aiReferrals: 0 };
+  return { affiliateClicks: 0, aiReferrals: 0, bannerClicks: 0 };
 }
 
 /**
@@ -117,10 +125,14 @@ async function aggregateOneDay(blogId: string, date: JstDate): Promise<number> {
   const clicks = await prisma.linkClick.findMany({
     where: {
       clickedAt: { gte: range.start, lt: range.endExclusive },
-      affiliateLink: { blogId },
+      // **案件のリンクとバナーの両方を拾う**（D-12・Q-032）。
+      // どちらか片方しか入らないことはDBが強制している
+      // （CHECK 制約 `link_clicks_target_exactly_one`）
+      OR: [{ affiliateLink: { blogId } }, { banner: { blogId } }],
     },
     select: {
       isAiReferral: true,
+      bannerId: true,
       affiliateLink: { select: { contentItemId: true } },
     },
   });
@@ -129,6 +141,13 @@ async function aggregateOneDay(blogId: string, date: JstDate): Promise<number> {
   const total = emptyCounts();
 
   for (const click of clicks) {
+    // **バナーは別の数に入れる。** 同じ列で数えると、
+    // 「案件のリンクが踏まれた回数」が分からなくなる
+    if (click.bannerId !== null) {
+      total.bannerClicks += 1;
+      continue;
+    }
+
     total.affiliateClicks += 1;
 
     if (click.isAiReferral) {
@@ -167,7 +186,7 @@ async function aggregateOneDay(blogId: string, date: JstDate): Promise<number> {
     contentItemId: null,
     metricDate,
     counts: total,
-    createIfMissing: total.affiliateClicks > 0,
+    createIfMissing: total.affiliateClicks > 0 || total.bannerClicks > 0,
   });
 
   for (const [contentItemId, counts] of byItem) {
@@ -190,7 +209,7 @@ async function aggregateOneDay(blogId: string, date: JstDate): Promise<number> {
 /**
  * 数だけを書く。
  *
- * **触るのは `affiliate_clicks` と `ai_referrals` の2列。**
+ * **触るのは `affiliate_clicks`・`ai_referrals`・`banner_clicks` の3列。**
  * 同じ行には検索データ（G-2）・成果（G-5）・インデックス（G-3）が入っている。
  */
 async function writeCounts(params: {
@@ -203,6 +222,7 @@ async function writeCounts(params: {
   const data = {
     affiliateClicks: params.counts.affiliateClicks,
     aiReferrals: params.counts.aiReferrals,
+    bannerClicks: params.counts.bannerClicks,
   };
 
   const existing = await prisma.metricDaily.findFirst({

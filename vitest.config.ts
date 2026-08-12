@@ -98,6 +98,8 @@ export default defineConfig({
         // | content-planning/plan-repository.ts | — | revenue-articles.test.ts |
         // | affiliate/scoring.ts | step2.ts | offer-scoring.test.ts |
         // | content-planning/ai.ts | step1.ts の filterAlternatives | genre-review.test.ts |
+        // | analytics/link-events.ts | 検証は link-event-payload.ts | link-events.test.ts |
+        // | blogs/link-event-token.ts | 生成と照合は同ファイルの純粋関数（テストは統合側） | link-events.test.ts |
         'src/modules/settings/service.ts',
         'src/modules/settings/resolve.ts',
         'src/modules/settings/provider.ts',
@@ -131,6 +133,8 @@ export default defineConfig({
         'src/modules/content-planning/plan-repository.ts',
         'src/modules/affiliate/scoring.ts',
         'src/modules/content-planning/ai.ts',
+        'src/modules/analytics/link-events.ts',
+        'src/modules/blogs/link-event-token.ts',
       ],
       thresholds: {
         lines: 80,

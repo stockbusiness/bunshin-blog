@@ -492,6 +492,30 @@ export async function ensureRedirectLinkForUser(params: {
  *
  * @returns 見つからなければ `null`
  */
+/**
+ * ブログの中でコードを引く（D-12）。
+ *
+ * **`blogId` を必ず条件に入れる。** 受信APIはトークンでブログを決めており、
+ * **他ブログのコードを混ぜて送られても取り違えない**ようにする
+ * （そのブログのクリック数を外から水増しできてしまう）。
+ *
+ * `userId` を取らないのは `findRedirectTargetByCode` と同じ — 送信元は
+ * 各ブログのWordPressで、セッションが無い。
+ */
+export async function findLinkByCodeInBlog(params: {
+  blogId: string;
+  code: string;
+}): Promise<{ id: string; destinationUrl: string } | null> {
+  if (!isRedirectCode(params.code)) {
+    return null;
+  }
+
+  return prisma.affiliateLink.findFirst({
+    where: { code: params.code, blogId: params.blogId },
+    select: { id: true, destinationUrl: true },
+  });
+}
+
 export async function findRedirectTargetByCode(code: string): Promise<{
   linkId: string;
   destinationUrl: string;

@@ -23,6 +23,7 @@ export {
   evaluateLandingPageForUser,
   ensureRedirectLinkForUser,
   findRedirectTargetByCode,
+  findLinkByCodeInBlog,
   type AppAffiliateLink,
 } from './repository';
 
