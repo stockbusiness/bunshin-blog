@@ -54,7 +54,15 @@ export type RiskFlagCode =
   /** 根拠のないランキング（SPEC 9.6） */
   | 'RANKING_WITHOUT_BASIS'
   /** 架空の口コミ（SPEC 9.6） */
-  | 'FABRICATED_REVIEW';
+  | 'FABRICATED_REVIEW'
+  /** 本文が短い（J-4）。**止めない** — 作り直す経路がまだ無い */
+  | 'THIN_BODY'
+  /** 見出しが少ない（J-4） */
+  | 'FEW_HEADINGS'
+  /** 案件の事実を1つも使っていない（J-4） */
+  | 'NO_FACT_USED'
+  /** 収益記事への内部リンクが本文に無い（J-4） */
+  | 'NO_INTERNAL_LINK';
 
 interface Detector {
   code: RiskFlagCode;

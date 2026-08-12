@@ -160,3 +160,12 @@ export {
   TOC_MIN_HEADINGS,
   type TocEntry,
 } from './readable';
+
+export {
+  judgeThickness,
+  countBodyChars,
+  countHeadings,
+  MIN_BODY_CHARS,
+  MIN_HEADINGS,
+  type ThicknessInput,
+} from './thickness';

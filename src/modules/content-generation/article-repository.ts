@@ -27,6 +27,8 @@ export interface AppArticleVersion {
   contentHash: string;
   /** 事実チェックの結果（E-12）。生成直後は `NOT_CHECKED` */
   factCheckStatus: string;
+  /** 案件の事実のうち、記事が使ったもの（J-4 が読む） */
+  usedFactIds: string[];
   modelProvider: string;
   modelName: string;
   promptVersion: string;
@@ -45,6 +47,8 @@ const SELECT = {
   bodyHtml: true,
   contentHash: true,
   factCheckStatus: true,
+  // **J-4 が読む。** 案件の事実をいくつ使ったか
+  usedFactIds: true,
   modelProvider: true,
   modelName: true,
   promptVersion: true,
