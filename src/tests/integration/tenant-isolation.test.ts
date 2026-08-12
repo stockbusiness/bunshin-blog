@@ -1169,6 +1169,8 @@ describe('入口の網羅', () => {
       'scoreOffersForUser',
       'designRevenueArticlesForUser',
       'listContentItemsForUser',
+      // I-4。まだ生成していない記事のうち、書き始めてよいもの
+      'listGenerationTargetsForUser',
       'findLatestPlanForUser',
       'designTrafficArticlesForUser',
       'appendItemsToPlanForUser',

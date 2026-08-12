@@ -183,6 +183,43 @@ export async function listContentItemsForUser(params: {
 }
 
 /**
+ * まだ生成していない記事のうち、**もう書き始めてよいもの**を引く
+ * （TASKS I-4）。
+ *
+ * **`planned_publish_week` で絞る。** 週あたりの上限は
+ * `assignPublishOrder` が週へ詰める時点で既に効いており（C-9）、
+ * **上限をここで数え直さない。** 2か所で数えると、どちらが効いているのか
+ * 読めなくなる。
+ *
+ * **`PLANNED` だけ。** 生成中・生成済み・却下は対象にしない
+ * （`ARTICLE_GENERATION` の冪等キーも記事IDなので二重には積まれないが、
+ * **積む前に外すほうが、失敗した挿入がジョブ一覧に残らない**）。
+ *
+ * **週が未割り当て（`null`）の記事は含めない。** いつ出すか決まって
+ * いないものを先に書くと、**構成表の順序が壊れる。**
+ *
+ * @param upToWeek この週までに公開予定のもの（1始まり）
+ */
+export async function listGenerationTargetsForUser(params: {
+  userId: string;
+  blogId: string;
+  upToWeek: number;
+}): Promise<{ id: string; publishPriority: number }[]> {
+  const blog = await requireBlogForUser(params);
+
+  return prisma.contentItem.findMany({
+    where: {
+      blogId: blog.id,
+      status: 'PLANNED',
+      plannedPublishWeek: { not: null, lte: params.upToWeek },
+    },
+    // **公開順に書く。** 収益記事が先行する並び（C-9）をそのまま使う
+    orderBy: { publishPriority: 'asc' },
+    select: { id: true, publishPriority: true },
+  });
+}
+
+/**
  * いちばん新しい構成表を引く。
  *
  * **`content-planning` の外から `content_items` を引く経路をここに集める。**
