@@ -285,6 +285,16 @@ export const SETTING_DEFINITIONS: readonly SettingDefinition[] = [
     schema: text.min(20, { message: 'トークンが短すぎます' }),
   },
   {
+    key: 'LINE_CHANNEL_SECRET',
+    group: 'LINE',
+    label: 'Messaging API チャネルシークレット',
+    description:
+      'LINEからの返信が本物かを確かめるために使います。読み返せません（D-7b）',
+    secret: true,
+    // **チャネルシークレットは32桁の16進**。長さで打ち間違いを弾く
+    schema: text.min(20, { message: 'シークレットが短すぎます' }),
+  },
+  {
     key: 'LIFF_BASE_URL',
     group: 'LINE',
     label: 'LIFF のURL',

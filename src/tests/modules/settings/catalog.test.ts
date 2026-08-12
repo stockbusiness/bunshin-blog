@@ -66,16 +66,19 @@ describe('設定できる名前', () => {
 
   /**
    * **読む処理が無い設定を出さない**（A-3 の方針）。
-   * `LINE_CHANNEL_ACCESS_TOKEN` は F-2 で読む処理ができたので足した。
-   * `LINE_CHANNEL_SECRET`（webhook の署名検証）は D-7 まで読み手がいない。
+   * `LINE_CHANNEL_ACCESS_TOKEN` は F-2、`LINE_CHANNEL_SECRET` は D-7b
+   * （webhook の署名検証）で読み手ができたので足した。
    */
   it('まだ誰も読まない設定を並べていない', () => {
-    expect(isSettingKey('LINE_CHANNEL_SECRET')).toBe(false);
+    expect(isSettingKey('LINE_LOGIN_CHANNEL_ID')).toBe(false);
   });
 
-  /** 通知に使うトークンは伏せる。飛び先のURLは伏せない（F-2） */
+  /** 通知に使うトークンは伏せる。飛び先のURLは伏せない（F-2・D-7b） */
   it('LINE の設定が並んでいる', () => {
     expect(isSecretSetting('LINE_CHANNEL_ACCESS_TOKEN')).toBe(true);
+    // **署名の鍵は伏せる。** 漏れると、なりすました返信で
+    // 分身の記憶を外から書き込める
+    expect(isSecretSetting('LINE_CHANNEL_SECRET')).toBe(true);
     expect(isSecretSetting('LIFF_BASE_URL')).toBe(false);
   });
 

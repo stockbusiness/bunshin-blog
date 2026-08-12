@@ -1129,6 +1129,9 @@ describe('入口の網羅', () => {
       'remainingSlotsForUser',
       'enqueueAlertsForUser',
       'collectAlertsForUser',
+      // D-7b。返信を取り込む。**分身は `userId` で絞って数える**ので、
+      // 他人の分身へ記憶を書き込めない（`line-reply.test.ts`）
+      'recordLineReplyForUser',
     ],
     /**
      * **`line_user_id` を返す唯一の経路**（F-2）。`AppUser` には載せない
