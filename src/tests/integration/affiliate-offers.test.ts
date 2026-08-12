@@ -12,6 +12,7 @@ import {
   updateOfferForUser,
   type CreateOfferInput,
 } from '@/modules/affiliate';
+import { listAuditLogsForAdmin } from '@/modules/audit';
 import {
   assertMigrationsApplied,
   createTestPrisma,
@@ -529,5 +530,88 @@ describe('facts を確かめ直した時刻', () => {
     });
 
     expect(linkable.factsUpdatedAt).toEqual(NOW);
+  });
+});
+
+/**
+ * 案件URL変更の記録（TASKS H-13、SPEC 14.4、Q-027）。
+ *
+ * **リンク先が変われば、記事から読者が行く先が変わる。**
+ * 成果の計上にも関わる。
+ */
+describe('案件URLの変更', () => {
+  async function created() {
+    return createOfferForUser({ userId: owner.id, blogId: blog1 }, input());
+  }
+
+  it('リンク先を変えると、変更前後が残る', async () => {
+    const offer = await created();
+
+    await updateOfferForUser(
+      { userId: owner.id, blogId: blog1, offerId: offer.id },
+      { affiliateUrl: 'https://asp.example/click?a=yyyy' },
+    );
+
+    const logs = await listAuditLogsForAdmin({ entityType: 'affiliate_offer' });
+
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toMatchObject({
+      actorUserId: owner.id,
+      action: 'OFFER_URL_CHANGED',
+      entityId: offer.id,
+    });
+    expect(logs[0]?.metadata).toMatchObject({
+      affiliateUrl: {
+        from: 'https://asp.example/click?a=xxxx',
+        to: 'https://asp.example/click?a=yyyy',
+      },
+    });
+  });
+
+  it('LPのURLも残る', async () => {
+    const offer = await created();
+
+    await updateOfferForUser(
+      { userId: owner.id, blogId: blog1, offerId: offer.id },
+      { landingPageUrl: 'https://lp.example.com/renewed' },
+    );
+
+    const [log] = await listAuditLogsForAdmin({
+      entityType: 'affiliate_offer',
+    });
+
+    expect(log?.metadata).toMatchObject({
+      landingPageUrl: { to: 'https://lp.example.com/renewed' },
+    });
+  });
+
+  /**
+   * **変わっていないのに残さない。** 保存のたびに1行増えると、
+   * 「いつ変わったか」を探すのに全部読むことになる
+   */
+  it('URL以外を変えても残さない', async () => {
+    const offer = await created();
+
+    await updateOfferForUser(
+      { userId: owner.id, blogId: blog1, offerId: offer.id },
+      { name: '別の名前', status: 'ACTIVE' },
+    );
+
+    expect(
+      await listAuditLogsForAdmin({ entityType: 'affiliate_offer' }),
+    ).toEqual([]);
+  });
+
+  it('同じURLを明示的に送っても残さない', async () => {
+    const offer = await created();
+
+    await updateOfferForUser(
+      { userId: owner.id, blogId: blog1, offerId: offer.id },
+      { affiliateUrl: offer.affiliateUrl },
+    );
+
+    expect(
+      await listAuditLogsForAdmin({ entityType: 'affiliate_offer' }),
+    ).toEqual([]);
   });
 });

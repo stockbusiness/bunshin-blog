@@ -9,6 +9,7 @@
  */
 
 import { prisma } from '@/lib/db';
+import { recordAudit } from '@/modules/audit';
 import { notFoundError, requireBlogForUser } from '@/modules/blogs';
 import { appendSubId, buildSubId } from './link';
 import { invalidOfferError } from './errors';
@@ -284,6 +285,33 @@ export async function updateOfferForUser(
     return current;
   }
 
+  // **URLが実際に変わったときだけ残す**（SPEC 14.4「案件URL変更」、H-13）。
+  //
+  // **変わっていないのに残さない。** 保存のたびに1行増えると、
+  // 「いつ変わったか」を探すのに全部読むことになる。
+  // `facts_updated_at`（確かめた記録）とは逆で、**こちらは変化の記録**
+  const urlChanges: Record<string, unknown> = {};
+
+  if (
+    data['landingPageUrl'] !== undefined &&
+    data['landingPageUrl'] !== current.landingPageUrl
+  ) {
+    urlChanges['landingPageUrl'] = {
+      from: current.landingPageUrl,
+      to: data['landingPageUrl'],
+    };
+  }
+
+  if (
+    data['affiliateUrl'] !== undefined &&
+    data['affiliateUrl'] !== current.affiliateUrl
+  ) {
+    urlChanges['affiliateUrl'] = {
+      from: current.affiliateUrl,
+      to: data['affiliateUrl'],
+    };
+  }
+
   // **`facts` を渡した経路だけが「確かめ直した」時刻を書く**（D-13・Q-022）。
   //
   // 状態を `ACTIVE` にした・報酬額を直した、では書かない。書くと
@@ -309,6 +337,18 @@ export async function updateOfferForUser(
   // 0件なら「存在しない」か「他ブログのもの」。どちらも404に揃える
   if (result.count === 0) {
     throw notFoundError('案件');
+  }
+
+  if (Object.keys(urlChanges).length > 0) {
+    // **変更前後を残す。** リンク先が変われば読者の行き先が変わり、
+    // 成果の計上にも関わる。どちらの値だったかが分からないと追えない
+    await recordAudit({
+      actorUserId: params.userId,
+      action: 'OFFER_URL_CHANGED',
+      entityType: 'affiliate_offer',
+      entityId: params.offerId,
+      metadata: { blogId: current.blogId, ...urlChanges },
+    });
   }
 
   return requireOfferForUser(params);

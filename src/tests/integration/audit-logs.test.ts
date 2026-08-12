@@ -1,6 +1,10 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import { listAuditLogsForAdmin, recordAudit } from '@/modules/audit';
+import {
+  activatePromptVersionForAdmin,
+  createPromptVersionForAdmin,
+} from '@/modules/content-generation';
 import { updateMonitorStatusForAdmin } from '@/modules/users';
 import {
   assertMigrationsApplied,
@@ -213,5 +217,89 @@ describe('一覧', () => {
 
     expect(await listAuditLogsForAdmin({ limit: 2 })).toHaveLength(2);
     expect(await listAuditLogsForAdmin({ limit: 0 })).toHaveLength(1);
+  });
+});
+
+/**
+ * AIプロンプト変更（TASKS H-13、SPEC 14.4、Q-027）。
+ *
+ * **どのプロンプトで生成したかは `prompt_versions` に残る。**
+ * 監査ログが残すのは「**いつ切り替わったか**」。
+ */
+describe('AIプロンプトの記録', () => {
+  const KEY = 'generation.article';
+
+  it('版を作ると残る', async () => {
+    await createPromptVersionForAdmin({
+      key: KEY,
+      version: 'v1',
+      body: '記事を書いてください。',
+    });
+
+    const logs = await listAuditLogsForAdmin({ entityType: 'prompt_version' });
+
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toMatchObject({
+      // **嘘の行為者を入れない。** この関数は誰が呼んだかを引数に持たない
+      actorUserId: null,
+      action: 'PROMPT_VERSION_CREATED',
+    });
+    expect(logs[0]?.metadata).toMatchObject({ key: KEY, version: 'v1' });
+  });
+
+  /** **版を作っただけでは生成は変わらない。** 効き始めたのは有効化のとき */
+  it('有効化すると別に残る', async () => {
+    await createPromptVersionForAdmin({
+      key: KEY,
+      version: 'v1',
+      body: '記事を書いてください。',
+      activate: true,
+    });
+
+    const logs = await listAuditLogsForAdmin({ entityType: 'prompt_version' });
+
+    expect(logs.map((log) => log.action)).toEqual([
+      'PROMPT_VERSION_ACTIVATED',
+      'PROMPT_VERSION_CREATED',
+    ]);
+  });
+
+  it('切り替えでも残る', async () => {
+    await createPromptVersionForAdmin({
+      key: KEY,
+      version: 'v1',
+      body: '記事を書いてください。',
+      activate: true,
+    });
+    await createPromptVersionForAdmin({
+      key: KEY,
+      version: 'v2',
+      body: 'もっとよく書いてください。',
+    });
+    await activatePromptVersionForAdmin({ key: KEY, version: 'v2' });
+
+    const activations = (
+      await listAuditLogsForAdmin({ entityType: 'prompt_version' })
+    ).filter((log) => log.action === 'PROMPT_VERSION_ACTIVATED');
+
+    expect(activations).toHaveLength(2);
+  });
+
+  /**
+   * **本文を写さない。** `prompt_versions` に残っており、
+   * 監査ログに入れると同じものが2か所になる
+   */
+  it('本文を入れない', async () => {
+    await createPromptVersionForAdmin({
+      key: KEY,
+      version: 'v1',
+      body: '記事を書いてください。',
+    });
+
+    const serialized = JSON.stringify(
+      await listAuditLogsForAdmin({ entityType: 'prompt_version' }),
+    );
+
+    expect(serialized).not.toContain('記事を書いてください');
   });
 });
