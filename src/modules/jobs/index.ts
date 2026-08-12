@@ -20,6 +20,8 @@ export {
   findJobById,
   findJobByIdempotencyKey,
   saveJobCheckpoint,
+  retryJobForAdmin,
+  listFailedJobsForAdmin,
 } from './repository';
 
 export {
@@ -63,6 +65,8 @@ export {
   JOB_ERROR_CODES,
   unknownJobTypeError,
   runnerUnauthorizedError,
+  jobNotFoundError,
+  jobNotRetryableError,
   type JobErrorCode,
 } from './errors';
 

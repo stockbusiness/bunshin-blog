@@ -11,12 +11,12 @@
  * | 承認 | H-12 |
  * | 公開 | H-12 |
  * | 管理者介入 | H-1 |
- * | ジョブ再実行 | **機能が無い**（下記） |
- * | AIプロンプト変更 | **H-13** |
+ * | ジョブ再実行 | **H-14** |
+ * | AIプロンプト変更 | H-13 |
  *
- * **ジョブ再実行の機能そのものが存在しない**（H-13 で判明）。ジョブは
- * cron が消化するだけで、手で積み直す入口がどこにも無い。
- * **無い操作は記録できない** — 作るタスクと一緒に足す。
+ * **8種類が揃った**（2026-08-12）。ジョブ再実行は H-13 の時点で
+ * 機能そのものが無く（cron が消化するだけだった）、**無い操作は
+ * 記録できない**ため、機能を作る H-14 で一緒に足した。
  *
  * 加えて SPEC 9.2.2 の「承知で進める」（14.4 の一覧には無い）。
  *
@@ -86,6 +86,13 @@ export const AUDIT_ACTIONS = [
    * ここに残す（管理画面はこれを読む）
    */
   'PUBLISH_CAP_ADJUSTED',
+  /**
+   * ADMIN が失敗したジョブを積み直した（H-14、SPEC 14.4「ジョブ再実行」）。
+   *
+   * **中断の印を消したかも残す。** 消した場合は
+   * **外部の副作用が二重になりうる**（C-4）
+   */
+  'JOB_RETRIED',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -103,6 +110,8 @@ export const AUDIT_ENTITY_TYPES = [
   'affiliate_offer',
   /** AIプロンプトの版（H-13） */
   'prompt_version',
+  /** ジョブ（H-14） */
+  'job',
 ] as const;
 
 export type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number];

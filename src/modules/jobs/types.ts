@@ -32,6 +32,8 @@ export const JOB_TYPES = [
   'PROPOSAL_SELECTION',
   // **2週間ごとの見直し**（G-8b）。インデックス率で公開ペースを上下させる
   'PUBLISH_PACE_REVIEW',
+  // **1日1回の積み込み**（I-1）。日次のジョブをここから配る
+  'DAILY_SCHEDULE',
   'LINE_NOTIFY',
   // **LINE返信の取り込みはジョブに載せる**（D-7b、MODULE_RULES 3）。
   // Webhook のハンドラで直接処理すると、保存に時間がかかったときに

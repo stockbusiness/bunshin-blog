@@ -18,6 +18,10 @@ export const JOB_ERROR_CODES = {
   runnerUnauthorized: 'JOB_RUNNER_UNAUTHORIZED',
   /** ワーカーの起動に必要な設定が無い */
   runnerNotConfigured: 'JOB_RUNNER_NOT_CONFIGURED',
+  /** 積み直そうとしたジョブが無い（H-14） */
+  notFound: 'JOB_NOT_FOUND',
+  /** `FAILED` でないジョブを積み直そうとした（H-14） */
+  notRetryable: 'JOB_NOT_RETRYABLE',
 } as const;
 
 export type JobErrorCode =
@@ -42,5 +46,24 @@ export function runnerUnauthorizedError(): AppError {
     JOB_ERROR_CODES.runnerUnauthorized,
     401,
     '認可されていません',
+  );
+}
+
+/** 積み直そうとしたジョブが無い（H-14） */
+export function jobNotFoundError(): AppError {
+  return new AppError(JOB_ERROR_CODES.notFound, 404, 'ジョブが見つかりません');
+}
+
+/**
+ * `FAILED` でないジョブは積み直せない（H-14）。
+ *
+ * **いまの状態を返す。** ADMIN しか触れない入口で、
+ * 「なぜ押せないのか」が分からないと運用で止まる
+ */
+export function jobNotRetryableError(status: string): AppError {
+  return new AppError(
+    JOB_ERROR_CODES.notRetryable,
+    409,
+    `失敗したジョブだけを積み直せます（いまの状態: ${status}）`,
   );
 }
