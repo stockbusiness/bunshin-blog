@@ -41,6 +41,13 @@ export interface AppBlog {
   articleRatio: ArticleRatio;
   /** 未審査なら `null`。設定画面では表示のみ（Q-009） */
   genre: AppBlogGenre | null;
+  /**
+   * クリック受信APIのトークンを発行した時刻（D-12）。未発行なら `null`。
+   *
+   * **原文は載せない。** DBにはハッシュしか無く、二度と出せない。
+   * 画面はこの値で「発行済みか」だけを示す
+   */
+  linkEventTokenIssuedAt: Date | null;
 }
 
 /**

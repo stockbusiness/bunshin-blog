@@ -199,6 +199,24 @@ export async function findNotificationTargetForUser(
  * （`dailyNotificationLimit`）。ここで既定値を持つと、上限の既定が
  * 2箇所になる。
  */
+export async function findNotificationScheduleForUser(userId: string): Promise<{
+  days: number[];
+  time: Date;
+} | null> {
+  const profile = await prisma.monitorProfile.findUnique({
+    where: { userId },
+    select: { notificationDays: true, notificationTime: true },
+  });
+
+  // **曜日が空なら「未設定」。** 行はあるが1日も選ばれていない状態を
+  // 設定済みにすると、通知が一度も飛ばないまま「済み」に見える
+  if (profile === null || profile.notificationDays.length === 0) {
+    return null;
+  }
+
+  return { days: profile.notificationDays, time: profile.notificationTime };
+}
+
 export async function findMaxDailyProposalsForUser(
   userId: string,
 ): Promise<number | null> {

@@ -39,6 +39,7 @@ interface BlogRecord {
   slotNumber: number;
   launchDate: Date | null;
   createdAt: Date;
+  linkEventTokenIssuedAt: Date | null;
   articleRatio: unknown;
   genre: { id: string; name: string; category: string } | null;
 }
@@ -69,6 +70,7 @@ function toAppBlog(record: BlogRecord): AppBlog {
     createdAt: record.createdAt,
     articleRatio: parseArticleRatio(record.articleRatio),
     genre: record.genre,
+    linkEventTokenIssuedAt: record.linkEventTokenIssuedAt,
   };
 }
 
