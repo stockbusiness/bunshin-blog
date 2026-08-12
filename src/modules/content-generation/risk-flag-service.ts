@@ -18,6 +18,7 @@ import {
   type AppArticleVersion,
 } from './article-repository';
 import { detectRiskFlags, type RiskFlag } from './risk-flags';
+import { judgeThickness } from './thickness';
 import { extractHrefs } from './article';
 import { itemNotInPlanError } from './errors';
 
@@ -75,6 +76,24 @@ export async function scanRiskFlagsForUser(
     hasAffiliateLink,
     ngExpressions: persona.ngExpressions,
   });
+
+  // **厚みもここで見る**（J-4）。リスクフラグを組み立てるのはこの1箇所で、
+  // **判定が2か所に分かれない**ようにする（`canSendToApproval` と同じ方針）
+  flags.push(
+    ...judgeThickness({
+      bodyHtml: latest.bodyHtml,
+      usedFactIds: latest.usedFactIds,
+      // **案件が紐づいているときだけ見る。** 案件の無い記事に
+      // 「事実を使っていない」と言っても、使う相手がいない
+      hasOffer: item.affiliateOfferId !== null,
+      plannedOutboundLinks: item.outboundLinkItemIds.length,
+      // **内部リンクは記事のURLとして書かれる**（E-11）。`#` で始まるのは
+      // 目次から見出しへの移動（J-1）なので、内部リンクとして数えない
+      actualInternalLinks: extractHrefs(latest.bodyHtml).filter(
+        (href) => !href.startsWith('#') && !href.startsWith('http'),
+      ).length,
+    }),
+  );
 
   const version = await saveRiskFlags({
     contentItemId: item.id,

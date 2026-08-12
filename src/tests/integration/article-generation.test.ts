@@ -32,6 +32,14 @@ import { createBlog, createUser } from './helpers/factories';
  * 保存されないこと。
  */
 
+/** 厚みの判定（J-4）が足すコード。**E-13 の検出とは別の話** */
+const THICKNESS_CODES = new Set([
+  'THIN_BODY',
+  'FEW_HEADINGS',
+  'NO_FACT_USED',
+  'NO_INTERNAL_LINK',
+]);
+
 let prisma: PrismaClient;
 let server: Server;
 let baseUrl: string;
@@ -935,7 +943,7 @@ describe('禁止表現とリスクフラグ（E-13）', () => {
     expect(flags.map((flag) => flag.code)).toContain('ASSERTIVE_CLAIM');
   });
 
-  it('問題が無ければフラグは空', async () => {
+  it('表現に問題が無ければフラグは空', async () => {
     const version = await generateArticleForUser(
       { userId, blogId, contentItemId: trafficItemId },
       { provider: provider() },
@@ -946,7 +954,13 @@ describe('禁止表現とリスクフラグ（E-13）', () => {
       select: { riskFlags: true },
     });
 
-    expect(row?.riskFlags).toEqual([]);
+    // **厚みの判定（J-4）は別。** この試験の記事は本文が短いので
+    // `THIN_BODY` などが立つが、ここで見ているのは E-13 の検出である
+    const expressionFlags = (row?.riskFlags as RiskFlag[]).filter(
+      (flag) => !THICKNESS_CODES.has(flag.code),
+    );
+
+    expect(expressionFlags).toEqual([]);
   });
 
   /** **本人が禁じた表現は承認を止める**（D-5。人格の設定は `絶対に`） */
@@ -1017,7 +1031,13 @@ describe('禁止表現とリスクフラグ（E-13）', () => {
       contentItemId: trafficItemId,
     });
 
-    expect(rescanned.flags.map((flag) => flag.code)).toEqual([
+    // **表現の検査だけを見る。** 厚みの判定（J-4）も同じ配列に入るが、
+    // ここで確かめているのは E-13 の検出である
+    const expressionCodes = rescanned.flags
+      .map((flag) => flag.code)
+      .filter((code) => !THICKNESS_CODES.has(code));
+
+    expect(expressionCodes).toEqual([
       'NG_EXPRESSION',
       'HIGH_RISK_ADVICE',
       'ASSERTIVE_CLAIM',
