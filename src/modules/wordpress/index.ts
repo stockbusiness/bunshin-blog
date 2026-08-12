@@ -123,3 +123,14 @@ export type {
   ConnectWordpressInput,
   WordpressCredentials,
 } from './types';
+
+export {
+  createAuthorizeState,
+  verifyAuthorizeState,
+  buildAuthorizeUrl,
+  matchesRequestedSite,
+  AUTHORIZE_APP_NAME,
+  AUTHORIZE_STATE_TTL_MINUTES,
+  type AuthorizeState,
+  type AuthorizeOptions,
+} from './authorize';
