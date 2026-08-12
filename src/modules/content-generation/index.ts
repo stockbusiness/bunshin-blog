@@ -149,3 +149,14 @@ export {
 } from './errors';
 
 export type { AppPromptVersion, CreatePromptVersionInput } from './types';
+
+export {
+  makeBodyReadable,
+  addHeadingIds,
+  collectHeadings,
+  buildTableOfContents,
+  ensureImageAlt,
+  ensureTableHeaders,
+  TOC_MIN_HEADINGS,
+  type TocEntry,
+} from './readable';

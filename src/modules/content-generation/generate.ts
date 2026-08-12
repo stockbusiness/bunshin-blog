@@ -40,6 +40,7 @@ import {
   assertUsedFacts,
   composeBodyWithCapsule,
 } from './article';
+import { makeBodyReadable } from './readable';
 import { buildStructuredData } from './structured-data';
 import { factCheckArticleForUser } from './fact-check-service';
 import { scanRiskFlagsForUser } from './risk-flag-service';
@@ -218,10 +219,14 @@ export async function generateArticleForUser(
   assertNoH1(generated.article.bodyHtml);
 
   // **結論を置く位置をAIに任せない**（E-11 の完了条件）
-  const bodyHtml = composeBodyWithCapsule({
+  const withCapsule = composeBodyWithCapsule({
     answerCapsule: generated.article.answerCapsule,
     bodyHtml: generated.article.bodyHtml,
   });
+
+  // **読まれる形に整える**（J-1・Q-041 の (a)）。目次・画像の `alt`・
+  // 表の見出しは、**テーマを問わず効く**（モニターに何も頼まずに済む）
+  const bodyHtml = makeBodyReadable(withCapsule);
 
   // **JSON-LD はコードで組み立てる**（CONTENT_PLANNING 7.3）。
   // 組み立てに失敗したらここで落ち、記事は保存されない。
