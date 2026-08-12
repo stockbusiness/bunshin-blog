@@ -74,12 +74,16 @@ business  = { revenuePolicy: string; monthlyGoalYen: number;
 
 - **1ユーザーが持てる `ACTIVE` な分身は最大3件**
 - **段階解放は参加開始日を起点にする**（ROADMAP 5章）。1〜30日は1件、31〜60日は2件、61〜90日は3件。判定は `personas.activated_at` とJSTの日付境界で行う（本文書10章）
-- Phase 0 では**1分身につきブログ1件**とする。SNS・動画は別媒体として将来追加する
+- Phase 0 では**1分身につきブログ1件**とする。SNS・動画は別媒体として将来追加する。判定は `createBlogForUser`（A-2-R-2c）。**`CLOSED` も数える** — 閉じれば作り直せるようにすると、同じ分身の媒体が実験期間中に2本に分かれ、一次データが繋がらなくなる（`CLOSED` がスロットを保持し続ける Q-008 と同じ扱い）
+- **ブログの `persona_id` は付け替えられない**（A-2-R-2c）。`UpdateBlogInput` に含めない。付け替えると、それまでに書いた記事の書き手が後から変わる。別の分身で書くなら別のブログを作る
+- **`DRAFT` の分身ではブログを作れない**（A-2-R-2c）。判定は `src/app/api/blogs/route.ts`。段階解放は `ACTIVE` の数を制限するもので、下書きのまま媒体を持てると**初日に3ブログを立てられて制限が意味を失う**
 - 上限判定は `src/lib/entitlements.ts` の `can()` を経由する（例：`can(userId, "persona.create")`）
 
 #### `blogs.persona_id` を段階的に必須へ
 
 **A-2-R-1 では nullable。** 既存のブログには分身がまだ無く、いきなり必須にすると作成の全経路とテストが落ちる（OPEN_QUESTIONS Q-033）。A-2-R-3 で `NOT NULL` にする。
+
+**A-2-R-2c で入力としては必須になった。** `CreateBlogInput.personaId` は省略できない。列が nullable なのは、A-2-R-2c より前に作られた行が残りうるためだけである。
 
 `onDelete` は `Restrict`。**分身を消してもブログを道連れにしない。**
 

@@ -14,7 +14,7 @@ import {
   createTestPrisma,
   resetDatabase,
 } from './helpers/db';
-import { createUser } from './helpers/factories';
+import { createPersona, createUser } from './helpers/factories';
 
 /**
  * LPの自動評価を**実PostgreSQLと実HTTPサーバーで**確かめる（TASKS D-2）。
@@ -105,6 +105,7 @@ beforeEach(async () => {
   owner = await createUser(prisma, { displayName: '所有者' });
   blogId = (
     await createBlogForUser(owner.id, {
+      personaId: (await createPersona(prisma, owner.id)).id,
       name: 'ブログ',
       slug: 'mine',
       targetReader: '読者',
@@ -347,6 +348,7 @@ describe('所有権（SPEC 14.1）', () => {
     const other = await createUser(prisma, { displayName: '別ユーザー' });
     const otherBlog = (
       await createBlogForUser(other.id, {
+        personaId: (await createPersona(prisma, other.id)).id,
         name: '他人のブログ',
         slug: 'theirs',
         targetReader: '読者',

@@ -14,7 +14,7 @@ import {
   createTestPrisma,
   resetDatabase,
 } from './helpers/db';
-import { createUser } from './helpers/factories';
+import { createPersona, createUser } from './helpers/factories';
 
 /**
  * 3ブログ上限とスロット制御を**実PostgreSQLで**検証する（TASKS B-4）。
@@ -33,11 +33,22 @@ let other: { id: string };
 
 let sequence = 0;
 
-function blogInput(overrides: Partial<CreateBlogInput> = {}): CreateBlogInput {
+/**
+ * **呼ぶたびに新しい分身を作る**（A-2-R-2c）。
+ *
+ * ブログは分身の媒体で、**1分身につきブログ1件**（DATA_MODEL 2章）。
+ * 使い回すと、スロットの判定を確かめる前に「この分身のブログはすでにあります」で
+ * 落ちてしまう。
+ */
+async function blogInput(
+  userId: string,
+  overrides: Partial<CreateBlogInput> = {},
+): Promise<CreateBlogInput> {
   sequence += 1;
   const suffix = String(sequence).padStart(4, '0');
 
   return {
+    personaId: (await createPersona(prisma, userId)).id,
     name: `ブログ${suffix}`,
     slug: `slot-blog-${suffix}`,
     targetReader: 'テスト読者',
@@ -73,9 +84,9 @@ beforeEach(async () => {
 
 describe('3件上限（SPEC 2.5）', () => {
   it('3件までは作れ、スロットが1から順に割り当てられる', async () => {
-    const first = await createBlogForUser(user.id, blogInput());
-    const second = await createBlogForUser(user.id, blogInput());
-    const third = await createBlogForUser(user.id, blogInput());
+    const first = await createBlogForUser(user.id, await blogInput(user.id));
+    const second = await createBlogForUser(user.id, await blogInput(user.id));
+    const third = await createBlogForUser(user.id, await blogInput(user.id));
 
     expect([first.slotNumber, second.slotNumber, third.slotNumber]).toEqual([
       1, 2, 3,
@@ -83,11 +94,13 @@ describe('3件上限（SPEC 2.5）', () => {
   });
 
   it('4件目は 409 で拒否される', async () => {
-    await createBlogForUser(user.id, blogInput());
-    await createBlogForUser(user.id, blogInput());
-    await createBlogForUser(user.id, blogInput());
+    await createBlogForUser(user.id, await blogInput(user.id));
+    await createBlogForUser(user.id, await blogInput(user.id));
+    await createBlogForUser(user.id, await blogInput(user.id));
 
-    const error = await catchError(createBlogForUser(user.id, blogInput()));
+    const error = await catchError(
+      createBlogForUser(user.id, await blogInput(user.id)),
+    );
 
     expect(error).toBeInstanceOf(AppError);
     expect(error.status).toBe(409);
@@ -97,22 +110,25 @@ describe('3件上限（SPEC 2.5）', () => {
 
   it('4件目はスロットを明示しても拒否される', async () => {
     for (const slotNumber of [1, 2, 3]) {
-      await createBlogForUser(user.id, blogInput({ slotNumber }));
+      await createBlogForUser(
+        user.id,
+        await blogInput(user.id, { slotNumber }),
+      );
     }
 
     const error = await catchError(
-      createBlogForUser(user.id, blogInput({ slotNumber: 2 })),
+      createBlogForUser(user.id, await blogInput(user.id, { slotNumber: 2 })),
     );
 
     expect(error.code).toBe(BLOG_SLOT_ERROR_CODES.limitReached);
   });
 
   it('上限はユーザーごと。別ユーザーは影響を受けない', async () => {
-    await createBlogForUser(user.id, blogInput());
-    await createBlogForUser(user.id, blogInput());
-    await createBlogForUser(user.id, blogInput());
+    await createBlogForUser(user.id, await blogInput(user.id));
+    await createBlogForUser(user.id, await blogInput(user.id));
+    await createBlogForUser(user.id, await blogInput(user.id));
 
-    const theirs = await createBlogForUser(other.id, blogInput());
+    const theirs = await createBlogForUser(other.id, await blogInput(other.id));
 
     expect(theirs.slotNumber).toBe(1);
     expect(theirs.userId).toBe(other.id);
@@ -121,10 +137,13 @@ describe('3件上限（SPEC 2.5）', () => {
 
 describe('スロット重複', () => {
   it('同じスロットの指定は 409 で拒否される', async () => {
-    await createBlogForUser(user.id, blogInput({ slotNumber: 2 }));
+    await createBlogForUser(
+      user.id,
+      await blogInput(user.id, { slotNumber: 2 }),
+    );
 
     const error = await catchError(
-      createBlogForUser(user.id, blogInput({ slotNumber: 2 })),
+      createBlogForUser(user.id, await blogInput(user.id, { slotNumber: 2 })),
     );
 
     expect(error.status).toBe(409);
@@ -133,10 +152,13 @@ describe('スロット重複', () => {
   });
 
   it('別ユーザーなら同じスロット番号を使える', async () => {
-    const mine = await createBlogForUser(user.id, blogInput({ slotNumber: 1 }));
+    const mine = await createBlogForUser(
+      user.id,
+      await blogInput(user.id, { slotNumber: 1 }),
+    );
     const theirs = await createBlogForUser(
       other.id,
-      blogInput({ slotNumber: 1 }),
+      await blogInput(other.id, { slotNumber: 1 }),
     );
 
     expect(mine.slotNumber).toBe(theirs.slotNumber);
@@ -145,7 +167,7 @@ describe('スロット重複', () => {
 
   it('範囲外のスロットは 422 で拒否され、DBへ届かない', async () => {
     const error = await catchError(
-      createBlogForUser(user.id, blogInput({ slotNumber: 4 })),
+      createBlogForUser(user.id, await blogInput(user.id, { slotNumber: 4 })),
     );
 
     expect(error.status).toBe(422);
@@ -173,11 +195,14 @@ describe('スロット重複', () => {
 
 describe('CLOSED のスロットは再利用できない（Q-008）', () => {
   it('閉じたスロットを指定すると 409 で拒否される', async () => {
-    const blog = await createBlogForUser(user.id, blogInput({ slotNumber: 1 }));
+    const blog = await createBlogForUser(
+      user.id,
+      await blogInput(user.id, { slotNumber: 1 }),
+    );
     await closeBlogForUser({ userId: user.id, blogId: blog.id });
 
     const error = await catchError(
-      createBlogForUser(user.id, blogInput({ slotNumber: 1 })),
+      createBlogForUser(user.id, await blogInput(user.id, { slotNumber: 1 })),
     );
 
     expect(error.status).toBe(409);
@@ -187,21 +212,29 @@ describe('CLOSED のスロットは再利用できない（Q-008）', () => {
   });
 
   it('閉じたスロットは自動割り当てでも飛ばされる', async () => {
-    const blog = await createBlogForUser(user.id, blogInput({ slotNumber: 1 }));
+    const blog = await createBlogForUser(
+      user.id,
+      await blogInput(user.id, { slotNumber: 1 }),
+    );
     await closeBlogForUser({ userId: user.id, blogId: blog.id });
 
-    const next = await createBlogForUser(user.id, blogInput());
+    const next = await createBlogForUser(user.id, await blogInput(user.id));
 
     expect(next.slotNumber).toBe(2);
   });
 
   it('3件すべて閉じても新しく作れない', async () => {
     for (const slotNumber of [1, 2, 3]) {
-      const blog = await createBlogForUser(user.id, blogInput({ slotNumber }));
+      const blog = await createBlogForUser(
+        user.id,
+        await blogInput(user.id, { slotNumber }),
+      );
       await closeBlogForUser({ userId: user.id, blogId: blog.id });
     }
 
-    const error = await catchError(createBlogForUser(user.id, blogInput()));
+    const error = await catchError(
+      createBlogForUser(user.id, await blogInput(user.id)),
+    );
 
     expect(error.code).toBe(BLOG_SLOT_ERROR_CODES.limitReached);
 
@@ -224,7 +257,10 @@ describe('getSlotUsageForUser', () => {
   });
 
   it('CLOSED を使用中として数える（一覧との違い）', async () => {
-    const blog = await createBlogForUser(user.id, blogInput({ slotNumber: 2 }));
+    const blog = await createBlogForUser(
+      user.id,
+      await blogInput(user.id, { slotNumber: 2 }),
+    );
     await closeBlogForUser({ userId: user.id, blogId: blog.id });
 
     const usage = await getSlotUsageForUser(user.id);
@@ -240,8 +276,14 @@ describe('getSlotUsageForUser', () => {
   });
 
   it('他ユーザーのブログを数えない', async () => {
-    await createBlogForUser(other.id, blogInput({ slotNumber: 1 }));
-    await createBlogForUser(other.id, blogInput({ slotNumber: 2 }));
+    await createBlogForUser(
+      other.id,
+      await blogInput(other.id, { slotNumber: 1 }),
+    );
+    await createBlogForUser(
+      other.id,
+      await blogInput(other.id, { slotNumber: 2 }),
+    );
 
     const usage = await getSlotUsageForUser(user.id);
 
@@ -250,8 +292,14 @@ describe('getSlotUsageForUser', () => {
   });
 
   it('スロット順に並ぶ', async () => {
-    await createBlogForUser(user.id, blogInput({ slotNumber: 3 }));
-    await createBlogForUser(user.id, blogInput({ slotNumber: 1 }));
+    await createBlogForUser(
+      user.id,
+      await blogInput(user.id, { slotNumber: 3 }),
+    );
+    await createBlogForUser(
+      user.id,
+      await blogInput(user.id, { slotNumber: 1 }),
+    );
 
     const usage = await getSlotUsageForUser(user.id);
 

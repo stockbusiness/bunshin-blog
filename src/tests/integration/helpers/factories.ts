@@ -82,3 +82,64 @@ export async function createBlog(
 
   return { id: blog.id, userId: blog.userId, slotNumber: blog.slotNumber };
 }
+
+/**
+ * `ACTIVE` の分身を作る（A-2-R-2c）。
+ *
+ * **`createBlogForUser` はこれが先に無いと呼べない。** ブログは分身の媒体で、
+ * `personaId` は必須（`blogs.persona_id` は A-2-R-3 で NOT NULL になる）。
+ *
+ * `personas` テーブルへ直接入れる。段階解放（ROADMAP 5章）を通すと、
+ * **ブログの準備だけのために参加日を操作することになる。**
+ */
+export async function createPersona(
+  prisma: PrismaClient,
+  userId: string,
+  overrides: { name?: string; status?: 'DRAFT' | 'ACTIVE' | 'PAUSED' } = {},
+): Promise<{ id: string }> {
+  const suffix = nextSuffix();
+
+  const persona = await prisma.persona.create({
+    data: {
+      userId,
+      name: overrides.name ?? `分身${suffix}`,
+      personaType: 'SELF',
+      identity: {
+        name: `まこと${suffix}`,
+        firstPerson: '私',
+        background: '30代の会社員',
+        tone: {
+          style: 'やわらかい',
+          emojiLevel: 'low',
+          lineBreak: 'normal',
+          politeness: 'です・ます',
+        },
+        values: { priorities: ['正確さ'], avoid: ['煽り'] },
+        ngExpressions: ['絶対に儲かる'],
+      },
+      expertise: {
+        fields: ['家計管理'],
+        sources: ['総務省統計'],
+        evaluationCriteria: ['実際に使ったか'],
+      },
+      audience: {
+        ageRange: '30代',
+        situation: '子育て中',
+        knowledgeLevel: 'beginner',
+        problems: ['固定費が下がらない'],
+        searchIntents: ['格安SIM 比較'],
+      },
+      business: {
+        revenuePolicy: '使ったものだけ紹介する',
+        monthlyGoalYen: 30_000,
+        kpis: ['成果件数'],
+        exitCriteria: '3か月で表示回数が伸びなければ畳む',
+      },
+      status: overrides.status ?? 'ACTIVE',
+      activatedAt: new Date('2026-08-01T00:00:00Z'),
+    },
+    select: { id: true },
+  });
+
+  return persona;
+}

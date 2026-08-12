@@ -16,7 +16,7 @@ import {
   createTestPrisma,
   resetDatabase,
 } from './helpers/db';
-import { createUser } from './helpers/factories';
+import { createPersona, createUser } from './helpers/factories';
 
 /**
  * 下書き投稿が**実PostgreSQLへ記録される**ことを確かめる（C-3）。
@@ -146,12 +146,14 @@ beforeEach(async () => {
   other = await createUser(prisma, { displayName: '別ユーザー' });
 
   const ownerBlog = await createBlogForUser(owner.id, {
+    personaId: (await createPersona(prisma, owner.id)).id,
     name: '自分のブログ',
     slug: 'mine',
     targetReader: '読者',
     slotNumber: 1,
   });
   const otherBlog = await createBlogForUser(other.id, {
+    personaId: (await createPersona(prisma, other.id)).id,
     name: '他人のブログ',
     slug: 'theirs',
     targetReader: '読者',
@@ -300,6 +302,7 @@ describe('再実行（SPEC 7.3「wp_post_id が存在する場合は新規投稿
 describe('接続の前提', () => {
   it('接続テストを通っていなければ投稿しない', async () => {
     const second = await createBlogForUser(owner.id, {
+      personaId: (await createPersona(prisma, owner.id)).id,
       name: '未テスト',
       slug: 'untested',
       targetReader: '読者',

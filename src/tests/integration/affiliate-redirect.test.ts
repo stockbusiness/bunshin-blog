@@ -17,7 +17,7 @@ import {
   createTestPrisma,
   resetDatabase,
 } from './helpers/db';
-import { createUser } from './helpers/factories';
+import { createPersona, createUser } from './helpers/factories';
 
 /**
  * リダイレクタとクリック計測を**実PostgreSQLで**確かめる（TASKS D-8）。
@@ -121,6 +121,7 @@ beforeEach(async () => {
   owner = await createUser(prisma, { displayName: '所有者' });
   blogId = (
     await createBlogForUser(owner.id, {
+      personaId: (await createPersona(prisma, owner.id)).id,
       name: 'ブログ',
       slug: 'mine',
       targetReader: '読者',
@@ -192,6 +193,7 @@ describe('リンクの発行', () => {
     const other = await createUser(prisma, { displayName: '別ユーザー' });
     const otherBlog = (
       await createBlogForUser(other.id, {
+        personaId: (await createPersona(prisma, other.id)).id,
         name: '他人のブログ',
         slug: 'theirs',
         targetReader: '読者',

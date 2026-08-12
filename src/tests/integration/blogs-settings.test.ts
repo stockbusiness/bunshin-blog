@@ -14,7 +14,7 @@ import {
   createTestPrisma,
   resetDatabase,
 } from './helpers/db';
-import { createUser } from './helpers/factories';
+import { createPersona, createUser } from './helpers/factories';
 
 /**
  * ブログ設定の保存を**実PostgreSQLで**検証する（TASKS B-5）。
@@ -45,6 +45,7 @@ beforeEach(async () => {
   other = await createUser(prisma, { displayName: '別モニター' });
 
   const blog = await createBlogForUser(user.id, {
+    personaId: (await createPersona(prisma, user.id)).id,
     name: '設定テスト',
     slug: 'settings-test',
     targetReader: '30代の会社員',

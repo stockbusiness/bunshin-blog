@@ -12,7 +12,7 @@ import {
   createTestPrisma,
   resetDatabase,
 } from './helpers/db';
-import { createUser } from './helpers/factories';
+import { createPersona, createUser } from './helpers/factories';
 
 /**
  * 管理画面のモニター一覧を**実PostgreSQLで**検証する（TASKS B-7）。
@@ -133,16 +133,19 @@ describe('countBlogsByUserForAdmin', () => {
     const b = await createUser(prisma);
 
     await createBlogForUser(a.id, {
+      personaId: (await createPersona(prisma, a.id)).id,
       name: 'A1',
       slug: 'a1',
       targetReader: '読者',
     });
     await createBlogForUser(a.id, {
+      personaId: (await createPersona(prisma, a.id)).id,
       name: 'A2',
       slug: 'a2',
       targetReader: '読者',
     });
     await createBlogForUser(b.id, {
+      personaId: (await createPersona(prisma, b.id)).id,
       name: 'B1',
       slug: 'b1',
       targetReader: '読者',
@@ -157,11 +160,13 @@ describe('countBlogsByUserForAdmin', () => {
   it('CLOSED を分けて数え、使用枠には含める（Q-008）', async () => {
     const user = await createUser(prisma);
     const blog = await createBlogForUser(user.id, {
+      personaId: (await createPersona(prisma, user.id)).id,
       name: '閉じる',
       slug: 'closing',
       targetReader: '読者',
     });
     await createBlogForUser(user.id, {
+      personaId: (await createPersona(prisma, user.id)).id,
       name: '稼働',
       slug: 'running',
       targetReader: '読者',
@@ -177,6 +182,7 @@ describe('countBlogsByUserForAdmin', () => {
   it('SETUP や PAUSED も稼働側で数える', async () => {
     const user = await createUser(prisma);
     const blog = await createBlogForUser(user.id, {
+      personaId: (await createPersona(prisma, user.id)).id,
       name: '休止',
       slug: 'paused',
       targetReader: '読者',
@@ -195,6 +201,7 @@ describe('countBlogsByUserForAdmin', () => {
     const withBlog = await createUser(prisma);
     const without = await createUser(prisma);
     await createBlogForUser(withBlog.id, {
+      personaId: (await createPersona(prisma, withBlog.id)).id,
       name: '持っている',
       slug: 'has-one',
       targetReader: '読者',
@@ -217,6 +224,7 @@ describe('countBlogsByUserForAdmin', () => {
     for (let index = 0; index < 5; index += 1) {
       const user = await createUser(prisma);
       await createBlogForUser(user.id, {
+        personaId: (await createPersona(prisma, user.id)).id,
         name: `ブログ${String(index)}`,
         slug: `bulk-${String(index)}`,
         targetReader: '読者',

@@ -19,7 +19,7 @@ import {
   createTestPrisma,
   resetDatabase,
 } from './helpers/db';
-import { createUser } from './helpers/factories';
+import { createPersona, createUser } from './helpers/factories';
 
 /**
  * テナント越境の統合テスト（TASKS C-6、SPEC 14.1）。
@@ -209,6 +209,7 @@ async function createTenant(
   const created = [];
   for (const slotNumber of [1, 2] as const) {
     const blog = await blogs.createBlogForUser(user.id, {
+      personaId: (await createPersona(prisma, user.id)).id,
       name: `${displayName}のブログ${slotNumber}`,
       slug: `${slugPrefix}-${slotNumber}`,
       targetReader: '読者',
@@ -1191,6 +1192,7 @@ describe('入口の網羅', () => {
    */
   it('createBlogForUser は userId しか取らない', async () => {
     const blog = await blogs.createBlogForUser(bob.userId, {
+      personaId: (await createPersona(prisma, bob.userId)).id,
       name: '3つめ',
       slug: 'bob-3',
       targetReader: '読者',
@@ -1198,6 +1200,63 @@ describe('入口の網羅', () => {
     });
 
     expect(blog.userId).toBe(bob.userId);
+  });
+});
+
+/**
+ * **自分のブログ + 他人の分身**（A-2-R-2c・A-2-R-2c-schema）。
+ *
+ * 依存の向きが `personas → blogs`（MODULE_RULES）なので、
+ * **`createBlogForUser` から分身の持ち主を確かめられない。**
+ * C-6・D-11 と同じく制約をDBへ置いた（`(persona_id, user_id)` の複合外部キー）。
+ *
+ * ここで確かめるのは、**モジュールの関数を素通しで呼んでも越境できない**こと。
+ * Route Handler の確認（`requirePersonaForUser`）に頼っていないことを示す。
+ */
+describe('他人の分身でブログを作る', () => {
+  it('他人の分身IDを指定したブログを作れない', async () => {
+    const alicesPersona = await createPersona(prisma, alice.userId);
+
+    await expect(
+      blogs.createBlogForUser(bob.userId, {
+        personaId: alicesPersona.id,
+        name: '乗っ取り',
+        slug: 'bob-hijack',
+        targetReader: '読者',
+        slotNumber: 3,
+      }),
+    ).rejects.toThrow();
+
+    // **相手の分身に紐づいた行が1件も出来ていないこと**まで見る
+    expect(
+      await prisma.blog.count({ where: { personaId: alicesPersona.id } }),
+    ).toBe(0);
+  });
+
+  it('存在しない分身IDでも作れない', async () => {
+    await expect(
+      blogs.createBlogForUser(bob.userId, {
+        personaId: '00000000-0000-0000-0000-000000000000',
+        name: '幽霊',
+        slug: 'bob-ghost',
+        targetReader: '読者',
+        slotNumber: 3,
+      }),
+    ).rejects.toThrow();
+  });
+
+  it('自分の分身なら作れる', async () => {
+    const persona = await createPersona(prisma, bob.userId);
+
+    const blog = await blogs.createBlogForUser(bob.userId, {
+      personaId: persona.id,
+      name: '3つめ',
+      slug: 'bob-3-ok',
+      targetReader: '読者',
+      slotNumber: 3,
+    });
+
+    expect(blog.personaId).toBe(persona.id);
   });
 });
 

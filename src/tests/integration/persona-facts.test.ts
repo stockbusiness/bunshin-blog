@@ -17,7 +17,7 @@ import {
   createTestPrisma,
   resetDatabase,
 } from './helpers/db';
-import { createUser } from './helpers/factories';
+import { createPersona, createUser } from './helpers/factories';
 
 /**
  * 本人の事実を**実PostgreSQLで**確かめる（TASKS D-6）。
@@ -77,6 +77,7 @@ beforeEach(async () => {
 
   blog1 = (
     await createBlogForUser(owner.id, {
+      personaId: (await createPersona(prisma, owner.id)).id,
       name: 'ブログ1',
       slug: 'mine-1',
       targetReader: '読者',
@@ -85,6 +86,7 @@ beforeEach(async () => {
   ).id;
   blog2 = (
     await createBlogForUser(owner.id, {
+      personaId: (await createPersona(prisma, owner.id)).id,
       name: 'ブログ2',
       slug: 'mine-2',
       targetReader: '読者',
@@ -93,6 +95,7 @@ beforeEach(async () => {
   ).id;
   otherBlog = (
     await createBlogForUser(other.id, {
+      personaId: (await createPersona(prisma, other.id)).id,
       name: '他人のブログ',
       slug: 'theirs',
       targetReader: '読者',
