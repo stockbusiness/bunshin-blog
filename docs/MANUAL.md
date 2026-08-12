@@ -89,7 +89,9 @@ LINEのメニューから「はじめの設定」を開きます。
 
 ### 段10 リンク計測を入れる
 
-WordPressに小さなプラグインを入れます。手順は `docs/WORDPRESS_SNIPPET.md`。
+**「リンク計測のファイルを受け取る」**を押すと `bunshin-go.php` が保存されます。それを WordPress の `wp-content/mu-plugins/` に置くだけです。手順は `docs/WORDPRESS_SNIPPET.md`。
+
+**トークンを貼る作業も、パーマリンクを保存し直す作業もありません。**
 
 **入れないと、記事の中のアフィリエイトリンクが開けません**（404になります）。
 
