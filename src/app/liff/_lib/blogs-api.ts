@@ -35,6 +35,19 @@ export interface BlogJson {
   genre: BlogGenreJson | null;
 }
 
+/** いま切れているリンク1件（H-3b、SPEC 6.1「エラー」） */
+export interface BrokenLinkJson {
+  offerId: string;
+  offerName: string;
+  /** ISO 8601。**いつから切れているか**（直す優先度がここで決まる） */
+  brokenAt: string;
+}
+
+export interface BlogDetailJson {
+  blog: BlogJson;
+  brokenLinks: BrokenLinkJson[];
+}
+
 export interface BlogListJson {
   blogs: BlogJson[];
   slots: { limit: number; available: number[]; remaining: number };
@@ -99,10 +112,8 @@ export function fetchBlogs(): Promise<BlogListJson> {
   return request<BlogListJson>('/api/blogs');
 }
 
-export function fetchBlog(blogId: string): Promise<{ blog: BlogJson }> {
-  return request<{ blog: BlogJson }>(
-    `/api/blogs/${encodeURIComponent(blogId)}`,
-  );
+export function fetchBlog(blogId: string): Promise<BlogDetailJson> {
+  return request<BlogDetailJson>(`/api/blogs/${encodeURIComponent(blogId)}`);
 }
 
 export function saveBlogSettings(

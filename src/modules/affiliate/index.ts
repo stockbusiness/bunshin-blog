@@ -109,7 +109,9 @@ export {
 
 export {
   checkOfferLinksForUser,
+  listBrokenOfferLinksForUser,
   judgeLinkHealth,
+  type BrokenOfferLink,
   type LinkHealth,
   type OfferLinkCheck,
   type CheckOfferLinksDeps,

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { AppError, toErrorHttpResponse } from '@/lib/errors';
+import { listBrokenOfferLinksForUser } from '@/modules/affiliate';
 import { requireConsentedUser } from '@/modules/auth';
 import {
   WEEKLY_PUBLISH_CAP_MAX,
@@ -51,7 +52,14 @@ export async function GET(
     const { id } = await context.params;
     const blog = await requireBlogForUser({ userId: user.id, blogId: id });
 
-    return Response.json({ blog });
+    // **リンク切れは `affiliate` から取る**（MODULE_RULES 1。`blogs` は
+    // `affiliate_offers` を触らない）。組み合わせるのは `src/app/` の役目
+    const brokenLinks = await listBrokenOfferLinksForUser({
+      userId: user.id,
+      blogId: id,
+    });
+
+    return Response.json({ blog, brokenLinks });
   } catch (error) {
     return toErrorHttpResponse(error);
   }

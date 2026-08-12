@@ -62,6 +62,15 @@ export interface AppAffiliateOffer {
   userExperience: UserExperience;
   userRating: number | null;
   denyConditions: string[];
+  /**
+   * リンクを最後に確かめた時刻（H-3b）。**通っていても入る。**
+   *
+   * **届かなかった回では動かない**（`UNAVAILABLE`）。古い値は
+   * 「確認できていない」であって「問題なし」ではない
+   */
+  linkCheckedAt: Date | null;
+  /** **切れていると分かった最初の時刻**（H-3b）。直っていれば `null` */
+  linkBrokenAt: Date | null;
   /** LPのフォーム項目数（D-2 の自動評価）。未評価なら `null` */
   lpFormFields: number | null;
   /** LPがスマートフォン対応か（D-2）。未評価なら `null` */

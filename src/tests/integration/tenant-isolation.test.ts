@@ -1010,6 +1010,8 @@ describe('入口の網羅', () => {
       'findOfferForUser',
       'requireOfferForUser',
       'checkOfferLinksForUser',
+      // H-3b。いま切れているリンクを画面に出す（`requireBlogForUser` で絞る）
+      'listBrokenOfferLinksForUser',
       'createOfferForUser',
       'updateOfferForUser',
       'endOfferForUser',

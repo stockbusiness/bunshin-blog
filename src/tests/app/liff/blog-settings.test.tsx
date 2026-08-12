@@ -66,7 +66,7 @@ async function renderLoaded() {
 }
 
 beforeEach(() => {
-  vi.mocked(fetchBlog).mockResolvedValue({ blog: BLOG });
+  vi.mocked(fetchBlog).mockResolvedValue({ blog: BLOG, brokenLinks: [] });
   vi.mocked(saveBlogSettings).mockResolvedValue({ blog: BLOG });
 });
 
@@ -118,7 +118,10 @@ describe('変更できない項目（Q-009・Q-011）', () => {
   });
 
   it('ジャンル未設定なら「未設定」と出す', async () => {
-    vi.mocked(fetchBlog).mockResolvedValue({ blog: { ...BLOG, genre: null } });
+    vi.mocked(fetchBlog).mockResolvedValue({
+      blog: { ...BLOG, genre: null },
+      brokenLinks: [],
+    });
 
     await renderLoaded();
 
@@ -253,5 +256,64 @@ describe('保存', () => {
 
     resolve({ blog: BLOG });
     await waitFor(() => expect(button).toBeEnabled());
+  });
+});
+
+/**
+ * いま切れているリンク（TASKS H-3b、SPEC 6.1「エラー」）。
+ *
+ * **いつから切れているか**が分からないと、モニターは直す優先度を決められない
+ */
+describe('リンク切れ', () => {
+  const brokenLink = (overrides: Record<string, unknown> = {}) => ({
+    offerId: 'offer-1',
+    offerName: '格安SIM案件',
+    brokenAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1_000).toISOString(),
+    ...overrides,
+  });
+
+  it('切れている案件と、いつからかを出す', async () => {
+    vi.mocked(fetchBlog).mockResolvedValue({
+      blog: BLOG,
+      brokenLinks: [brokenLink()],
+    });
+
+    await renderLoaded();
+
+    expect(screen.getByText('格安SIM案件')).toBeVisible();
+    expect(screen.getByText('（3日前から）')).toBeVisible();
+  });
+
+  it('今日切れたなら「今日から」', async () => {
+    vi.mocked(fetchBlog).mockResolvedValue({
+      blog: BLOG,
+      brokenLinks: [brokenLink({ brokenAt: new Date().toISOString() })],
+    });
+
+    await renderLoaded();
+
+    expect(screen.getByText('（今日から）')).toBeVisible();
+  });
+
+  /**
+   * **「問題ありません」と書かない。** 確認できていない案件まで
+   * 問題なしに見える（確認の結果が無いことと、確認して問題が無かったことは別）
+   */
+  it('切れていなければ何も出さない', async () => {
+    await renderLoaded();
+
+    expect(screen.queryByText(/リンクが切れています/)).not.toBeInTheDocument();
+  });
+
+  /** **「切れています」だけだと何をすればよいか分からない** */
+  it('直し方を書く', async () => {
+    vi.mocked(fetchBlog).mockResolvedValue({
+      blog: BLOG,
+      brokenLinks: [brokenLink()],
+    });
+
+    await renderLoaded();
+
+    expect(screen.getByText(/ASPの管理画面でご確認/)).toBeVisible();
   });
 });
