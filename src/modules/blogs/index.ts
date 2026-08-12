@@ -89,3 +89,9 @@ export {
   type PermalinkPattern,
   type PublishSchedule,
 } from './publish-schedule';
+
+export {
+  buildLinkSnippet,
+  assertSnippetEndpoint,
+  SNIPPET_RULES_VERSION,
+} from './snippet';
