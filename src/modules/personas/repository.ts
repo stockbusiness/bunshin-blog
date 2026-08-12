@@ -213,14 +213,14 @@ export async function resolveEffectivePersonaForUser(params: {
  * `persona_facts` テーブルへのアクセス（TASKS D-6・A-2-R-4、SPEC 5.7）。
  *
  * **記憶は分身に溜まる。** 所有は `persona` を辿って確かめる
- * （`persona_facts.user_id` と `blog_id` は A-2-R-4-schema で落とす）。
+ * （`user_id` と `blog_id` は A-2-R-4-schema で落とした）。
  * **`persona.userId` を必ず条件に入れる** — 他人の分身の記憶を引かせない
  * （SPEC 14.1）。
  */
 
 interface FactRow {
   id: string;
-  personaId: string | null;
+  personaId: string;
   factType: string;
   content: string;
   source: string;
@@ -245,10 +245,7 @@ const FACT_SELECT = {
 function toAppFact(row: FactRow): AppPersonaFact {
   return {
     id: row.id,
-    // **列はまだ nullable**（NOT NULL 化は A-2-R-4-schema）。作成時に必ず
-    // 入れるので、ここでは型の主張だけに留めて例外は投げない —
-    // 読み出しで落ちると、直す画面にも入れなくなる（`toAppBlogSetting` と同じ方針）
-    personaId: row.personaId as string,
+    personaId: row.personaId,
     factType: row.factType as FactType,
     content: row.content,
     source: row.source as FactSource,
@@ -269,9 +266,8 @@ function toAppFact(row: FactRow): AppPersonaFact {
  * **記憶が分身に溜まるようになり、その分身の媒体は1件なので、
  * 「共通」と「固有」を分ける意味が無くなった。**
  *
- * 所有は `persona` 経由で絞る（`persona_facts.user_id` は A-2-R-4-schema で
- * 落とす）。**`persona.userId` を必ず条件に入れる** — 他人の分身の記憶を
- * 引かせない（SPEC 14.1）。
+ * 所有は `persona` 経由で絞る。**`persona.userId` を必ず条件に入れる** —
+ * 他人の分身の記憶を引かせない（SPEC 14.1）。
  */
 export async function listPersonaFactsForUser(
   userId: string,
@@ -347,9 +343,7 @@ export async function createPersonaFactForUser(
   });
 
   const row = await prisma.personaFact.create({
-    // `user_id` は A-2-R-4-schema で落とすまで NOT NULL なので入れておく。
-    // **読むのは `persona` 経由だけ**（この列で絞らない）
-    data: { userId, personaId: persona.id, ...data },
+    data: { personaId: persona.id, ...data },
     select: FACT_SELECT,
   });
 
