@@ -407,11 +407,12 @@ model Blog {
   publishWeekdays        Int[]            @map("publish_weekdays")
   /// 公開時刻（JSTの壁掛け時計）。`time` 型にUTCへ直さずそのまま入れる。
   ///
-  /// **nullable なのは割り当ての処理が C-9（コード）だから。**
-  /// 埋まったあとに `NOT NULL` にする（C-9-schema-2）。
-  /// 共通の既定値を置かないのは、**散らすものに既定値は無い**ため —
-  /// 既定値を置くと、割り当てを忘れた行が「9時のブログ」として紛れる
-  publishTime            DateTime?        @map("publish_time") @db.Time(6)
+  /// **必須**（C-9-schema-2）。空だと投稿ジョブから見て「いつ公開するか
+  /// 決まっていない」ことになり、読む側が必ず既定値を持つ。
+  ///
+  /// **既定値は置かない。** 置くと、**割り当てを忘れた行が
+  /// 「9時のブログ」として紛れる。** 落とすなら保存の時点で落とす
+  publishTime            DateTime         @map("publish_time") @db.Time(6)
   /// 実行時刻のゆらぎ（分）。**全ブログの投稿ジョブを同一時刻に集中させない**
   publishJitterMin       Int              @default(0) @map("publish_jitter_min")
   /// WordPress のパーマリンク様式。**初回設定後に変更しない**

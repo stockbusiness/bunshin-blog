@@ -47,7 +47,7 @@ interface BlogRecord {
   createdAt: Date;
   linkEventTokenIssuedAt: Date | null;
   publishWeekdays: number[];
-  publishTime: Date | null;
+  publishTime: Date;
   publishJitterMin: number;
   permalinkPattern: string;
   initialArticleCount: number;
@@ -83,10 +83,7 @@ function toAppBlog(record: BlogRecord): AppBlog {
     genre: record.genre,
     linkEventTokenIssuedAt: record.linkEventTokenIssuedAt,
     publishWeekdays: record.publishWeekdays,
-    publishTime:
-      record.publishTime === null
-        ? null
-        : fromPublishTimeColumn(record.publishTime),
+    publishTime: fromPublishTimeColumn(record.publishTime),
     publishJitterMin: record.publishJitterMin,
     permalinkPattern: record.permalinkPattern as PermalinkPattern,
     initialArticleCount: record.initialArticleCount,
