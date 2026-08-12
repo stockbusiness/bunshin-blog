@@ -299,7 +299,6 @@ model User {
   monitorProfile MonitorProfile?
   personas       Persona[]
   blogs          Blog[]
-  personaFacts   PersonaFact[]
   approvals      Approval[]
   aiUsageLogs    AiUsageLog[]
   auditLogs      AuditLog[]        @relation("AuditActor")
@@ -385,7 +384,6 @@ model Blog {
   searchConsole   SearchConsoleConnection?
   offers          AffiliateOffer[]
   banners         Banner[]
-  personaFacts    PersonaFact[]
   contentPlans    ContentPlan[]
   contentItems    ContentItem[]
   wordpressPosts  WordpressPost[]
@@ -509,11 +507,14 @@ model BlogPersonaSetting {
 /// `user_id` と `blog_id` は **A-2-R-3 で落とす。** いま消すと参照している
 /// コードが一斉に壊れるため、移行のあいだだけ並存させる（Q-033）。
 model PersonaFact {
-  id                String           @id @default(uuid()) @db.Uuid
-  userId            String           @map("user_id") @db.Uuid
-  /// A-2-R-2 で nullable として追加し、A-2-R-3 で必須にする
-  personaId         String?          @map("persona_id") @db.Uuid
-  blogId            String?          @map("blog_id") @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
+  /// どの分身の記憶か（A-2-R-4-schema で必須にした）。
+  ///
+  /// **記憶は媒体ではなく人格に溜まる。** 同じ分身が将来べつの媒体
+  /// （SNS・動画）へ広がっても引き継げるようにする。
+  ///
+  /// **`Cascade`。** 分身を消せばその記憶も消える（人格に属するものだから）
+  personaId         String           @map("persona_id") @db.Uuid
   factType          FactType         @map("fact_type")
   content           String
   source            FactSource
@@ -522,13 +523,9 @@ model PersonaFact {
   createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  persona Persona? @relation(fields: [personaId], references: [id], onDelete: Cascade)
-  blog    Blog?    @relation(fields: [blogId], references: [id], onDelete: SetNull)
+  persona Persona @relation(fields: [personaId], references: [id], onDelete: Cascade)
 
   @@index([personaId, verification])
-  @@index([userId, verification])
-  @@index([blogId])
   @@map("persona_facts")
 }
 

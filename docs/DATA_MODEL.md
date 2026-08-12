@@ -99,11 +99,13 @@ PostgreSQL の複合外部キーは既定で MATCH SIMPLE のため、参照側�
 
 | 列 | 扱い |
 |---|---|
-| `persona_id` | **A-2-R-2-schema で nullable として追加。** A-2-R-4 で必須にする |
-| `user_id` | A-2-R-4 で削除 |
-| `blog_id` | A-2-R-4 で削除（媒体に紐づけない） |
+| `persona_id` | **A-2-R-4-schema で `NOT NULL` になった** |
+| `user_id` | 削除済み。所有は `persona.user_id` を辿る |
+| `blog_id` | 削除済み（媒体に紐づけない） |
 
-**A-2-R-4 でコードを移した。** 取得・作成・更新・削除が `persona_id` を基準にし、所有は `persona.userId` を辿って確かめる。列を落とすのは **A-2-R-4-schema**（A-2-R-2f → A-2-R-3 と同じ順序）。
+**`persona_id` が NULL の行が1つでもあれば、A-2-R-4-schema のマイグレーションは失敗する。** どの分身の記憶か分からない行を、推測で誰かに割り当てない。
+
+`persona_facts_user_id_verification_idx` も落とした。**その列で絞らなくなったので、索引を残しても書き込みが遅くなるだけ。** 所有つきの取得は `persona_facts(persona_id, verification)` と `personas(user_id, status)` で足りる。
 
 **「ブログ固有」と「全ブログ共通」を分けるのをやめた**（A-2-R-4）。A-2-R-4 より前は `blog_id` が `null` の事実を全ブログ共通として扱っていたが、**記憶が分身に溜まり、その分身の媒体は1件**になったので、分ける意味が無くなった。`listPersonaFactsForUser(userId, { blogId })` は「そのブログを書く分身の記憶」を返す。
 

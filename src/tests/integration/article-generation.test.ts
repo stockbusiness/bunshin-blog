@@ -754,7 +754,6 @@ describe('事実チェック（E-12）', () => {
   it('使ってはいけない事実を根拠にした体験談は FAILED', async () => {
     await prisma.personaFact.create({
       data: {
-        userId,
         // **記憶は分身に溜まる**（A-2-R-4）。ブログを書く分身に紐づける
         personaId,
         factType: 'EXPERIENCE',
@@ -786,7 +785,6 @@ describe('事実チェック（E-12）', () => {
   it('使ってよい事実に基づく体験談は通る', async () => {
     await prisma.personaFact.create({
       data: {
-        userId,
         // **記憶は分身に溜まる**（A-2-R-4）。ブログを書く分身に紐づける
         personaId,
         factType: 'EXPERIENCE',
