@@ -100,6 +100,8 @@ export {
   activatePersonaForUser,
   pausePersonaForUser,
   countActivePersonasForUser,
+  getPersonaLimitsForUser,
+  type PersonaLimits,
 } from './persona-repository';
 
 export {

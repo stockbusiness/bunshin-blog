@@ -7,6 +7,7 @@ import {
   countActivePersonasForUser,
   createPersonaForUser,
   findPersonaForUser,
+  getPersonaLimitsForUser,
   listPersonasForUser,
   pausePersonaForUser,
   requirePersonaForUser,
@@ -382,5 +383,71 @@ describe('他人の分身', () => {
     const other = await createUser(prisma);
 
     expect(await listPersonasForUser(other.id)).toEqual([]);
+  });
+});
+
+/**
+ * **断る理由を数値で返す**（D-14）。
+ *
+ * 「上限です」だけだと、待てば開くのか、止めれば開くのか、そもそも
+ * 開かないのかが画面から分からない。画面はこの値から文を書き分ける。
+ */
+describe('いま何体まで使えるか', () => {
+  async function joinedDaysAgo(days: number): Promise<void> {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { activatedAt: new Date(NOW.getTime() - days * 86_400_000) },
+    });
+  }
+
+  it('参加直後は1体まで、次は30日後に開く', async () => {
+    await joinedDaysAgo(0);
+
+    expect(await getPersonaLimitsForUser(userId, NOW)).toEqual({
+      max: MAX_ACTIVE_PERSONAS,
+      active: 0,
+      allowedNow: 1,
+      joinedDays: 0,
+      nextUnlockInDays: 30,
+    });
+  });
+
+  it('40日目は2体まで、次は60日目', async () => {
+    await joinedDaysAgo(40);
+
+    const limits = await getPersonaLimitsForUser(userId, NOW);
+
+    expect(limits.allowedNow).toBe(2);
+    expect(limits.nextUnlockInDays).toBe(20);
+  });
+
+  /** **もう開かないなら `null`。** 日数を出すと嘘になる */
+  it('70日目は3体まで、もう増えない', async () => {
+    await joinedDaysAgo(70);
+
+    const limits = await getPersonaLimitsForUser(userId, NOW);
+
+    expect(limits.allowedNow).toBe(MAX_ACTIVE_PERSONAS);
+    expect(limits.nextUnlockInDays).toBeNull();
+  });
+
+  it('使い始めた数を数える', async () => {
+    await joinedDaysAgo(70);
+    const created = await createPersonaForUser(userId, input());
+    await activatePersonaForUser({ userId, personaId: created.id, now: NOW });
+
+    expect((await getPersonaLimitsForUser(userId, NOW)).active).toBe(1);
+  });
+
+  /**
+   * **参加を認められる前は段階解放を効かせない**（`activatePersonaForUser`
+   * と揃える）。ここだけ1体に見せると、画面と実際の挙動が食い違う
+   */
+  it('参加前は全体の上限だけが効く', async () => {
+    const limits = await getPersonaLimitsForUser(userId, NOW);
+
+    expect(limits.joinedDays).toBeNull();
+    expect(limits.allowedNow).toBe(MAX_ACTIVE_PERSONAS);
+    expect(limits.nextUnlockInDays).toBeNull();
   });
 });

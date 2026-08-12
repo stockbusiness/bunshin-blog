@@ -230,6 +230,60 @@ async function elapsedDaysSinceJoin(
 }
 
 /**
+ * いま何体まで使えるか（D-14）。
+ *
+ * **画面に出すために、断る理由を数値で返す。** 「上限です」だけだと、
+ * 待てば開くのか、止めれば開くのか、そもそも開かないのかが分からない。
+ *
+ * | 値 | 意味 |
+ * |---|---|
+ * | `max` | 全体の上限（3体） |
+ * | `active` | いま `ACTIVE` な数 |
+ * | `allowedNow` | 経過日数で開いている数。`joinedDays` が `null` なら `max` |
+ * | `joinedDays` | 参加から何日経ったか。まだ承認されていなければ `null` |
+ * | `nextUnlockInDays` | あと何日で1体増えるか。もう増えないなら `null` |
+ */
+export interface PersonaLimits {
+  max: number;
+  active: number;
+  allowedNow: number;
+  joinedDays: number | null;
+  nextUnlockInDays: number | null;
+}
+
+/** 次に枠が開くまでの日数。段階解放の境目は 30 日と 60 日（ROADMAP 5章） */
+const UNLOCK_DAYS = [30, 60] as const;
+
+export async function getPersonaLimitsForUser(
+  userId: string,
+  now: Date = new Date(),
+): Promise<PersonaLimits> {
+  const [active, joinedDays] = await Promise.all([
+    countActivePersonasForUser(userId),
+    elapsedDaysSinceJoin(userId, now),
+  ]);
+
+  const allowedNow =
+    joinedDays === null ? MAX_ACTIVE_PERSONAS : maxActivePersonas(joinedDays);
+
+  const nextBoundary =
+    joinedDays === null
+      ? undefined
+      : UNLOCK_DAYS.find((boundary) => joinedDays < boundary);
+
+  return {
+    max: MAX_ACTIVE_PERSONAS,
+    active,
+    allowedNow,
+    joinedDays,
+    nextUnlockInDays:
+      nextBoundary === undefined || joinedDays === null
+        ? null
+        : nextBoundary - joinedDays,
+  };
+}
+
+/**
  * 分身を使い始める。
  *
  * **上限は2つある。**
