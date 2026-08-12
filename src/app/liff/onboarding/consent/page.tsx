@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { OnboardingApiError, acceptConsent } from '../../_lib/onboarding-api';
+import { CONSENT_SECTIONS } from '../_lib/consent-text';
 
 /**
  * `/liff/onboarding/consent` 同意（TASKS H-2b、SPEC 6.1 の段2・3）。
@@ -15,37 +16,10 @@ import { OnboardingApiError, acceptConsent } from '../../_lib/onboarding-api';
  *
  * **取り消しは置かない。** データを残したまま同意だけ外れた状態を作らない。
  * やめるときは退会（H-4）。
+ *
+ * **文言は `_lib/consent-text.ts` が正**（H-6）。`docs/CONSENT.md` と
+ * 食い違わないことをテストが見張る。
  */
-
-interface Section {
-  kind: 'TERMS' | 'DATA_USE';
-  title: string;
-  body: string[];
-}
-
-const SECTIONS: Section[] = [
-  {
-    kind: 'TERMS',
-    title: '利用規約',
-    body: [
-      'この実験に参加するための約束です。',
-      'ドメインとサーバーの費用はご自身の負担になります。',
-      'ブログはご自身のドメインで動き、記事の公開はご自身の承認で行われます。',
-      '承認していない記事が公開されることはありません。',
-    ],
-  },
-  {
-    kind: 'DATA_USE',
-    title: 'データの使い方',
-    body: [
-      '実験の結果をまとめるために、次の記録を使わせていただきます。',
-      '・提案に答えた記録（承認・修正依頼・見送り）',
-      '・公開した記事と、その表示回数やクリック数',
-      '・登録した案件と成果の報告',
-      'LINEのユーザーIDは、まとめや持ち出しには含めません。',
-    ],
-  },
-];
 
 export default function ConsentPage() {
   const [accepted, setAccepted] = useState<Record<string, boolean>>({});
@@ -65,7 +39,7 @@ export default function ConsentPage() {
         </p>
       )}
 
-      {SECTIONS.map((section) => (
+      {CONSENT_SECTIONS.map((section) => (
         <section key={section.kind} className="mt-4 rounded-lg border p-4">
           <h2 className="text-sm font-bold">{section.title}</h2>
           {section.body.map((line) => (

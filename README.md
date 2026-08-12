@@ -61,6 +61,8 @@ docs/          仕様・設計・進捗
 | `docs/DATA_MODEL.md` | スキーマ補足 |
 | `docs/IMPLEMENTATION_STATUS.md` | タスク別の進捗 |
 | `docs/OPEN_QUESTIONS.md` | 未解決の論点 |
+| `docs/MANUAL.md` | モニターに渡す操作マニュアル |
+| `docs/CONSENT.md` | 同意していただくこと |
 | `docs/WORDPRESS_SNIPPET.md` | モニターに渡す手順書（各ブログの `/go/` 処理） |
 
 ## 実装ルール
