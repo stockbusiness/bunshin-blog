@@ -103,7 +103,9 @@ PostgreSQL の複合外部キーは既定で MATCH SIMPLE のため、参照側�
 | `user_id` | A-2-R-4 で削除 |
 | `blog_id` | A-2-R-4 で削除（媒体に紐づけない） |
 
-**A-2-R-3 では触らない。** `listPersonaFactsForUser` などが `user_id` と `blog_id` で絞っており、列を落とすと typecheck が通らない。コードを移す **A-2-R-4** と、列を落とす **A-2-R-4-schema** に分ける（A-2-R-2f → A-2-R-3 と同じ順序）。
+**A-2-R-4 でコードを移した。** 取得・作成・更新・削除が `persona_id` を基準にし、所有は `persona.userId` を辿って確かめる。列を落とすのは **A-2-R-4-schema**（A-2-R-2f → A-2-R-3 と同じ順序）。
+
+**「ブログ固有」と「全ブログ共通」を分けるのをやめた**（A-2-R-4）。A-2-R-4 より前は `blog_id` が `null` の事実を全ブログ共通として扱っていたが、**記憶が分身に溜まり、その分身の媒体は1件**になったので、分ける意味が無くなった。`listPersonaFactsForUser(userId, { blogId })` は「そのブログを書く分身の記憶」を返す。
 
 `onDelete` は `Cascade`。**分身を消せばその記憶も消える** — 人格に属するものだから。
 

@@ -127,12 +127,16 @@ export const FACT_VERIFICATIONS: readonly FactVerification[] = [
   'REJECTED',
 ];
 
-/** 本人の経験や意見（`persona_facts`・SPEC 5.7） */
+/**
+ * 本人の経験や意見（`persona_facts`・SPEC 5.7）。
+ *
+ * **記憶は分身に溜まる**（A-2-R-4）。旧 `user_id` / `blog_id` は持たない
+ * — 同じ分身が将来べつの媒体（SNS・動画）へ広がっても引き継げるようにする。
+ */
 export interface AppPersonaFact {
   id: string;
-  userId: string;
-  /** ブログ固有の事実なら設定。`null` は全ブログ共通 */
-  blogId: string | null;
+  /** どの分身の記憶か */
+  personaId: string;
   factType: FactType;
   content: string;
   source: FactSource;
@@ -150,10 +154,11 @@ export interface AppPersonaFact {
 }
 
 export interface CreatePersonaFactInput {
+  /** どの分身の記憶か（A-2-R-4）。**必須** */
+  personaId: string;
   factType: FactType;
   content: string;
   source: FactSource;
-  blogId?: string | undefined;
   verification?: FactVerification | undefined;
   usableFirstPerson?: boolean | undefined;
 }
