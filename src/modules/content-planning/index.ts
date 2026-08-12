@@ -83,6 +83,7 @@ export {
 export {
   listContentItemsForUser,
   listPlanItemsWithLinksForUser,
+  listGenerationTargetsForUser,
   findLatestPlanForUser,
   type AppContentItem,
   type NewContentItem,

@@ -6,6 +6,7 @@ import {
   enqueueSearchMetricsForUser,
 } from '@/modules/analytics';
 import { enqueueProposalSelectionForUser } from '@/modules/approvals';
+import { enqueueArticleGenerationForUser } from './article-schedule';
 import {
   enqueueLinkCheckForUser,
   sendPendingProposalsForUser,
@@ -72,6 +73,7 @@ export interface DailyScheduleResult {
     dailyAggregate: number;
     linkCheck: number;
     proposalSelection: number;
+    articleGeneration: number;
   };
   /** 積めなかった利用者の数。**0でないことが分かるように返す** */
   failed: number;
@@ -107,6 +109,7 @@ export async function runDailySchedule(
       dailyAggregate: 0,
       linkCheck: 0,
       proposalSelection: 0,
+      articleGeneration: 0,
     },
     failed: 0,
   };
@@ -137,6 +140,15 @@ export async function runDailySchedule(
       if (await enqueueProposalSelectionForUser(monitor.id, { now })) {
         result.queued.proposalSelection += 1;
       }
+
+      // **記事生成はブログ単位**（公開する曜日がブログごとに違う。I-4）。
+      // **1ブログの失敗で他のブログを止めない**ので、失敗の数はここへ足す
+      const articles = await enqueueArticleGenerationForUser(monitor.id, {
+        now,
+      });
+
+      result.queued.articleGeneration += articles.queued;
+      result.failed += articles.failed;
     } catch (error) {
       // **利用者IDだけを残す。** 中身は出さない（SPEC 14.2）
       result.failed += 1;
