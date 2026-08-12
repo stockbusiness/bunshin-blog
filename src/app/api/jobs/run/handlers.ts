@@ -1,4 +1,5 @@
 import { AppError } from '@/lib/errors';
+import type { AiProvider } from '@/lib/ai';
 import {
   buildPlanForUser,
   type JobPlanInput,
@@ -214,6 +215,18 @@ export interface JobHandlerDeps {
         credentials: WordpressCredentials;
       }) => WordpressClient)
     | undefined;
+
+  /**
+   * AI の呼び出しを差し替える。
+   *
+   * **試験のためだけに開ける**（`wordpressClientFactory` と同じ）。
+   * 未指定なら各モジュールが設定から組み立てる
+   * （`createConfiguredAiProvider`）。
+   *
+   * **通しの試験（I-5）が要る。** 差し替えられないと、E2E が
+   * 実際に AI を呼ぶことになり、CI で回せない。
+   */
+  aiProvider?: AiProvider | undefined;
 }
 
 /**
@@ -257,6 +270,12 @@ function readReplyInput(job: AppJob): {
 export function createJobHandlers(
   deps: JobHandlerDeps = {},
 ): JobHandlerRegistry {
+  // **未指定なら渡さない。** `{ provider: undefined }` を渡すと、
+  // 受け取る側の `?? createConfiguredAiProvider()` と噛み合わなくなる型が
+  // あるため、形を揃えておく
+  const aiDeps =
+    deps.aiProvider === undefined ? {} : { provider: deps.aiProvider };
+
   return {
     /**
      * 構成表を作る（STEP 3〜4 ＋ 制約チェック ＋ 公開順序）。
@@ -265,7 +284,7 @@ export function createJobHandlers(
      * （SPEC 9.2.6）。暫定的な構成表を承認依頼へ送らない。
      */
     PLAN_GENERATION: async (job) => {
-      const result = await buildPlanForUser(readPlanInput(job));
+      const result = await buildPlanForUser(readPlanInput(job), aiDeps);
 
       // **戻り値は `output_json` に入る。** 何本作ったかを残す
       return {
@@ -283,7 +302,10 @@ export function createJobHandlers(
      * 承認依頼へ送れない。
      */
     ARTICLE_GENERATION: async (job) => {
-      const version = await generateArticleForUser(readArticleTarget(job));
+      const version = await generateArticleForUser(
+        readArticleTarget(job),
+        aiDeps,
+      );
 
       return {
         articleVersionId: version.id,
