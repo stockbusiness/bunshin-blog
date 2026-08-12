@@ -126,9 +126,6 @@ export async function saveBlogPersonaSettingForUser(
   const write = {
     penName: data.penName,
     toneOverride: data.toneOverride as unknown as Prisma.InputJsonObject,
-    // **もう読まない列**（A-2-R-2d）。読者像は `Persona.audience` が持つ。
-    // まだ NOT NULL なので空で埋める。列の削除は A-2-R-3
-    targetReader: {},
     ngTopics: data.ngTopics,
     writingRules: data.writingRules as unknown as Prisma.InputJsonObject,
   };
@@ -193,20 +190,16 @@ export async function updateBlogPersonaSettingForUser(
  *
  * ブログ別設定は無くてもよい（設定前のブログでも記事は書けるべき）。
  *
- * @throws {AppError} 他人のブログ（404）、分身の割り当てが無いブログ（404）
+ * **分身の割り当てが無いブログは存在しない**（`blogs.persona_id` は
+ * `NOT NULL`・A-2-R-3）。推測で既定の分身を当てる分岐は要らない。
+ *
+ * @throws {AppError} 他人のブログ（404）
  */
 export async function resolveEffectivePersonaForUser(params: {
   userId: string;
   blogId: string;
 }): Promise<EffectivePersona> {
   const blog = await requireBlogForUser(params);
-
-  // **A-2-R-2c より前に作られたブログだけがここへ来る。**
-  // `blogs.persona_id` は A-2-R-3 で NOT NULL になり、この分岐は消える。
-  // **推測で既定の分身を当てない** — 誰が書いた記事なのかが分からなくなる
-  if (blog.personaId === null) {
-    throw personaNotFoundError();
-  }
 
   const [persona, setting] = await Promise.all([
     requirePersonaForUser({ userId: params.userId, personaId: blog.personaId }),

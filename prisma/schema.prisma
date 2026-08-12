@@ -297,7 +297,6 @@ model User {
   updatedAt        DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   monitorProfile MonitorProfile?
-  userPersona    UserPersona?
   personas       Persona[]
   blogs          Blog[]
   personaFacts   PersonaFact[]
@@ -356,11 +355,7 @@ model Blog {
   name              String
   slug              String
   genreId           String?     @map("genre_id") @db.Uuid
-  /// どの分身の媒体か（A-2-R-1）。
-  ///
-  /// **A-2-R-1 では nullable。** 既存のブログには分身がまだ無く、
-  /// いきなり必須にすると作成の全経路とテストが落ちる。
-  /// A-2-R-3 で `NOT NULL` にする。
+  /// どの分身の媒体か。**ブログは分身の媒体である**（A-2-R-3 で必須にした）。
   ///
   /// **`Restrict`。** 分身を消してもブログを道連れにしない。
   ///
@@ -369,7 +364,7 @@ model Blog {
   /// `affiliate_links` とまったく同じ形で、理由も同じ —
   /// **依存の向きが `personas → blogs` なので、`blogs` から
   /// 分身の持ち主を確かめられない**（MODULE_RULES 3）
-  personaId         String?     @map("persona_id") @db.Uuid
+  personaId         String      @map("persona_id") @db.Uuid
   penName           String?     @map("pen_name")
   targetReader      String      @map("target_reader")
   purpose           BlogPurpose @default(AFFILIATE)
@@ -383,7 +378,7 @@ model Blog {
 
   user            User                     @relation(fields: [userId], references: [id], onDelete: Restrict)
   genre           Genre?                   @relation(fields: [genreId], references: [id], onDelete: SetNull)
-  persona         Persona?                 @relation(fields: [personaId, userId], references: [id, userId], onDelete: Restrict)
+  persona         Persona                  @relation(fields: [personaId, userId], references: [id, userId], onDelete: Restrict)
   experimentGroup ExperimentGroup?         @relation(fields: [experimentGroupId], references: [id], onDelete: SetNull)
   wordpress       WordpressConnection?
   personaSettings BlogPersonaSetting?
@@ -490,28 +485,12 @@ model Persona {
   @@map("personas")
 }
 
-model UserPersona {
-  id            String   @id @default(uuid()) @db.Uuid
-  userId        String   @unique @map("user_id") @db.Uuid
-  baseProfile   Json     @map("base_profile")
-  tone          Json
-  values        Json
-  ngExpressions String[] @map("ng_expressions")
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("user_personas")
-}
 
 model BlogPersonaSetting {
   id                 String   @id @default(uuid()) @db.Uuid
   blogId             String   @unique @map("blog_id") @db.Uuid
   penName            String   @map("pen_name")
   toneOverride       Json     @map("tone_override")
-  targetReader       Json     @map("target_reader")
-  allowedExperiences String[] @map("allowed_experiences") @db.Uuid
   ngTopics           String[] @map("ng_topics")
   writingRules       Json     @map("writing_rules")
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)

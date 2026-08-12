@@ -81,9 +81,9 @@ business  = { revenuePolicy: string; monthlyGoalYen: number;
 
 #### `blogs.persona_id` を段階的に必須へ
 
-**A-2-R-1 では nullable。** 既存のブログには分身がまだ無く、いきなり必須にすると作成の全経路とテストが落ちる（OPEN_QUESTIONS Q-033）。A-2-R-3 で `NOT NULL` にする。
+**A-2-R-3 で `NOT NULL` になった。** 段階を踏んだのは、いきなり必須にすると作成の全経路とテストが落ちるため（OPEN_QUESTIONS Q-033）。A-2-R-1 で nullable として足し、A-2-R-2c で入力を必須にし、A-2-R-3 で列を締めた。
 
-**A-2-R-2c で入力としては必須になった。** `CreateBlogInput.personaId` は省略できない。列が nullable なのは、A-2-R-2c より前に作られた行が残りうるためだけである。
+**`NULL` の行が1つでもあれば、A-2-R-3 のマイグレーションは失敗する。** それが正しい振る舞いで、**推測で既定の分身を当てると、誰が書いた記事なのかが分からなくなる。**
 
 `onDelete` は `Restrict`。**分身を消してもブログを道連れにしない。**
 
@@ -91,7 +91,7 @@ business  = { revenuePolicy: string; monthlyGoalYen: number;
 
 依存の向きは `personas → blogs`（MODULE_RULES）なので、**`blogs` から分身の持ち主を確かめると循環する。** 「上位へ寄せる」で `src/app/` に確認を置くこともできるが、それは確認を呼び出し側の作法に頼ることになり、経路が増えたときに抜けてもレビューでしか気づけない。C-6・D-11 と同じ形で**制約をDBに置く。**
 
-PostgreSQL の複合外部キーは既定で MATCH SIMPLE のため、**`persona_id` が NULL のあいだは検査されない。** `user_id` は NOT NULL なので、片方だけ NULL にしてすり抜ける余地は無い。
+PostgreSQL の複合外部キーは既定で MATCH SIMPLE のため、参照側の列が1つでも NULL なら検査されない。**A-2-R-3 で両列とも NOT NULL になったので、常に検査される。**
 
 #### `persona_facts` の所属
 
@@ -99,15 +99,19 @@ PostgreSQL の複合外部キーは既定で MATCH SIMPLE のため、**`persona
 
 | 列 | 扱い |
 |---|---|
-| `persona_id` | **A-2-R-2 で nullable として追加。** A-2-R-3 で必須にする |
-| `user_id` | A-2-R-3 で削除 |
-| `blog_id` | A-2-R-3 で削除（媒体に紐づけない） |
+| `persona_id` | **A-2-R-2-schema で nullable として追加。** A-2-R-4 で必須にする |
+| `user_id` | A-2-R-4 で削除 |
+| `blog_id` | A-2-R-4 で削除（媒体に紐づけない） |
+
+**A-2-R-3 では触らない。** `listPersonaFactsForUser` などが `user_id` と `blog_id` で絞っており、列を落とすと typecheck が通らない。コードを移す **A-2-R-4** と、列を落とす **A-2-R-4-schema** に分ける（A-2-R-2f → A-2-R-3 と同じ順序）。
 
 `onDelete` は `Cascade`。**分身を消せばその記憶も消える** — 人格に属するものだから。
 
-#### `user_personas` との並存
+#### `user_personas` は消えた
 
-**A-2-R-3 まで両方が存在する。** 恒久的な二重管理ではなく、移行のあいだだけの状態である。新しく書くコードは `personas` を参照する。
+**A-2-R-3 で削除した。** A-2-R-1 から A-2-R-2f まで `personas` と並存していたが、移行のあいだだけの状態だった。
+
+順序は **コード（A-2-R-2f）→ スキーマ（A-2-R-3）**。逆にすると Prisma クライアントから `userPersona` が消えて typecheck と build が落ち、スキーマだけのPRが赤のままマージできない。
 
 ### `user_personas.base_profile` / `tone` / `values`
 

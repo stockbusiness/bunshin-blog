@@ -26,13 +26,8 @@ export interface AppGenre extends AppBlogGenre {
 export interface AppBlog {
   id: string;
   userId: string;
-  /**
-   * どの分身の媒体か（A-2-R-2c）。
-   *
-   * **A-2-R-3 で `NOT NULL` になる。** それまでは A-2-R-2c 以前に
-   * 作られたブログが `null` を持ちうる。
-   */
-  personaId: string | null;
+  /** どの分身の媒体か。**ブログは分身の媒体である**（A-2-R-3 で必須になった） */
+  personaId: string;
   name: string;
   slug: string;
   targetReader: string;

@@ -42,6 +42,8 @@ SPEC 20.1 が「Phase C に入る前に確定させる」とした2件の状況�
 | A-2-R-1 | 人格中心モデル：`Persona` の追加 | A-2 | `Persona` `PersonaType` `PersonaStatus` が追加され、`blogs.persona_id` が **nullable** で入る。既存の `user_personas` は残す。migrate が成功し、既存のコードとテストが通る | `prisma/` |
 | A-2-R-2 | 人格中心モデル：コードの移行 | A-2-R-1 | `personas` `content-generation` `content-planning` `users` が `Persona` を参照する。`persona_facts` の所属が人格になる。既存の統合テストが通る | `src/modules/` |
 | A-2-R-3 | 人格中心モデル：旧モデルの削除 | A-2-R-2 | `user_personas` が消え、`blogs.persona_id` が **NOT NULL** になる。`blog_persona_settings` が媒体別の上書きのみになる。migrate が成功 | `prisma/` |
+| A-2-R-4 | 記憶の所属を人格へ移す（コード） | A-2-R-3 | `persona_facts` の取得・作成・更新が `persona_id` を基準にする。`user_id` `blog_id` を読まなくなる。既存の統合テストが通る | `src/modules/personas/` |
+| A-2-R-4-schema | 記憶の所属を人格へ移す（スキーマ） | A-2-R-4 | `persona_facts.persona_id` が **NOT NULL** になり、`user_id` `blog_id` が消える。migrate が成功 | `prisma/` |
 | A-3 | 環境変数バリデーション | A-1 | 未設定時に起動が失敗し、欠落名が表示される | `src/lib/env.ts` |
 | A-4 | 共通ロガー・エラーレスポンス・権限判定の入口・モジュール境界 | A-1 | 秘密情報がログに出ないことをテストで確認。`can()` が定義されユニットテストがある。`docs/MODULE_RULES.md` が存在する | `src/lib/logger.ts` `src/lib/errors.ts` `src/lib/entitlements.ts` `docs/MODULE_RULES.md` |
 | A-5 | テスト基盤とCI | A-1 | lint / typecheck / test / build がCIで成功 | `.github/` `vitest.config.ts` |

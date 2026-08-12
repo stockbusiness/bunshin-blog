@@ -182,6 +182,7 @@ describe('スロット重複', () => {
       prisma.blog.create({
         data: {
           userId: user.id,
+          personaId: (await createPersona(prisma, user.id)).id,
           name: '範囲外',
           slug: 'out-of-range',
           targetReader: 'テスト読者',

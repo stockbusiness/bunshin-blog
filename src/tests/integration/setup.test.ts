@@ -39,16 +39,16 @@ describe('統合テスト基盤', () => {
 
   /**
    * **数を固定しておく。** テーブルが黙って増減したときに気づくため。
-   * A-2-R-1 で `personas` を足して 28 → 29。**A-2-R-3 で `user_personas` を
-   * 落とすと 28 に戻る**（並存はそのあいだだけ）
+   * A-2-R-1 で `personas` を足して 28 → 29、**A-2-R-3 で `user_personas` を
+   * 落として 28 に戻った**（並存は移行のあいだだけだった）
    */
-  it('マイグレーションで29テーブルが作られている', async () => {
+  it('マイグレーションで28テーブルが作られている', async () => {
     const rows = await prisma.$queryRawUnsafe<{ count: bigint }[]>(
       `select count(*)::bigint as count from information_schema.tables
        where table_schema = 'public' and table_name <> '_prisma_migrations'`,
     );
 
-    expect(Number(rows[0]?.count ?? 0)).toBe(29);
+    expect(Number(rows[0]?.count ?? 0)).toBe(28);
   });
 
   it('ユーザーとブログを作れる', async () => {
