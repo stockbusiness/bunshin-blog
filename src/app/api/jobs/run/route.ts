@@ -3,6 +3,7 @@ import { toErrorHttpResponse } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 import { drainJobs, runnerUnauthorizedError } from '@/modules/jobs';
 import { JOB_HANDLERS } from './handlers';
+import { enqueueDailySchedule } from './schedule';
 
 /**
  * `GET /api/jobs/run` — キューの消化（TASKS E-1、SPEC 4.3）
@@ -16,6 +17,14 @@ import { JOB_HANDLERS } from './handlers';
  *
  * **締め切りを持って抜ける。** 関数の実行時間の上限を超えると途中で
  * 殺され、実行結果が記録されない。残ったジョブは次の起動で処理する。
+ *
+ * ## 決まった間隔のジョブをここで積む
+ *
+ * **cron はこの1つだけ**（`vercel.json`）。間隔ごとに cron を増やすより、
+ * **間隔を冪等キーに持たせて**ここから積むほうが、設定が1か所で済む
+ * （I-1）。毎分呼ばれても、同じ日のものは1件しか積まれない（C-4）。
+ *
+ * **積めなくても消化は続ける。** 積むのは次の分でもできる。
  */
 
 export const runtime = 'nodejs';
@@ -67,6 +76,16 @@ function authorize(request: Request): void {
 export async function GET(request: Request): Promise<Response> {
   try {
     authorize(request);
+
+    // **消化の前に積む。** 積んだ分をこの実行で拾えるようにする
+    try {
+      if (await enqueueDailySchedule()) {
+        logger.info('日次ジョブの積み込みを積んだ');
+      }
+    } catch (error) {
+      // **積めなくても消化は続ける。** 次の分で積める
+      logger.error('定期ジョブを積めなかった', { cause: error });
+    }
 
     const result = await drainJobs({
       registry: JOB_HANDLERS,
