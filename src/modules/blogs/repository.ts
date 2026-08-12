@@ -8,6 +8,12 @@ import {
 } from './article-ratio';
 import { ownedBy, requireFound } from './ownership';
 import {
+  assignPublishSchedule,
+  fromPublishTimeColumn,
+  toPublishTimeColumn,
+  type PermalinkPattern,
+} from './publish-schedule';
+import {
   MAX_BLOGS_PER_USER,
   availableSlots,
   isBlogSlotNumber,
@@ -40,6 +46,11 @@ interface BlogRecord {
   launchDate: Date | null;
   createdAt: Date;
   linkEventTokenIssuedAt: Date | null;
+  publishWeekdays: number[];
+  publishTime: Date | null;
+  publishJitterMin: number;
+  permalinkPattern: string;
+  initialArticleCount: number;
   articleRatio: unknown;
   genre: { id: string; name: string; category: string } | null;
 }
@@ -71,6 +82,14 @@ function toAppBlog(record: BlogRecord): AppBlog {
     articleRatio: parseArticleRatio(record.articleRatio),
     genre: record.genre,
     linkEventTokenIssuedAt: record.linkEventTokenIssuedAt,
+    publishWeekdays: record.publishWeekdays,
+    publishTime:
+      record.publishTime === null
+        ? null
+        : fromPublishTimeColumn(record.publishTime),
+    publishJitterMin: record.publishJitterMin,
+    permalinkPattern: record.permalinkPattern as PermalinkPattern,
+    initialArticleCount: record.initialArticleCount,
   };
 }
 
@@ -240,11 +259,22 @@ export async function createBlogForUser(
     throw AppError.validationFailed('この分身のブログはすでにあります');
   }
 
+  // **ブログごとに散らして割り当てる**（C-9・W-8）。
+  //
+  // 種は `(userId, slotNumber)` — **IDはDBが採番するので、作る前には
+  // 分からない**。この2つの組はブログを一意に決める（`UNIQUE`）
+  const schedule = assignPublishSchedule(`${userId}:${String(slotNumber)}`);
+
   try {
     const record = await prisma.blog.create({
       data: {
         userId,
         personaId: input.personaId,
+        publishWeekdays: schedule.publishWeekdays,
+        publishTime: toPublishTimeColumn(schedule.publishTime),
+        publishJitterMin: schedule.publishJitterMin,
+        permalinkPattern: schedule.permalinkPattern,
+        initialArticleCount: schedule.initialArticleCount,
         name: input.name,
         slug: input.slug,
         targetReader: input.targetReader,

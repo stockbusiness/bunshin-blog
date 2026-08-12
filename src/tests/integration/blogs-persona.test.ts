@@ -178,3 +178,45 @@ describe('分身の付け替え', () => {
     expect(updated.personaId).toBe(persona.id);
   });
 });
+
+/**
+ * 公開スケジュールが割り当てられる（TASKS C-9、作業指示書 W-8）。
+ *
+ * **全ブログの投稿ジョブが同一時刻に集中しないこと**が完了条件。
+ */
+describe('公開スケジュールの割り当て', () => {
+  it('作成時に埋まる', async () => {
+    const persona = await createPersona(prisma, user.id);
+
+    const blog = await createBlogForUser(user.id, input(persona.id, 'sched'));
+
+    expect(blog.publishWeekdays.length).toBeGreaterThan(0);
+    expect(blog.publishTime).toMatch(/^\d{2}:\d{2}$/);
+    expect(blog.publishJitterMin).toBeGreaterThanOrEqual(0);
+    expect(blog.initialArticleCount).toBeGreaterThanOrEqual(28);
+
+    // **DBの行まで見る**（戻り値だけだと列へ入ったか分からない）
+    const row = await prisma.blog.findUniqueOrThrow({
+      where: { id: blog.id },
+      select: { publishWeekdays: true, publishTime: true },
+    });
+
+    expect(row.publishWeekdays).toEqual(blog.publishWeekdays);
+    expect(row.publishTime).not.toBeNull();
+  });
+
+  /** **同じ種なら同じ値**（ランダムにしない） */
+  it('同じ利用者の別スロットには別の割り当てが入りうる', async () => {
+    const first = await createPersona(prisma, user.id);
+    const second = await createPersona(prisma, user.id);
+
+    const a = await createBlogForUser(user.id, input(first.id, 'sched-a'));
+    const b = await createBlogForUser(user.id, input(second.id, 'sched-b'));
+
+    // 枠が違えば種が違う。**必ず違う値とは限らない**ので、
+    // ここでは「両方とも埋まっている」ことだけを見る
+    expect(a.publishTime).not.toBeNull();
+    expect(b.publishTime).not.toBeNull();
+    expect(a.slotNumber).not.toBe(b.slotNumber);
+  });
+});
