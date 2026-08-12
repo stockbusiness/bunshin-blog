@@ -204,6 +204,24 @@ jobs:
           fi
           echo "他人の分身は拒否された"
 
+          # 公開曜日は空にできない（blogs_publish_weekdays_not_empty・C-9-schema-3）
+          #
+          # **空の配列はどの曜日にも当たらない。** 時刻があっても一度も
+          # 公開されないまま、ブログは ACTIVE で記事だけが溜まる
+          if psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c \
+            "insert into blogs (id, user_id, persona_id, name, slug, target_reader,
+                                article_ratio, slot_number, publish_time,
+                                publish_weekdays, updated_at)
+             values ('00000000-0000-0000-0000-000000000005',
+                     '00000000-0000-0000-0000-000000000001',
+                     '00000000-0000-0000-0000-0000000000a1',
+                     'ng','ng3','r','{}'::jsonb,2,'09:00','{}',now())" \
+            > /dev/null 2>&1; then
+            echo "::error::公開曜日が空のブログが登録できてしまった"
+            exit 1
+          fi
+          echo "空の公開曜日は拒否された"
+
       - name: 統合テスト
         run: |
           # 前のステップで入れた検証用データを消してから走らせる

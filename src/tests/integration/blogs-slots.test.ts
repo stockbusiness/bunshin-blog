@@ -189,8 +189,10 @@ describe('スロット重複', () => {
           articleRatio: {},
           slotNumber: 4,
           // **狙った制約で落ちることを確かめる。** 省くと
-          // `publish_time` の NOT NULL で落ち、slot_range を通らない
+          // `publish_time` の NOT NULL や曜日の CHECK で落ち、
+          // slot_range を通らない
           publishTime: new Date(Date.UTC(1970, 0, 1, 9, 0, 0, 0)),
+          publishWeekdays: [1, 4],
         },
       }),
     ).rejects.toThrow();
