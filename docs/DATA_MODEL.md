@@ -119,13 +119,33 @@ tone         = { style: string; emojiLevel: "none"|"low"|"mid"; lineBreak: "shor
 values       = { priorities: string[]; avoid: string[] }
 ```
 
-### `blog_persona_settings.tone_override` / `target_reader` / `writing_rules`
+### `blog_persona_settings.tone_override` / `writing_rules`
 
 ```ts
-tone_override = Partial<typeof tone>  // 未指定項目は user_personas を継承
-target_reader = { ageRange: string; situation: string; knowledgeLevel: "beginner"|"intermediate"|"advanced" }
+tone_override = Partial<typeof tone>  // 未指定項目は personas.identity.tone を継承
 writing_rules = { headingDepth: number; leadLength: number; bulletFrequency: "low"|"mid"|"high" }
 ```
+
+**`blog_persona_settings` は媒体別の上書きだけを持つ**（A-2-R-2d）。
+
+| 列 | 扱い |
+|---|---|
+| `target_reader` | **A-2-R-2d でコードから外した。** 読者像は `personas.audience` が持つ。列の削除は A-2-R-3 |
+| `allowed_experiences` | A-2-R-2e でコードから外す。列の削除は A-2-R-3 |
+
+**読者像を媒体側から上書きさせない。** 分身が「誰に向けて書く人か」を持ち、媒体はそれを変えない。**同じことを2か所に置くと、どちらが正か分からなくなる。** 読者を変えたいなら別の分身を立てる。
+
+### 記事生成が使う人格（`EffectivePersona`）
+
+**`blogs.persona_id` から分身を引き、`blog_persona_settings` を重ねたもの**（A-2-R-2d）。呼び出し側に「どちらを見るか」を判断させない。
+
+| 由来 | 項目 |
+|---|---|
+| `personas` | `personaId` `name` `personaType` `firstPerson` `background` `values` `ngExpressions` `expertise` `audience` |
+| 重ね合わせ | `tone`（`identity.tone` に `tone_override` を重ねたもの） |
+| `blog_persona_settings` | `penName` `writingRules` `ngTopics`（未設定なら `null`／空） |
+
+**分身の割り当てが無いブログは404にする。** 推測で既定の分身を当てると、誰が書いた記事なのかが分からなくなる。
 
 ### `affiliate_offers.facts`
 

@@ -14,18 +14,16 @@
  */
 
 import { invalidPersonaError } from './errors';
+import type { AppPersona, EffectivePersona } from './persona';
 import {
   BULLET_FREQUENCIES,
   EMOJI_LEVELS,
   KNOWLEDGE_LEVELS,
   LINE_BREAK_STYLES,
   type AppBlogPersonaSetting,
-  type AppUserPersona,
   type BulletFrequency,
-  type EffectivePersona,
   type KnowledgeLevel,
   type SaveBlogPersonaSettingInput,
-  type TargetReader,
   type ToneOverride,
   type UpdateBlogPersonaSettingInput,
   type WritingRules,
@@ -174,33 +172,6 @@ export function normalizeToneOverride(value: unknown): ToneOverride {
   return override;
 }
 
-/** @throws {AppError} 形が違う・知らない値 */
-export function normalizeTargetReader(value: unknown): TargetReader {
-  if (!isRecord(value)) {
-    throw invalidPersonaError('想定読者を指定してください');
-  }
-
-  if (!isKnowledgeLevel(value['knowledgeLevel'])) {
-    throw invalidPersonaError(
-      `読者の知識レベルは ${KNOWLEDGE_LEVELS.join(' / ')} のいずれかで指定してください`,
-    );
-  }
-
-  return {
-    ageRange: assertText(
-      value['ageRange'],
-      '読者の年代',
-      PERSONA_TEXT_MAX_LENGTH,
-    ),
-    situation: assertText(
-      value['situation'],
-      '読者の状況',
-      PERSONA_TEXT_MAX_LENGTH,
-    ),
-    knowledgeLevel: value['knowledgeLevel'],
-  };
-}
-
 /** @throws {AppError} 形が違う・範囲外 */
 export function normalizeWritingRules(value: unknown): WritingRules {
   if (!isRecord(value)) {
@@ -233,7 +204,6 @@ export function normalizeWritingRules(value: unknown): WritingRules {
 export interface NormalizedBlogPersonaSetting {
   penName: string;
   toneOverride: ToneOverride;
-  targetReader: TargetReader;
   ngTopics: string[];
   writingRules: WritingRules;
 }
@@ -245,7 +215,6 @@ export function normalizeSaveBlogPersonaSetting(
   return {
     penName: assertText(input.penName, 'ペンネーム', PEN_NAME_MAX_LENGTH),
     toneOverride: normalizeToneOverride(input.toneOverride),
-    targetReader: normalizeTargetReader(input.targetReader),
     ngTopics: assertList(input.ngTopics, 'NG話題'),
     writingRules: normalizeWritingRules(input.writingRules),
   };
@@ -265,10 +234,6 @@ export function normalizeUpdateBlogPersonaSetting(
     data.toneOverride = normalizeToneOverride(input.toneOverride);
   }
 
-  if (input.targetReader !== undefined) {
-    data.targetReader = normalizeTargetReader(input.targetReader);
-  }
-
   if (input.ngTopics !== undefined) {
     data.ngTopics = assertList(input.ngTopics, 'NG話題');
   }
@@ -281,38 +246,48 @@ export function normalizeUpdateBlogPersonaSetting(
 }
 
 /**
- * 共通人格にブログ別の上書きを重ねる（記事生成 E-8 の入力）。
+ * 分身にブログ別の上書きを重ねる（記事生成 E-8 の入力）。
  *
- * **`tone_override` の未指定項目は共通人格を継承する**（DATA_MODEL 3章）。
+ * **`tone_override` の未指定項目は分身のものを継承する**（DATA_MODEL 3章）。
  *
  * **ブログ別設定が無くても動く。** 設定前のブログでも記事は書けるべきで、
- * その場合はブログ固有の項目が `null`／空になるだけ。
+ * その場合は媒体固有の項目が `null`／空になるだけ。
+ *
+ * **読者像（`audience`）は上書きの対象ではない**（A-2-R-2d）。分身が
+ * 「誰に向けて書く人か」を持ち、媒体はそれを変えない。変えたいなら
+ * 別の分身を立てる。
  */
 export function resolveEffectivePersona(
-  persona: AppUserPersona,
+  persona: AppPersona,
   setting: AppBlogPersonaSetting | null,
 ): EffectivePersona {
+  const base = {
+    personaId: persona.id,
+    name: persona.name,
+    personaType: persona.personaType,
+    firstPerson: persona.identity.firstPerson,
+    background: persona.identity.background,
+    values: persona.identity.values,
+    ngExpressions: persona.identity.ngExpressions,
+    expertise: persona.expertise,
+    audience: persona.audience,
+  };
+
   if (setting === null) {
     return {
-      baseProfile: persona.baseProfile,
-      tone: persona.tone,
-      values: persona.values,
-      ngExpressions: persona.ngExpressions,
+      ...base,
+      tone: persona.identity.tone,
       penName: null,
-      targetReader: null,
       writingRules: null,
       ngTopics: [],
     };
   }
 
   return {
-    baseProfile: persona.baseProfile,
-    // **ここが上書きの本体。** 未指定の項目は共通人格のまま
-    tone: { ...persona.tone, ...setting.toneOverride },
-    values: persona.values,
-    ngExpressions: persona.ngExpressions,
+    ...base,
+    // **ここが上書きの本体。** 未指定の項目は分身のまま
+    tone: { ...persona.identity.tone, ...setting.toneOverride },
     penName: setting.penName,
-    targetReader: setting.targetReader,
     writingRules: setting.writingRules,
     ngTopics: setting.ngTopics,
   };

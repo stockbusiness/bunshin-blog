@@ -95,12 +95,6 @@ export const BULLET_FREQUENCIES: readonly BulletFrequency[] = [
   'high',
 ];
 
-export interface TargetReader {
-  ageRange: string;
-  situation: string;
-  knowledgeLevel: KnowledgeLevel;
-}
-
 export interface WritingRules {
   headingDepth: number;
   leadLength: number;
@@ -114,20 +108,24 @@ export interface WritingRules {
  */
 export type ToneOverride = Partial<Tone>;
 
-/** ブログ別の人格設定（`blog_persona_settings`・SPEC 5.6） */
+/**
+ * ブログ別の人格設定（`blog_persona_settings`・SPEC 5.6）。
+ *
+ * **媒体別の上書きだけを持つ**（A-2-R-2d）。読者像は分身が持つもので、
+ * ここには無い（`Persona.audience`）。**同じことを2か所に置くと、
+ * どちらが正か分からなくなる。**
+ */
 export interface AppBlogPersonaSetting {
   id: string;
   blogId: string;
   /** 記事の署名に使う名前 */
   penName: string;
   toneOverride: ToneOverride;
-  targetReader: TargetReader;
   /**
    * 使ってよい体験（`persona_facts` のID）。
    *
-   * **D-5 では設定できない。** 参照先の `persona_facts` は D-6 で作る。
-   * 所有権を確かめられないIDを受け取ると、他人の体験を引き当てられる
-   * （C-6 で見つけたのと同じ形）。**D-6 で入口を足す。**
+   * **A-2-R-2e で外す。** 記憶は分身に溜まり、その分身の媒体は1つなので、
+   * 媒体ごとに選び直す意味が無くなった。列の削除は A-2-R-3。
    */
   allowedExperiences: string[];
   /** 触れない話題 */
@@ -140,7 +138,6 @@ export interface AppBlogPersonaSetting {
 export interface SaveBlogPersonaSettingInput {
   penName: string;
   toneOverride?: ToneOverride | undefined;
-  targetReader: TargetReader;
   ngTopics?: string[] | undefined;
   writingRules: WritingRules;
 }
@@ -148,28 +145,8 @@ export interface SaveBlogPersonaSettingInput {
 export interface UpdateBlogPersonaSettingInput {
   penName?: string | undefined;
   toneOverride?: ToneOverride | undefined;
-  targetReader?: TargetReader | undefined;
   ngTopics?: string[] | undefined;
   writingRules?: WritingRules | undefined;
-}
-
-/**
- * 記事生成が実際に使う人格（E-8 の入力）。
- *
- * **ユーザー共通人格にブログ別の上書きを重ねたもの。** 呼び出し側に
- * 「どちらを見るか」を判断させない。
- */
-export interface EffectivePersona {
-  baseProfile: BaseProfile;
-  /** 共通の `tone` に `tone_override` を重ねた結果 */
-  tone: Tone;
-  values: PersonaValues;
-  ngExpressions: string[];
-  /** ブログ別設定が無ければ `null` */
-  penName: string | null;
-  targetReader: TargetReader | null;
-  writingRules: WritingRules | null;
-  ngTopics: string[];
 }
 
 /** 事実の種類（SPEC 5.7） */
