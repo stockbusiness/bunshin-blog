@@ -234,7 +234,7 @@ graph TD
 
 送信方向は `approvals → line` に固定する（F-2）。
 
-受信方向は `line → approvals` にすると循環するため、**LINE Webhook はジョブに載せる**（D-7・F-6）。`line` はリクエストを受けてジョブを積むところまでを担い、承認処理そのものは `src/app/` に登録したジョブハンドラが `approvals` を呼ぶ。
+受信方向は `line → approvals` にすると循環するため、**LINE Webhook はジョブに載せる**（D-7b・F-6）。`line` はリクエストを受けてジョブを積むところまでを担い、承認処理そのものは `src/app/` に登録したジョブハンドラが `approvals` を呼ぶ。
 
 ---
 

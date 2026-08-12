@@ -223,7 +223,8 @@ B-1 が実装したのは**サーバー側のIDトークン検証**であり、�
 | D-4 | `user_personas` | B-2 | ユーザー共通人格を編集できる | `src/modules/personas/` |
 | D-5 | `blog_persona_settings` | D-4, B-4 | ブログ別の上書き設定が保存される | `src/modules/personas/` |
 | D-6 | `persona_facts` | D-4 | `AI_INFERENCE` かつ `UNVERIFIED` が一人称利用不可のフラグを持つ | `src/modules/personas/` |
-| D-7 | LINE返信からのfacts保存 | D-6 | 返信が `persona_facts` または `revision_requests` に保存される。**着手前に Q-015 の決定が要る**（`revision_requests` 側は `approvals` が無いと書けない） | `src/modules/line/` |
+| D-7a | LINE返信の分類 | D-6 | 返信が SPEC 8.4 の4種類（感想・助言・自由回答・修正希望）に分かれる。**DBも外部も触らない純粋な処理。** **修正希望は分類だけで保存しない**（宛先の承認が決まらない。下記 D-7b） | `src/modules/line/` |
+| D-7b | LINE返信の受け口とfacts保存 | D-7a, F-6 | `POST /api/line/webhook` が**署名を検証**し、返信が `persona_facts` に保存される。**修正希望は保存せず承認画面（F-6）へ案内する** — `revision_requests.approval_id` は NOT NULL だが、**テキスト返信はどの記事への返信かを示さない**（取り違えると望まない書き換えが起きる） | `src/app/api/line/webhook/` `src/modules/line/` |
 | D-8 | アフィリエイトリダイレクタとクリック計測 | D-1 | リンク方式に従って組み立てられ、**`REDIRECT` の案件でクリックが記録される**。`DIRECT` の案件は直リンクのまま（OPEN_QUESTIONS Q-001） | `src/app/go/` `src/modules/analytics/` |
 | D-12-schema | クリック受信APIのための列 | D-8 | `blogs.link_event_token_hash` と `banners.code` が入り、`link_clicks` がバナーのクリックも受けられる（**どちらか片方だけ**をDBが強制する）。migrate が成功 | `prisma/` |
 | D-12-schema-2 | クリックの再送を二重に数えない列 | D-12-schema | `link_clicks.event_id` が **unique** で入る。同じ電文が2回届いても行が増えない。migrate が成功 | `prisma/` |

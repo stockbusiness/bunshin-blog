@@ -47,6 +47,13 @@ export {
 } from './alerts';
 
 export {
+  REPLY_KINDS,
+  classifyLineReply,
+  type ReplyKind,
+  type ReplyClassification,
+} from './reply-classification';
+
+export {
   NOTIFICATION_WINDOW_MINUTES,
   UNSENT_PROPOSAL_TTL_DAYS,
   isWithinNotificationWindow,
