@@ -27,8 +27,14 @@ export const INBOUND_MIN = 3;
 /** 1集客記事が持てるリンク（SPEC 9.2.6） */
 export const OUTBOUND_MAX = 2;
 
-/** 1週あたりの公開上限（SPEC 2.2。判定はここ、割り当ては E-9） */
-export const WEEKLY_PUBLISH_CAP = 4;
+/**
+ * 1週あたりの公開上限（SPEC 2.2。判定はここ、割り当ては E-9）。
+ *
+ * **絶対の上限。** ブログごとの設定（`article_ratio.weeklyPublishCap`。
+ * 3〜5）はこれ以下で、**構成表がこれを超えたら違反**。
+ * 2026-08-12 に4本から5本へ改めた（Q-036）
+ */
+export const WEEKLY_PUBLISH_CAP = 5;
 
 /** 違反の種類。`planning_runs.constraint_result` に入る */
 export const CONSTRAINT_CODES = {

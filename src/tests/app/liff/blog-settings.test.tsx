@@ -38,7 +38,7 @@ const BLOG: BlogJson = {
   purpose: 'AFFILIATE',
   status: 'ACTIVE',
   slotNumber: 1,
-  articleRatio: { revenue: 11, traffic: 19, weeklyPublishCap: 2 },
+  articleRatio: { revenue: 11, traffic: 19, weeklyPublishCap: 3 },
   genre: { id: 'genre-1', name: '一人暮らしの節約', category: '暮らし' },
 };
 
@@ -90,7 +90,7 @@ describe('読み込み', () => {
     expect(screen.getByRole('combobox', { name: '収益方針' })).toHaveValue(
       'AFFILIATE',
     );
-    expect(screen.getByRole('combobox', { name: '投稿頻度' })).toHaveValue('2');
+    expect(screen.getByRole('combobox', { name: '投稿頻度' })).toHaveValue('3');
   });
 
   it('読み込みに失敗すると理由を出す', async () => {
@@ -144,17 +144,35 @@ describe('変更できない項目（Q-009・Q-011）', () => {
     expect(screen.queryByText(/通知/)).not.toBeInTheDocument();
   });
 
-  it('投稿頻度は週4本までしか選べない（SPEC 2.2）', async () => {
+  /**
+   * **0本を選べるようにしない**（Q-036）。公開の停止は G-8 の
+   * 異常時の処理で、設定として選ぶものではない
+   */
+  it('投稿頻度は3〜5本しか選べない（SPEC 2.2・Q-036）', async () => {
     await renderLoaded();
 
     const options = screen.getAllByRole('option', { name: /^週 \d 本$/ });
 
     expect(options.map((option) => option.textContent)).toEqual([
-      '週 1 本',
-      '週 2 本',
       '週 3 本',
       '週 4 本',
+      '週 5 本',
     ]);
+  });
+
+  /** **黙って選べる値へ丸めない。** 保存した覚えのない値になる */
+  it('範囲の外の設定なら、そう書く', async () => {
+    vi.mocked(fetchBlog).mockResolvedValue({
+      blog: {
+        ...BLOG,
+        articleRatio: { ...BLOG.articleRatio, weeklyPublishCap: 0 },
+      },
+      brokenLinks: [],
+    });
+
+    await renderLoaded();
+
+    expect(screen.getByText(/いまの設定は週/)).toBeVisible();
   });
 });
 

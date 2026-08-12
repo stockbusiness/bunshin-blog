@@ -9,7 +9,7 @@ import { AppError } from '@/lib/errors';
  * {
  *   revenue: number;          // 収益記事の本数（9.2.4の算出値）
  *   traffic: number;          // 集客記事の本数
- *   weeklyPublishCap: number; // 既定 4（SPEC 2.2）
+ *   weeklyPublishCap: number; // 既定 4、範囲 3〜5（SPEC 2.2・Q-036）
  * }
  * ```
  *
@@ -24,15 +24,34 @@ export interface ArticleRatio {
   weeklyPublishCap: number;
 }
 
-/** 週の公開上限。SPEC 2.2「週4本を超えて公開する処理を実装してはならない」 */
-export const WEEKLY_PUBLISH_CAP_MAX = 4;
-export const WEEKLY_PUBLISH_CAP_MIN = 1;
+/**
+ * 週の公開上限の範囲（SPEC 2.2。2026-08-12 に週4本固定から改めた・Q-036）。
+ *
+ * 「週5本を超えて公開する処理を実装してはならない」。
+ *
+ * **下限は3本。** 更新が途切れたブログは評価が落ちるため、
+ * 通常運転の下限として3本を置く。
+ *
+ * **0本はここに含めない。** インデックス率が50%未満のときに公開を止める
+ * （G-8）**異常時の停止**であって、利用者が選べる設定ではない。
+ * 同じ検証を共用すると**画面から0本にでき、止まっているのが異常なのか
+ * 設定なのか区別できなくなる。**
+ */
+export const WEEKLY_PUBLISH_CAP_MAX = 5;
+export const WEEKLY_PUBLISH_CAP_MIN = 3;
 
-/** 新規作成時の既定値。SPEC 9.3 の初期30記事・週4本 */
+/**
+ * 新規作成時の既定値（SPEC 2.2「既定は週4本」・9.3 の初期30記事）。
+ *
+ * **上限と同じ値にしない。** 上限を5へ広げたのは G-8 が実測で
+ * 上げるためで、**最初から5本で始めるためではない**
+ */
+export const DEFAULT_WEEKLY_PUBLISH_CAP = 4;
+
 export const DEFAULT_ARTICLE_RATIO: ArticleRatio = {
   revenue: 7,
   traffic: 23,
-  weeklyPublishCap: WEEKLY_PUBLISH_CAP_MAX,
+  weeklyPublishCap: DEFAULT_WEEKLY_PUBLISH_CAP,
 };
 
 export const ARTICLE_RATIO_ERROR_CODES = {
@@ -83,7 +102,8 @@ export function invalidPublishCapError(requested: number): AppError {
  * **`revenue` と `traffic` はそのまま引き継ぐ**（Q-011）。上限だけを
  * 受け取って全体を組み立て直すと、算出値が既定値で上書きされる。
  *
- * @throws {AppError} 1〜4 以外（422）
+ * @throws {AppError} 3〜5 以外（422）。**0は通さない** —
+ *   公開の停止は G-8 の異常時の処理で、設定画面から選ぶものではない
  */
 export function withWeeklyPublishCap(
   current: ArticleRatio,

@@ -265,7 +265,7 @@ Prismaのスキーマでは表現できない。**`modules/content-planning/cons
 | 4 | `content_type = AFFILIATE` の記事は `inbound_link_item_ids` が3件以上 | SPEC 9.2.6 |
 | 5 | 同一ブログ内で `primary_keyword` が重複しない | SPEC 9.2.5 |
 | 6 | 収益記事数 ＝ 採用案件数 × 2 ＋ 1（上限10） | SPEC 9.2.4 |
-| 7 | 1週あたりの `planned_publish_week` の件数が4以下 | SPEC 2.2 |
+| 7 | 1週あたりの `planned_publish_week` の件数が**5以下** | SPEC 2.2（2026-08-12改訂・Q-036） |
 | 8 | `verification = UNVERIFIED` かつ `source = AI_INFERENCE` の fact は一人称利用不可 | SPEC 5.7 |
 
 **1〜7はDBのCHECK制約でも一部表現できるが、Phase 0ではアプリ層に一本化する。** 二重管理を避け、違反時のエラーメッセージを制約チェック結果（`planning_runs.constraint_result`）として保存できるようにするため。
@@ -469,7 +469,7 @@ DBへの保存は全て `timestamptz`（内部的にUTC）とする。**ロー�
 | 判定 | 対象 |
 |---|---|
 | 1日の境界 | 日次集計、`metrics_daily.metric_date` |
-| 1週の境界 | `content_items.planned_publish_week`、週4本の上限判定（SPEC 2.2） |
+| 1週の境界 | `content_items.planned_publish_week`、週の上限判定（SPEC 2.2） |
 | 週次成果入力の対象期間 | G-5 の手動収益入力 |
 | LINE通知の送信時刻 | `monitor_profiles.notification_time` |
 
@@ -477,7 +477,7 @@ UTCで日付を切ると、JSTの朝9時までに公開された記事が前日�
 
 ### 週の開始
 
-**週の開始は月曜とする。** `planned_publish_week` の週番号も、週4本の上限判定の集計区間も、月曜始まりで揃える。
+**週の開始は月曜とする。** `planned_publish_week` の週番号も、週の上限判定の集計区間も、月曜始まりで揃える。
 
 ### 日付型のカラムはJSTの暦日として扱う
 
