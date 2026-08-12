@@ -1,6 +1,9 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
-import { POST as createOffer, GET as listOffers } from '@/app/api/blogs/[id]/offers/route';
+import {
+  POST as createOffer,
+  GET as listOffers,
+} from '@/app/api/blogs/[id]/offers/route';
 import {
   DELETE as endOffer,
   PATCH as patchOffer,
@@ -35,8 +38,9 @@ let ownerBlogId: string;
 let otherBlogId: string;
 
 function cookieFor(userId: string): string {
-  return buildSessionCookie(createSessionToken(userId, { secret: SECRET }))
-    .split(';')[0] as string;
+  return buildSessionCookie(
+    createSessionToken(userId, { secret: SECRET }),
+  ).split(';')[0] as string;
 }
 
 function request(userId: string, body?: unknown): Request {
@@ -112,28 +116,30 @@ describe('案件の登録（オンボーディング STEP 8）', () => {
    * **モニターに判断させない項目は入口から入らない**（Q-001・Q-014・Q-019）。
    * ASPの規約に関わる判断で、誤ると成果が無効になる
    */
-  it.each(['linkMode', 'subIdParam', 'blogPostingProhibited', 'selectionScore'])(
-    '%s は受け取らない',
-    async (key) => {
-      const response = await createOffer(
-        request(owner.id, offerBody({ [key]: 'REDIRECT' })),
-        { params: Promise.resolve({ id: ownerBlogId }) },
-      );
+  it.each([
+    'linkMode',
+    'subIdParam',
+    'blogPostingProhibited',
+    'selectionScore',
+  ])('%s は受け取らない', async (key) => {
+    const response = await createOffer(
+      request(owner.id, offerBody({ [key]: 'REDIRECT' })),
+      { params: Promise.resolve({ id: ownerBlogId }) },
+    );
 
-      expect(response.status).toBe(201);
+    expect(response.status).toBe(201);
 
-      const [row] = await prisma.affiliateOffer.findMany({
-        select: { linkMode: true, subIdParam: true, blogPostingProhibited: true },
-      });
+    const [row] = await prisma.affiliateOffer.findMany({
+      select: { linkMode: true, subIdParam: true, blogPostingProhibited: true },
+    });
 
-      // 既定のまま（Q-001 の「安全側は DIRECT」）
-      expect(row).toMatchObject({
-        linkMode: 'DIRECT',
-        subIdParam: null,
-        blogPostingProhibited: false,
-      });
-    },
-  );
+    // 既定のまま（Q-001 の「安全側は DIRECT」）
+    expect(row).toMatchObject({
+      linkMode: 'DIRECT',
+      subIdParam: null,
+      blogPostingProhibited: false,
+    });
+  });
 
   it('内容が不正なら422', async () => {
     const response = await createOffer(
@@ -185,10 +191,12 @@ describe('テナント分離（SPEC 14.1）', () => {
 
     expect(response.status).toBe(404);
     expect(
-      (await prisma.affiliateOffer.findUniqueOrThrow({
-        where: { id: offer.id },
-        select: { name: true },
-      })).name,
+      (
+        await prisma.affiliateOffer.findUniqueOrThrow({
+          where: { id: offer.id },
+          select: { name: true },
+        })
+      ).name,
     ).toBe('格安SIM案件');
   });
 });
@@ -209,10 +217,12 @@ describe('削除は終了にする', () => {
     });
 
     expect(
-      (await prisma.affiliateOffer.findUniqueOrThrow({
-        where: { id: offer.id },
-        select: { status: true },
-      })).status,
+      (
+        await prisma.affiliateOffer.findUniqueOrThrow({
+          where: { id: offer.id },
+          select: { status: true },
+        })
+      ).status,
     ).toBe('ENDED');
   });
 
@@ -236,10 +246,12 @@ describe('削除は終了にする', () => {
     });
 
     expect(
-      (await prisma.banner.findUniqueOrThrow({
-        where: { id: banner.id },
-        select: { status: true },
-      })).status,
+      (
+        await prisma.banner.findUniqueOrThrow({
+          where: { id: banner.id },
+          select: { status: true },
+        })
+      ).status,
     ).toBe('ENDED');
   });
 });
