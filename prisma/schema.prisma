@@ -594,6 +594,18 @@ model AffiliateOffer {
   rewardYen             Int?           @map("reward_yen")
   conversionType        ConversionType @map("conversion_type")
   facts                 Json
+  /// 事実（報酬・条件・キャンペーン）を**確かめ直した**時刻
+  /// （D-13-schema・Q-022）。CONTENT_PLANNING 8.2 の90日判定が読む。
+  ///
+  /// **`updated_at` では代用できない。** あちらは行のどの列を変えても
+  /// 更新されるので、状態を `ACTIVE` にしただけで
+  /// 「事実を確かめ直した」ことになってしまう。
+  ///
+  /// **NULL は「一度も確かめていない」。** 既定値を入れない —
+  /// 入れると、確かめていない案件が「今日確かめた」ことになり、
+  /// **古い価格が「確認済み」として公開される。**
+  /// 書くのは `facts` を実際に変えた経路だけ（D-13）
+  factsUpdatedAt        DateTime?      @map("facts_updated_at") @db.Timestamptz(6)
   userExperience        UserExperience @default(UNKNOWN) @map("user_experience")
   userRating            Int?           @map("user_rating")
   denyConditions        String[]       @map("deny_conditions")
