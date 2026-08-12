@@ -30,6 +30,8 @@ export const JOB_TYPES = [
   'METRICS_AGGREGATE',
   'GA4_FETCH',
   'PROPOSAL_SELECTION',
+  // **2週間ごとの見直し**（G-8b）。インデックス率で公開ペースを上下させる
+  'PUBLISH_PACE_REVIEW',
   'LINE_NOTIFY',
   // **LINE返信の取り込みはジョブに載せる**（D-7b、MODULE_RULES 3）。
   // Webhook のハンドラで直接処理すると、保存に時間がかかったときに

@@ -78,6 +78,14 @@ export const AUDIT_ACTIONS = [
   'PROMPT_VERSION_CREATED',
   /** AIプロンプトの版を有効化した（H-13、SPEC 14.4） */
   'PROMPT_VERSION_ACTIVATED',
+  /**
+   * インデックス率の見直しで週の公開上限が変わった（G-8b、W-8）。
+   *
+   * **人が押した操作ではない**ので `actor_user_id` は `null`。
+   * 専用のテーブルを作らず、**ブログに対する自動的な介入**として
+   * ここに残す（管理画面はこれを読む）
+   */
+  'PUBLISH_CAP_ADJUSTED',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

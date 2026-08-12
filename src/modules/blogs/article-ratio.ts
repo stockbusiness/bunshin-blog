@@ -119,3 +119,32 @@ export function withWeeklyPublishCap(
 
   return { ...current, weeklyPublishCap };
 }
+
+/**
+ * 見直しの結果を入れる（G-8b）。**利用者の入力には使わない。**
+ *
+ * `withWeeklyPublishCap` と分けているのは、**0本を通す唯一の経路**を
+ * ここに閉じるため。同じ検証を共用すると**画面から0本にでき、
+ * 止まっているのが異常なのか設定なのか区別できなくなる。**
+ *
+ * 0 と 3〜5 だけを通す。**1・2 は通さない** — 利用者も選べず、
+ * 見直しも作らない値で、入ってきたなら呼ぶ側が誤っている。
+ *
+ * @throws {AppError} 0・3〜5 以外（422）
+ */
+export function withAdjustedPublishCap(
+  current: ArticleRatio,
+  weeklyPublishCap: number,
+): ArticleRatio {
+  const allowed =
+    weeklyPublishCap === 0 ||
+    (Number.isInteger(weeklyPublishCap) &&
+      weeklyPublishCap >= WEEKLY_PUBLISH_CAP_MIN &&
+      weeklyPublishCap <= WEEKLY_PUBLISH_CAP_MAX);
+
+  if (!allowed) {
+    throw invalidPublishCapError(weeklyPublishCap);
+  }
+
+  return { ...current, weeklyPublishCap };
+}

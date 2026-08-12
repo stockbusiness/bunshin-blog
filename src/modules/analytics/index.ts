@@ -108,3 +108,27 @@ export {
   type ResolvedLinkEvent,
   type RecordLinkEventsResult,
 } from './link-events';
+
+export {
+  enqueuePublishPaceReview,
+  reviewPeriod,
+  REVIEW_INTERVAL_DAYS,
+  reviewPublishPaceForBlog,
+  reviewPublishPaceForAllBlogs,
+  wasStopped,
+  type PaceReviewResult,
+  type PaceReviewDeps,
+} from './publish-pace-service';
+
+export {
+  judgePublishPace,
+  isMatureArticle,
+  MIN_JUDGED_ARTICLES,
+  MATURE_AFTER_DAYS,
+  RAISE_RATE,
+  STOP_RATE,
+  STOPPED_CAP,
+  type PaceDecision,
+  type PaceInput,
+  type PaceJudgement,
+} from './publish-pace';
