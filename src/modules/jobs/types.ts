@@ -30,6 +30,8 @@ export const JOB_TYPES = [
   'METRICS_AGGREGATE',
   'GA4_FETCH',
   'PROPOSAL_SELECTION',
+  // **2週間ごとの見直し**（G-8b）。インデックス率で公開ペースを上下させる
+  'PUBLISH_PACE_REVIEW',
   // **1日1回の積み込み**（I-1）。日次のジョブをここから配る
   'DAILY_SCHEDULE',
   'LINE_NOTIFY',

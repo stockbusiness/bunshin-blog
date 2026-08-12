@@ -4,6 +4,7 @@ import { AppError } from '@/lib/errors';
 import {
   DEFAULT_ARTICLE_RATIO,
   parseArticleRatio,
+  withAdjustedPublishCap,
   withWeeklyPublishCap,
 } from './article-ratio';
 import { ownedBy, requireFound } from './ownership';
@@ -358,4 +359,39 @@ export async function closeBlogForUser(params: {
   requireFound(result.count === 0 ? null : result.count);
 
   return requireBlogForUser({ ...params });
+}
+
+/**
+ * 見直しの結果を書き込む（G-8b、SPEC 2.2）。
+ *
+ * **ADMIN／システム専用**（MODULE_RULES 5）。利用者の操作ではないので
+ * `userId` を取らず、名前で横断参照であることを示す。
+ *
+ * **`blogs` を触ってよいのはこのモジュールだけ**（MODULE_RULES 1）なので、
+ * `analytics` から直接書かずにここを通す。
+ *
+ * **0本を通す唯一の経路。** 利用者向けの `updateBlogForUser` は
+ * 3〜5 しか受け付けない（G-8a）。
+ */
+export async function applyPublishPaceForAdmin(params: {
+  blogId: string;
+  weeklyPublishCap: number;
+}): Promise<AppBlog> {
+  const current = await prisma.blog.findUniqueOrThrow({
+    where: { id: params.blogId },
+    select: { articleRatio: true },
+  });
+
+  const articleRatio = withAdjustedPublishCap(
+    parseArticleRatio(current.articleRatio),
+    params.weeklyPublishCap,
+  );
+
+  const updated = await prisma.blog.update({
+    where: { id: params.blogId },
+    data: { articleRatio: { ...articleRatio } },
+    include: WITH_GENRE,
+  });
+
+  return toAppBlog(updated);
 }

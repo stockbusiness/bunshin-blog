@@ -12,6 +12,7 @@ import {
   aggregateDailyMetricsForUser,
   fetchIndexStatusForUser,
   fetchSearchMetricsForUser,
+  reviewPublishPaceForAllBlogs,
 } from '@/modules/analytics';
 import {
   enqueueAlertsForUser,
@@ -50,6 +51,7 @@ import type {
  * | `LINE_NOTIFY` | **H-3（登録済み）** |
  * | `DAILY_SCHEDULE` | **I-1（登録済み）** |
  * | `LINE_REPLY` | **D-7b（登録済み）** |
+ * | `PUBLISH_PACE_REVIEW` | **G-8b（登録済み）** |
  */
 
 /**
@@ -366,6 +368,28 @@ export function createJobHandlers(
       });
 
       return { kind: input.kind };
+    },
+
+    /**
+     * 公開ペースの見直し（G-8b、作業指示書 W-8）。
+     *
+     * **全ブログを横断する**ので `user_id` を取らない。
+     * 積むのは2週間ごと（`vercel.json` の cron）。
+     *
+     * **止めたブログは ADMIN へ通知される**（黙って止めない）。
+     */
+    PUBLISH_PACE_REVIEW: async () => {
+      const results = await reviewPublishPaceForAllBlogs();
+
+      // **変わった数と、測れなかった数の両方を残す。**
+      // 「0件変更」だけだと、測れていないのか変える必要が無いのか読めない
+      return {
+        reviewed: results.length,
+        raised: results.filter((r) => r.decision === 'RAISE').length,
+        stopped: results.filter((r) => r.decision === 'STOP').length,
+        notEnoughData: results.filter((r) => r.decision === 'NOT_ENOUGH_DATA')
+          .length,
+      };
     },
 
     /**

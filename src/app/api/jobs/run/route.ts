@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { toErrorHttpResponse } from '@/lib/errors';
 import { logger } from '@/lib/logger';
+import { enqueuePublishPaceReview } from '@/modules/analytics';
 import { drainJobs, runnerUnauthorizedError } from '@/modules/jobs';
 import { JOB_HANDLERS } from './handlers';
 import { enqueueDailySchedule } from './schedule';
@@ -22,6 +23,7 @@ import { enqueueDailySchedule } from './schedule';
  *
  * **cron はこの1つだけ**（`vercel.json`）。間隔ごとに cron を増やすより、
  * **間隔を冪等キーに持たせて**ここから積むほうが、設定が1か所で済む
+ * （G-8b）。毎分呼ばれても、同じ回のジョブは1件しか積まれない（C-4）。
  * （I-1）。毎分呼ばれても、同じ日のものは1件しか積まれない（C-4）。
  *
  * **積めなくても消化は続ける。** 積むのは次の分でもできる。
@@ -81,6 +83,10 @@ export async function GET(request: Request): Promise<Response> {
     try {
       if (await enqueueDailySchedule()) {
         logger.info('日次ジョブの積み込みを積んだ');
+      }
+
+      if (await enqueuePublishPaceReview()) {
+        logger.info('公開ペースの見直しを積んだ');
       }
     } catch (error) {
       // **積めなくても消化は続ける。** 次の分で積める
