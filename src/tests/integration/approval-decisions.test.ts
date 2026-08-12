@@ -9,6 +9,7 @@ import {
   requestRevisionForUser,
   skipForUser,
 } from '@/modules/approvals';
+import { listAuditLogsForAdmin } from '@/modules/audit';
 import {
   assertMigrationsApplied,
   createTestPrisma,
@@ -461,5 +462,70 @@ describe('他人の承認は決められない', () => {
         now: NOW,
       }),
     ).rejects.toMatchObject({ code: APPROVAL_ERROR_CODES.notFound });
+  });
+});
+
+/**
+ * 監査ログ（TASKS H-12、SPEC 14.4「承認」、Q-027）。
+ *
+ * **誰がいつ何を通したかが分からないと、実験の結果を検証できない。**
+ */
+describe('承認の記録', () => {
+  it('承認すると残る', async () => {
+    await approveForUser({ userId, approvalId, now: NOW });
+
+    const logs = await listAuditLogsForAdmin({ entityType: 'approval' });
+
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toMatchObject({
+      actorUserId: userId,
+      action: 'ARTICLE_APPROVED',
+      entityId: approvalId,
+    });
+    expect(logs[0]?.metadata).toMatchObject({ blogId, contentItemId });
+  });
+
+  /** **本文もタイトルも入れない。** 追えれば足りる（SPEC 14.2） */
+  it('記事の中身を入れない', async () => {
+    await approveForUser({ userId, approvalId, now: NOW });
+
+    const [log] = await listAuditLogsForAdmin({ entityType: 'approval' });
+
+    expect(JSON.stringify(log?.metadata)).not.toContain('タイトル');
+  });
+
+  /** 二度押しで2行にならない（冪等） */
+  it('二度承認しても1件', async () => {
+    await approveForUser({ userId, approvalId, now: NOW });
+    await approveForUser({ userId, approvalId, now: NOW });
+
+    expect(
+      await listAuditLogsForAdmin({ entityType: 'approval' }),
+    ).toHaveLength(1);
+  });
+
+  /**
+   * **全ての決定を残さない。** SPEC 14.4 の一覧は「承認」だけで、
+   * 正常系を全部残すと異常が埋もれる
+   */
+  it.each([
+    {
+      name: '見送り',
+      act: () => skipForUser({ userId, approvalId, now: NOW }),
+    },
+    {
+      name: '修正依頼',
+      act: () =>
+        requestRevisionForUser({
+          userId,
+          approvalId,
+          requestType: 'SHORTER',
+          now: NOW,
+        }),
+    },
+  ])('$name は残さない', async ({ act }) => {
+    await act();
+
+    expect(await listAuditLogsForAdmin({ entityType: 'approval' })).toEqual([]);
   });
 });

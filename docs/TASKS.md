@@ -341,6 +341,7 @@ B-1 が実装したのは**サーバー側のIDトークン検証**であり、�
 | H-3b-schema | リンク切れの状態を持つ列 | A-2 | マイグレーションのみ。`affiliate_offers` に `link_checked_at` / `link_broken_at`（Q-029） | `prisma/` |
 | H-3b | リンク切れの状態を保存して見せる | H-3b-schema, H-3 | 確認の結果を保存し、**いつから切れているか**が画面で分かる（SPEC 6.1「エラー」） | `src/modules/affiliate/` `src/app/liff/` |
 | H-12 | 監査ログを SPEC 14.4 に揃える | H-11 | **承認・公開・WordPress接続変更**が `audit_logs` に残る（Q-027）。残り4種類（ログイン・案件URL変更・ジョブ再実行・AIプロンプト変更）は後続 | `src/modules/approvals/` `src/modules/wordpress/` `src/app/api/jobs/` |
+| H-13 | 監査ログの残り4種類 | H-12 | **ログイン・案件URL変更・ジョブ再実行・AIプロンプト変更**が `audit_logs` に残る（Q-027 で後回しにした分）。**SPEC 14.4 の8種類が揃う** | `src/modules/users/` `src/modules/affiliate/` `src/modules/settings/` `src/app/api/jobs/` |
 | D-14 | 分身のAPIと画面 | A-2-R-4-schema | `POST/GET/PATCH /api/personas`、使い始める・止める。LIFFで分身を作れる。**上限と段階解放の理由が画面に出る**（「上限です」だけにしない）。**H-2 の前に要る** — 分身が無いとブログを作れない（Q-035） | `src/app/api/personas/` `src/app/liff/personas/` |
 | H-2a | オンボーディングの現在地 | D-12, D-14 | **中断・再開ができる。** 現在地を保存せずデータから導く。10段が画面に出て、いまの段が分かる | `src/modules/users/onboarding.ts` `src/app/liff/onboarding/` |
 | H-2b | オンボーディングの足りない入口 | H-2a | 同意（段2・3）と通知の曜日・時刻（段9）を**受け付けられる**。`monitor_profiles` の行ができ、`onboarding_status` が導いた値で更新される | `src/app/api/` `src/app/liff/onboarding/` |

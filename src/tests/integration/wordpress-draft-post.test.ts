@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
+import { listAuditLogsForAdmin } from '@/modules/audit';
 import { createBlogForUser } from '@/modules/blogs';
 import {
   WORDPRESS_POST_ERROR_CODES,
@@ -415,5 +416,61 @@ describe('テナント分離（SPEC 14.1）', () => {
         contentItemId: otherContentItemId,
       }),
     ).rejects.toMatchObject({ code: 'BLOG_NOT_FOUND' });
+  });
+});
+
+/**
+ * 監査ログ（TASKS H-12、SPEC 14.4「公開」、Q-027）。
+ *
+ * **Phase 0 で作るのは下書きだけ**（SPEC 7）。公開はモニターが
+ * WordPress 側で行うので、こちらが記録できるのはここまで。
+ */
+describe('投稿の記録', () => {
+  async function post() {
+    return publishDraftForUser(
+      { userId: owner.id, blogId: ownerBlogId, contentItemId },
+      INPUT,
+      createFactory(healthyResponder),
+    );
+  }
+
+  it('送ったら残る', async () => {
+    await post();
+
+    const logs = await listAuditLogsForAdmin({ entityType: 'content_item' });
+
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toMatchObject({
+      // **行為者は null。** 送るのはジョブで、人が押した瞬間とは別の時刻に動く
+      actorUserId: null,
+      action: 'ARTICLE_POSTED',
+      entityId: contentItemId,
+    });
+    expect(logs[0]?.metadata).toMatchObject({
+      blogId: ownerBlogId,
+      wpPostId: 4242,
+      // **下書きであることを残す。** 公開の運用が変わっても読み方が変わらない
+      wpStatus: 'DRAFT',
+      created: true,
+    });
+  });
+
+  it('本文を入れない', async () => {
+    await post();
+
+    const [log] = await listAuditLogsForAdmin({ entityType: 'content_item' });
+
+    expect(JSON.stringify(log?.metadata)).not.toContain(INPUT.content);
+    expect(JSON.stringify(log?.metadata)).not.toContain(INPUT.title);
+  });
+
+  /** **何も起きていないなら記録もしない**（C-5 の「内容が同じなら変えない」） */
+  it('内容が同じで送り直したときは残さない', async () => {
+    await post();
+    await post();
+
+    expect(
+      await listAuditLogsForAdmin({ entityType: 'content_item' }),
+    ).toHaveLength(1);
   });
 });

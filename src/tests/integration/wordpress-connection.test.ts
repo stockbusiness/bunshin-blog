@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import { AppError } from '@/lib/errors';
+import { listAuditLogsForAdmin } from '@/modules/audit';
 import { closeBlogForUser, createBlogForUser } from '@/modules/blogs';
 import {
   WORDPRESS_ERROR_CODES,
@@ -395,5 +396,57 @@ describe('CLOSED のブログ（OPEN_QUESTIONS Q-008）', () => {
       code: 'BLOG_NOT_FOUND',
       status: 404,
     });
+  });
+});
+
+/**
+ * 監査ログ（TASKS H-12、SPEC 14.4「WordPress接続変更」、Q-027）。
+ *
+ * **投稿が止まった理由を後から辿るのに要る。**
+ */
+describe('接続変更の記録', () => {
+  it('つないだら残る', async () => {
+    await connect();
+
+    const logs = await listAuditLogsForAdmin({ entityType: 'blog' });
+
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toMatchObject({
+      actorUserId: owner.id,
+      action: 'WORDPRESS_CONNECTED',
+      entityId: ownerBlogId,
+    });
+  });
+
+  it('切ったら残る', async () => {
+    await connect();
+    await disconnectWordpressForUser({
+      userId: owner.id,
+      blogId: ownerBlogId,
+    });
+
+    const logs = await listAuditLogsForAdmin({ entityType: 'blog' });
+
+    expect(logs.map((log) => log.action)).toEqual([
+      'WORDPRESS_DISCONNECTED',
+      'WORDPRESS_CONNECTED',
+    ]);
+  });
+
+  /**
+   * **接続情報を入れない。** ユーザー名もアプリケーションパスワードも
+   * 秘密で、監査ログに入れてよい値ではない（SPEC 14.2）
+   */
+  it('認証情報を入れない', async () => {
+    await connect();
+
+    const serialized = JSON.stringify(
+      await listAuditLogsForAdmin({ entityType: 'blog' }),
+    );
+
+    expect(serialized).not.toContain(APP_PASSWORD);
+    expect(serialized).not.toContain(USERNAME);
+    // どこへ向いたかは残す
+    expect(serialized).toContain(SITE_URL);
   });
 });
