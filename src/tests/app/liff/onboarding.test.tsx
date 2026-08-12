@@ -95,21 +95,38 @@ describe('はじめの設定', () => {
     expect(await screen.findAllByText('見直す')).not.toHaveLength(0);
   });
 
-  /**
-   * **押せないボタンを置かない。** 同意（段2・3）と通知（段9）は
-   * 受け付ける画面がまだ無い（H-2b）
-   */
-  it('画面が無い段はリンクを出さず、無いことを書く', async () => {
+  /** H-2b で同意と通知の画面ができ、**行き先の無い段は残り1つ** */
+  it('同意と通知には行き先がある', async () => {
     vi.mocked(fetchOnboarding).mockResolvedValue(progress(1));
 
     render(<OnboardingPage />);
 
-    const terms = await screen.findByText('利用規約に同意する');
-    const item = terms.closest('li');
+    const terms = (await screen.findByText('利用規約に同意する')).closest('li');
+    const notification = screen
+      .getByText('通知の曜日と時刻を決める')
+      .closest('li');
 
-    expect(item).not.toBeNull();
-    expect(item).toHaveTextContent('この画面はまだありません');
+    expect(terms?.querySelector('a')).toHaveAttribute(
+      'href',
+      '/liff/onboarding/consent',
+    );
+    expect(notification?.querySelector('a')).toHaveAttribute(
+      'href',
+      '/liff/onboarding/notification',
+    );
+  });
+
+  /**
+   * **`LINE_LOGIN` には行き先が要らない。** この画面が見えている時点で
+   * 済んでいるので、押せないボタンも「まだありません」も出さない
+   */
+  it('LINEログインの段にはリンクを出さない', async () => {
+    render(<OnboardingPage />);
+
+    const item = (await screen.findByText('LINEでログイン')).closest('li');
+
     expect(item?.querySelector('a')).toBeNull();
+    expect(item).toHaveTextContent('済み');
   });
 
   it('全部済んでいれば、そう伝える', async () => {

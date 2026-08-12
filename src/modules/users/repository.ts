@@ -1,4 +1,9 @@
 import { prisma } from '@/lib/db';
+import { AppError } from '@/lib/errors';
+import {
+  normalizeNotificationSchedule,
+  toNotificationTimeColumn,
+} from './notification-schedule';
 import type { AppUser, ConsentKind } from './types';
 
 /**
@@ -199,6 +204,90 @@ export async function findNotificationTargetForUser(
  * （`dailyNotificationLimit`）。ここで既定値を持つと、上限の既定が
  * 2箇所になる。
  */
+/**
+ * 同意を記録する（TASKS H-2b、SPEC 6.1 のオンボーディング2・3）。
+ *
+ * **一度入れた時刻を動かさない。** いつ同意したかは実験の記録
+ * （SPEC 6.1 の同意はデータ利用の範囲を決める）で、
+ * **二度目の操作で上書きすると「いつから使ってよかったか」が分からなくなる。**
+ *
+ * **同意を取り消す入口はここに作らない。** 取り消しは退会（H-4）で扱う。
+ */
+export async function acceptConsentForUser(params: {
+  userId: string;
+  kind: 'TERMS' | 'DATA_USE';
+  now?: Date;
+}): Promise<AppUser> {
+  const now = params.now ?? new Date();
+  const column =
+    params.kind === 'TERMS' ? 'termsAcceptedAt' : 'dataUseConsentAt';
+
+  await prisma.user.updateMany({
+    // **まだ入っていない行だけ**。二度目は何もしない（冪等）
+    where: { id: params.userId, [column]: null },
+    data: { [column]: now },
+  });
+
+  const user = await findById(params.userId);
+
+  if (user === null) {
+    throw AppError.notFound('利用者が見つかりません');
+  }
+
+  return user;
+}
+
+/**
+ * 通知の曜日と時刻を保存する（TASKS H-2b、SPEC 8.3）。
+ *
+ * **`monitor_profiles` の行はここで作る。** オンボーディングの段9まで
+ * 来た人だけが持つ（登録した全員に空の行を作らない）。
+ *
+ * `upsert` を使う。「引いてから入れる」を分けると、同時に2回呼ばれた
+ * ときに片方が unique 制約で落ちる（B-11 と同じ考え）。
+ */
+export async function saveNotificationScheduleForUser(
+  userId: string,
+  input: unknown,
+): Promise<{ days: number[]; time: string }> {
+  const schedule = normalizeNotificationSchedule(input);
+  const time = toNotificationTimeColumn(schedule.time);
+
+  await prisma.monitorProfile.upsert({
+    where: { userId },
+    create: {
+      userId,
+      notificationDays: schedule.days,
+      notificationTime: time,
+      // **オンボーディングの段9まで来ている**ので、進行中にする。
+      // 全段が済んだかは `syncOnboardingStatusForUser` が入れ直す
+      onboardingStatus: 'IN_PROGRESS',
+    },
+    update: { notificationDays: schedule.days, notificationTime: time },
+  });
+
+  return schedule;
+}
+
+/**
+ * オンボーディングの進み具合を書き戻す（TASKS H-2b、B-7）。
+ *
+ * **導いた値を書くだけ**（正は `resolveOnboardingProgress`）。
+ * 管理画面の一覧（B-7）がこの列を読む。
+ *
+ * **行が無ければ何もしない。** 段9まで来ていない人に空の行を作ると、
+ * 通知の設定が「未設定」なのか「行だけある」のか区別できなくなる。
+ */
+export async function syncOnboardingStatusForUser(params: {
+  userId: string;
+  status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
+}): Promise<void> {
+  await prisma.monitorProfile.updateMany({
+    where: { userId: params.userId, onboardingStatus: { not: params.status } },
+    data: { onboardingStatus: params.status },
+  });
+}
+
 export async function findNotificationScheduleForUser(userId: string): Promise<{
   days: number[];
   time: Date;

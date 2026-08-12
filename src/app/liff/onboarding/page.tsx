@@ -23,11 +23,10 @@ import {
  * 設定を直したくなるのは普通のこと。「先へ進む」だけにすると、
  * **直すために最初からやり直す**ことになる。
  *
- * ## まだ行き先が無い段がある
+ * ## 行き先が無い段は1つだけ
  *
- * 同意（段2・3）と通知の設定（段9）は**受け付ける画面がまだ無い**（H-2b）。
- * リンクを出さず、**何が必要かだけを書く** — 押せないボタンを置くより、
- * 何をすればよいか分からない状態のほうが害が大きい。
+ * `LINE_LOGIN` は**この画面が見えている時点で済んでいる**ので、行き先が
+ * 要らない。同意（段2・3）と通知（段9）は H-2b で足した。
  */
 
 interface StepView {
@@ -51,12 +50,12 @@ const STEP_VIEWS: Record<OnboardingStep, StepView> = {
   TERMS: {
     title: '利用規約に同意する',
     description: '参加の条件を確認します',
-    href: null,
+    href: '/liff/onboarding/consent',
   },
   DATA_CONSENT: {
     title: 'データの使い方に同意する',
     description: '実験の記録として何を残すかを確認します',
-    href: null,
+    href: '/liff/onboarding/consent',
   },
   PERSONA: {
     title: '分身をつくる',
@@ -87,7 +86,7 @@ const STEP_VIEWS: Record<OnboardingStep, StepView> = {
   NOTIFICATION: {
     title: '通知の曜日と時刻を決める',
     description: '提案が届く時間帯です',
-    href: null,
+    href: '/liff/onboarding/notification',
   },
   SNIPPET: {
     title: 'リンク計測を入れる',

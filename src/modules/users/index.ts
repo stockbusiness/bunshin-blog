@@ -12,6 +12,9 @@ export {
   findNotificationTargetForUser,
   findMaxDailyProposalsForUser,
   findNotificationScheduleForUser,
+  acceptConsentForUser,
+  saveNotificationScheduleForUser,
+  syncOnboardingStatusForUser,
   recordConsent,
   type UsersDb,
   type UsersDeps,
@@ -57,3 +60,12 @@ export {
   type OnboardingFacts,
   type OnboardingProgress,
 } from './onboarding';
+
+export {
+  NOTIFICATION_DAY_MIN,
+  NOTIFICATION_DAY_MAX,
+  normalizeNotificationSchedule,
+  toNotificationTimeColumn,
+  fromNotificationTimeColumn,
+  type NotificationSchedule,
+} from './notification-schedule';
