@@ -12,7 +12,7 @@ import {
   createTestPrisma,
   resetDatabase,
 } from './helpers/db';
-import { createBlog, createUser } from './helpers/factories';
+import { createBlog, createPersona, createUser } from './helpers/factories';
 
 /**
  * 退会とデータの持ち出しを**実PostgreSQLで**確かめる（TASKS H-4、SPEC 13.2）。
@@ -147,6 +147,34 @@ describe('データエクスポート（完了条件）', () => {
     expect(data.user.id).toBe(userId);
     expect(data.blogs).toHaveLength(1);
     expect(data.blogs[0]?.name).toBe('節約ブログ');
+  });
+
+  /**
+   * **分身も持ち出せる**（A-2-R-2f）。1ユーザー1件だった頃は1つの
+   * オブジェクトだったが、複数持てるようになったので配列で返す。
+   *
+   * `ARCHIVED` も含める — **途中でやめた分身があること自体が本人の記録**で、
+   * 抜くと「最初から作らなかった」と区別できない。
+   */
+  it('分身が入る（やめたものも含む）', async () => {
+    const archived = await createPersona(prisma, userId, {
+      name: 'やめた分身',
+    });
+    await prisma.persona.update({
+      where: { id: archived.id },
+      data: { status: 'ARCHIVED' },
+    });
+
+    const data = await exportUserDataForAdmin(userId);
+
+    // ブログと一緒に作られた分身（`createBlog`）と、やめた分身の2件
+    expect(data.personas).toHaveLength(2);
+    expect(data.personas.map((persona) => persona.name)).toContain(
+      'やめた分身',
+    );
+    expect(
+      data.personas.find((persona) => persona.name === 'やめた分身')?.status,
+    ).toBe('ARCHIVED');
   });
 
   /** **閉じたブログも含める。** 外すと退会後に空のファイルが出てくる */

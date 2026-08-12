@@ -1,27 +1,25 @@
 /**
- * ユーザー共通人格の検証（TASKS D-4、DATA_MODEL 3章）。
+ * 人格まわりの共通の検証（TASKS D-4・D-5、DATA_MODEL 3章）。
  *
- * `base_profile` `tone` `values` は `jsonb`。**DBは中身を保証しない**ので、
- * 保存の直前にここで形を固定する。壊れた形のまま入ると、記事生成（E-8）が
- * 読めない値を掴んで落ちる。
+ * jsonb は **DBが中身を保証しない**ので、保存の直前にここで形を固定する。
+ * 壊れた形のまま入ると、記事生成（E-8）が読めない値を掴んで落ちる。
+ *
+ * **旧 `user_personas` 専用の検証は A-2-R-2f で消した。** 分身の検証は
+ * `persona.ts` が持つ。ここに残っているのは `blog_persona_settings` と
+ * 分身の両方から使うもの。
  */
 
 import { invalidPersonaError } from './errors';
 import {
   EMOJI_LEVELS,
   LINE_BREAK_STYLES,
-  type BaseProfile,
-  type CreateUserPersonaInput,
   type EmojiLevel,
   type LineBreakStyle,
   type PersonaValues,
   type Tone,
-  type UpdateUserPersonaInput,
 } from './types';
 
 export const PERSONA_TEXT_MAX_LENGTH = 200;
-export const PERSONA_BACKGROUND_MAX_LENGTH = 1000;
-export const FIRST_PERSON_MAX_LENGTH = 10;
 export const PERSONA_LIST_MAX = 20;
 
 function assertText(value: unknown, label: string, max: number): string {
@@ -90,28 +88,6 @@ export function isLineBreakStyle(value: unknown): value is LineBreakStyle {
   );
 }
 
-/** @throws {AppError} 形が違う */
-export function normalizeBaseProfile(value: unknown): BaseProfile {
-  if (!isRecord(value)) {
-    throw invalidPersonaError('基本プロフィールを指定してください');
-  }
-
-  return {
-    ageRange: assertText(value['ageRange'], '年代', PERSONA_TEXT_MAX_LENGTH),
-    position: assertText(value['position'], '立場', PERSONA_TEXT_MAX_LENGTH),
-    firstPerson: assertText(
-      value['firstPerson'],
-      '一人称',
-      FIRST_PERSON_MAX_LENGTH,
-    ),
-    background: assertText(
-      value['background'],
-      '背景',
-      PERSONA_BACKGROUND_MAX_LENGTH,
-    ),
-  };
-}
-
 /** @throws {AppError} 形が違う・知らない値 */
 export function normalizeTone(value: unknown): Tone {
   if (!isRecord(value)) {
@@ -152,53 +128,4 @@ export function normalizeValues(value: unknown): PersonaValues {
     priorities: assertList(value['priorities'], '大事にすること'),
     avoid: assertList(value['avoid'], '避けること'),
   };
-}
-
-export interface NormalizedUserPersona {
-  baseProfile: BaseProfile;
-  tone: Tone;
-  values: PersonaValues;
-  ngExpressions: string[];
-}
-
-/** @throws {AppError} 入力の不備 */
-export function normalizeCreateUserPersona(
-  input: CreateUserPersonaInput,
-): NormalizedUserPersona {
-  return {
-    baseProfile: normalizeBaseProfile(input.baseProfile),
-    tone: normalizeTone(input.tone),
-    values: normalizeValues(input.values),
-    ngExpressions: assertList(input.ngExpressions, 'NG表現'),
-  };
-}
-
-/**
- * 編集入力を整える。
- *
- * **渡された項目だけを返す。** `undefined` は「変えない」を意味する。
- * 項目を渡した場合は、その項目の中身をすべて指定する（部分更新はしない）。
- */
-export function normalizeUpdateUserPersona(
-  input: UpdateUserPersonaInput,
-): Partial<NormalizedUserPersona> {
-  const data: Partial<NormalizedUserPersona> = {};
-
-  if (input.baseProfile !== undefined) {
-    data.baseProfile = normalizeBaseProfile(input.baseProfile);
-  }
-
-  if (input.tone !== undefined) {
-    data.tone = normalizeTone(input.tone);
-  }
-
-  if (input.values !== undefined) {
-    data.values = normalizeValues(input.values);
-  }
-
-  if (input.ngExpressions !== undefined) {
-    data.ngExpressions = assertList(input.ngExpressions, 'NG表現');
-  }
-
-  return data;
 }
