@@ -9,6 +9,7 @@ import {
   type BlogJson,
   type BlogPurpose,
   type BlogSettingsInput,
+  type BrokenLinkJson,
 } from '../../../_lib/blogs-api';
 import {
   PURPOSE_LABELS,
@@ -54,6 +55,7 @@ export default function BlogSettingsPage({
   const { blogId } = use(params);
 
   const [blog, setBlog] = useState<BlogJson | null>(null);
+  const [brokenLinks, setBrokenLinks] = useState<BrokenLinkJson[]>([]);
   const [form, setForm] = useState<FormState | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -67,6 +69,7 @@ export default function BlogSettingsPage({
       (result) => {
         if (cancelled) return;
         setBlog(result.blog);
+        setBrokenLinks(result.brokenLinks);
         setForm(toFormState(result.blog));
       },
       (thrown: unknown) => {
@@ -141,6 +144,8 @@ export default function BlogSettingsPage({
         ブログ一覧へ
       </Link>
       <h1 className="mt-3 text-lg font-bold">{blog.name} の設定</h1>
+
+      <BrokenLinkSection links={brokenLinks} />
 
       <form
         onSubmit={(e) => void submit(e)}
@@ -332,6 +337,63 @@ function ReadOnlySection({ blog }: { blog: BlogJson }) {
           </dd>
         </div>
       </dl>
+    </section>
+  );
+}
+
+/**
+ * 何日前から切れているかを出す（H-3b）。
+ *
+ * **日付そのものより「何日前か」。** 「8月3日から」と言われても、
+ * 今日が何日かを数え直すことになる。
+ */
+function daysAgo(from: Date, now: Date): number {
+  const diff = now.getTime() - from.getTime();
+
+  return Math.max(0, Math.floor(diff / (24 * 60 * 60 * 1_000)));
+}
+
+/**
+ * いま切れているリンク（H-3b、SPEC 6.1「エラー」）。
+ *
+ * **切れていないときは何も出さない。**「問題ありません」と書くと、
+ * 確認できていない案件まで問題なしに見える（確認の結果が無いことと、
+ * 確認して問題が無かったことは別）。
+ *
+ * **直し方を書く。** 「切れています」だけだと何をすればよいか分からない。
+ */
+function BrokenLinkSection({ links }: { links: BrokenLinkJson[] }) {
+  if (links.length === 0) {
+    return null;
+  }
+
+  const now = new Date();
+
+  return (
+    <section className="mt-4 rounded border border-red-300 bg-red-50 p-4">
+      <h2 className="text-sm font-bold text-red-900">
+        リンクが切れています（{links.length}件）
+      </h2>
+
+      <ul className="mt-2 flex flex-col gap-2 text-sm text-red-900">
+        {links.map((link) => {
+          const days = daysAgo(new Date(link.brokenAt), now);
+
+          return (
+            <li key={link.offerId}>
+              {link.offerName}
+              <span className="ml-1 text-xs">
+                （{days === 0 ? '今日から' : `${String(days)}日前から`}）
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+
+      <p className="mt-3 text-xs leading-relaxed text-red-900">
+        案件が終了しているか、リンク先が移動しています。ASPの管理画面でご確認のうえ、
+        サポートへご連絡ください。切れたままの案件は記事から外されません。
+      </p>
     </section>
   );
 }

@@ -45,6 +45,8 @@ interface OfferRow {
   userExperience: string;
   userRating: number | null;
   denyConditions: string[];
+  linkCheckedAt: Date | null;
+  linkBrokenAt: Date | null;
   lpFormFields: number | null;
   lpMobileReady: boolean | null;
   lpEvaluatedAt: Date | null;
@@ -81,6 +83,8 @@ function toAppOffer(row: OfferRow): AppAffiliateOffer {
     userExperience: row.userExperience as UserExperience,
     userRating: row.userRating,
     denyConditions: row.denyConditions,
+    linkCheckedAt: row.linkCheckedAt,
+    linkBrokenAt: row.linkBrokenAt,
     lpFormFields: row.lpFormFields,
     lpMobileReady: row.lpMobileReady,
     lpEvaluatedAt: row.lpEvaluatedAt,
@@ -111,6 +115,9 @@ const SELECT = {
   userExperience: true,
   userRating: true,
   denyConditions: true,
+  // リンク切れの状態（H-3b）。画面が「いつから切れているか」を出す
+  linkCheckedAt: true,
+  linkBrokenAt: true,
   // LPの自動評価（D-2）の結果。**スコアリング（E-5）が読む**
   lpFormFields: true,
   lpMobileReady: true,
