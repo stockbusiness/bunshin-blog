@@ -39,6 +39,7 @@ let userId: string;
 let blogId: string;
 let personaId: string;
 let planId: string;
+let offerId: string;
 let revenueItemId: string;
 let trafficItemId: string;
 
@@ -187,11 +188,14 @@ beforeEach(async () => {
       affiliateUrl: 'https://asp.example/click?a=x',
       conversionType: 'FREE_SIGNUP',
       facts: { features: ['機能A'] },
+      // **確かめ直した時刻を入れない。** 一度も確かめていない案件の状態
+      // （D-13。90日判定に引っかかる）
       denyConditions: [],
       status: 'ACTIVE',
     },
     select: { id: true },
   });
+  offerId = offer.id;
 
   const plan = await prisma.contentPlan.create({
     data: { blogId, planType: 'INITIAL', version: 1, strategySnapshot: {} },
@@ -743,7 +747,64 @@ describe('事実チェック（E-12）', () => {
       { provider: provider() },
     );
 
-    // facts に `updatedAt` が無いため、一致しても WARNING（Q-022）
+    // **一度も確かめていない案件なので、一致しても WARNING**（Q-022・D-13）
+    expect(version.factCheckStatus).toBe('WARNING');
+  });
+
+  /**
+   * **90日判定が実際に効くこと**（D-13 の完了条件）。
+   *
+   * D-13 より前は書き込む経路が無く、**すべての収益記事が WARNING**
+   * だった。確かめ直した時刻が入れば通る
+   */
+  it('確かめ直した案件なら PASSED', async () => {
+    await prisma.affiliateOffer.update({
+      where: { id: offerId },
+      data: { factsUpdatedAt: new Date() },
+    });
+
+    respondClaims = () => ({
+      claims: [
+        {
+          text: '機能Aが使えます',
+          type: 'FEATURE',
+          excerpt: '機能Aが使えます',
+        },
+      ],
+    });
+
+    const version = await generateArticleForUser(
+      { userId, blogId, contentItemId: revenueItemId },
+      { provider: provider() },
+    );
+
+    expect(version.factCheckStatus).toBe('PASSED');
+  });
+
+  /** **90日を過ぎたら、確かめたことがあっても WARNING**（CONTENT_PLANNING 8.2） */
+  it('90日より古ければ WARNING', async () => {
+    await prisma.affiliateOffer.update({
+      where: { id: offerId },
+      data: {
+        factsUpdatedAt: new Date(Date.now() - 91 * 24 * 60 * 60 * 1_000),
+      },
+    });
+
+    respondClaims = () => ({
+      claims: [
+        {
+          text: '機能Aが使えます',
+          type: 'FEATURE',
+          excerpt: '機能Aが使えます',
+        },
+      ],
+    });
+
+    const version = await generateArticleForUser(
+      { userId, blogId, contentItemId: revenueItemId },
+      { provider: provider() },
+    );
+
     expect(version.factCheckStatus).toBe('WARNING');
   });
 

@@ -412,3 +412,122 @@ describe('閉じたブログ', () => {
     ).rejects.toMatchObject({ status: 404 });
   });
 });
+
+/**
+ * 事実を確かめ直した時刻（TASKS D-13、Q-022）。
+ *
+ * **`facts` を渡した経路だけが書く。** 行の `updated_at` で代用すると、
+ * 状態を変えただけで「確かめ直した」ことになり、90日判定（E-12）が
+ * 黙って通る
+ */
+describe('facts を確かめ直した時刻', () => {
+  const NOW = new Date('2026-08-12T00:00:00.000Z');
+
+  it('facts を付けて作れば入る', async () => {
+    const offer = await createOfferForUser(
+      { userId: owner.id, blogId: blog1 },
+      input({ facts: { reward: '1000円' } }),
+      NOW,
+    );
+
+    expect(offer.factsUpdatedAt).toEqual(NOW);
+  });
+
+  /**
+   * **中身の無い事実を「確認済み」にしない。** `facts` を省くと `{}` が
+   * 入るので、書き込む値だけを見ると全ての案件が確認済みになる
+   */
+  it('facts を付けずに作れば null のまま', async () => {
+    const offer = await createOfferForUser(
+      { userId: owner.id, blogId: blog1 },
+      input(),
+      NOW,
+    );
+
+    expect(offer.factsUpdatedAt).toBeNull();
+  });
+
+  it('facts を更新すれば書き換わる', async () => {
+    const created = await createOfferForUser(
+      { userId: owner.id, blogId: blog1 },
+      input({ facts: { reward: '1000円' } }),
+      new Date('2026-01-01T00:00:00.000Z'),
+    );
+
+    const updated = await updateOfferForUser(
+      { userId: owner.id, blogId: blog1, offerId: created.id },
+      { facts: { reward: '1200円' } },
+      NOW,
+    );
+
+    expect(updated.factsUpdatedAt).toEqual(NOW);
+  });
+
+  /**
+   * **確かめ直して変わっていなかった、がいちばん多い。**
+   * 中身の変化で判定すると、警告が永久に鳴り続ける
+   */
+  it('同じ facts を渡しても書き換わる', async () => {
+    const facts = { reward: '1000円' };
+    const created = await createOfferForUser(
+      { userId: owner.id, blogId: blog1 },
+      input({ facts }),
+      new Date('2026-01-01T00:00:00.000Z'),
+    );
+
+    const updated = await updateOfferForUser(
+      { userId: owner.id, blogId: blog1, offerId: created.id },
+      { facts },
+      NOW,
+    );
+
+    expect(updated.factsUpdatedAt).toEqual(NOW);
+  });
+
+  /**
+   * **ここが `updated_at` を使えない理由。** 行を触っただけで
+   * 90日判定が黙って通ってしまう
+   */
+  it.each([
+    { name: '状態を変える', patch: { status: 'ACTIVE' as const } },
+    { name: '報酬額を直す', patch: { rewardYen: 3000 } },
+    { name: '名前を直す', patch: { name: '別の案件' } },
+  ])('$name だけでは書き換わらない', async ({ patch }) => {
+    const created = await createOfferForUser(
+      { userId: owner.id, blogId: blog1 },
+      input({ facts: { reward: '1000円' } }),
+      new Date('2026-01-01T00:00:00.000Z'),
+    );
+
+    const updated = await updateOfferForUser(
+      { userId: owner.id, blogId: blog1, offerId: created.id },
+      patch,
+      NOW,
+    );
+
+    expect(updated.factsUpdatedAt).toEqual(
+      new Date('2026-01-01T00:00:00.000Z'),
+    );
+    // 行の updated_at のほうは動いている
+    expect(updated.updatedAt.getTime()).toBeGreaterThan(
+      created.updatedAt.getTime(),
+    );
+  });
+
+  /** 記事生成（E-12）はこの値を読む */
+  it('リンク用の読み取りにも載る', async () => {
+    const created = await createOfferForUser(
+      { userId: owner.id, blogId: blog1 },
+      input({ facts: { reward: '1000円' } }),
+      NOW,
+    );
+
+    const linkable = await readLinkableOfferForUser({
+      userId: owner.id,
+      blogId: blog1,
+      offerId: created.id,
+    });
+
+    expect(linkable.factsUpdatedAt).toEqual(NOW);
+  });
+});

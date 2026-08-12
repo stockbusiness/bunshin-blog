@@ -196,13 +196,17 @@ describe('主張の照合先（CONTENT_PLANNING 8.2）', () => {
   });
 });
 
+/**
+ * **読むのは jsonb ではなく `affiliate_offers.facts_updated_at`**
+ * （D-13-schema・Q-022）。jsonb の中に書く規約は書き忘れを防げない
+ */
 describe('facts の古さ（CONTENT_PLANNING 8.2）', () => {
-  const updatedAt = '2026-01-15T00:00:00.000Z';
+  const factsUpdatedAt = new Date('2026-01-15T00:00:00.000Z');
 
   it('90日以内なら古くない', () => {
     expect(
       areFactsStale({
-        facts: { updatedAt },
+        factsUpdatedAt,
         now: new Date('2026-03-01T00:00:00.000Z'),
       }),
     ).toBe(false);
@@ -211,7 +215,7 @@ describe('facts の古さ（CONTENT_PLANNING 8.2）', () => {
   it('90日を超えたら古い', () => {
     expect(
       areFactsStale({
-        facts: { updatedAt },
+        factsUpdatedAt,
         now: new Date('2026-06-01T00:00:00.000Z'),
       }),
     ).toBe(true);
@@ -219,22 +223,25 @@ describe('facts の古さ（CONTENT_PLANNING 8.2）', () => {
 
   /**
    * **「いつ確かめたか分からない」を「新しい」に倒さない。**
-   * 測っていないことが「問題なし」に化ける（Q-022）
+   * 測っていないことが「問題なし」に化ける（Q-022）。
+   * 書くのは `facts` を渡した経路だけなので、一度も確かめていない案件は
+   * `null` のまま
    */
   it.each([
-    { reason: 'updatedAt が無い', facts: {} },
-    { reason: '日付として読めない', facts: { updatedAt: 'いつか' } },
-    { reason: 'facts が無い', facts: null },
-  ])('$reason なら古い扱い', ({ facts }) => {
-    expect(areFactsStale({ facts, now: new Date() })).toBe(true);
+    { reason: '一度も確かめていない', value: null },
+    { reason: '日付として読めない', value: new Date('ng') },
+  ])('$reason なら古い扱い', ({ value }) => {
+    expect(areFactsStale({ factsUpdatedAt: value, now: new Date() })).toBe(
+      true,
+    );
   });
 
   it('ちょうど90日は古くない', () => {
     const now = new Date(
-      new Date(updatedAt).getTime() + FACTS_STALE_DAYS * 24 * 60 * 60 * 1_000,
+      factsUpdatedAt.getTime() + FACTS_STALE_DAYS * 24 * 60 * 60 * 1_000,
     );
 
-    expect(areFactsStale({ facts: { updatedAt }, now })).toBe(false);
+    expect(areFactsStale({ factsUpdatedAt, now })).toBe(false);
   });
 });
 

@@ -41,6 +41,7 @@ interface OfferRow {
   rewardYen: number | null;
   conversionType: string;
   facts: unknown;
+  factsUpdatedAt: Date | null;
   userExperience: string;
   userRating: number | null;
   denyConditions: string[];
@@ -76,6 +77,7 @@ function toAppOffer(row: OfferRow): AppAffiliateOffer {
     rewardYen: row.rewardYen,
     conversionType: row.conversionType as ConversionType,
     facts: row.facts,
+    factsUpdatedAt: row.factsUpdatedAt,
     userExperience: row.userExperience as UserExperience,
     userRating: row.userRating,
     denyConditions: row.denyConditions,
@@ -105,6 +107,7 @@ const SELECT = {
   rewardYen: true,
   conversionType: true,
   facts: true,
+  factsUpdatedAt: true,
   userExperience: true,
   userRating: true,
   denyConditions: true,
@@ -130,6 +133,8 @@ const LINK_SELECT = {
   blogId: true,
   name: true,
   facts: true,
+  // **90日判定が読む**（E-12。列は D-13-schema）
+  factsUpdatedAt: true,
   affiliateUrl: true,
   linkMode: true,
   subIdParam: true,
@@ -221,6 +226,7 @@ export async function requireOfferForUser(params: {
 export async function createOfferForUser(
   params: { userId: string; blogId: string },
   input: CreateOfferInput,
+  now: Date = new Date(),
 ): Promise<AppAffiliateOffer> {
   const blogId = await requireOpenBlogId(params);
   const data = normalizeCreateOffer(input);
@@ -236,6 +242,10 @@ export async function createOfferForUser(
       rewardYen: data.rewardYen,
       conversionType: data.conversionType,
       facts: data.facts as object,
+      // **`facts` を渡したときだけ入れる。** `normalizeCreateOffer` は
+      // 省略時に `{}` を入れるので、`data.facts` を見ると
+      // **中身の無い事実が「確認済み」になる**（D-13）
+      factsUpdatedAt: input.facts === undefined ? null : now,
       userExperience: data.userExperience,
       userRating: data.userRating,
       denyConditions: data.denyConditions,
@@ -258,12 +268,25 @@ export async function createOfferForUser(
 export async function updateOfferForUser(
   params: { userId: string; blogId: string; offerId: string },
   input: UpdateOfferInput,
+  now: Date = new Date(),
 ): Promise<AppAffiliateOffer> {
   const current = await requireOfferForUser(params);
   const data = normalizeUpdateOffer(input);
 
   if (Object.keys(data).length === 0) {
     return current;
+  }
+
+  // **`facts` を渡した経路だけが「確かめ直した」時刻を書く**（D-13・Q-022）。
+  //
+  // 状態を `ACTIVE` にした・報酬額を直した、では書かない。書くと
+  // **行を触っただけで90日判定が黙って通る**（`updated_at` を使えない理由）。
+  //
+  // **中身が変わったかは見ない。** 確かめ直して**変わっていなかった**のが
+  // いちばん多く、そこで時刻が動かないと**警告が永久に鳴り続ける。**
+  // 見たいのは「いつ確かめたか」であって「いつ変わったか」ではない
+  if (data['facts'] !== undefined) {
+    data['factsUpdatedAt'] = now;
   }
 
   assertPeriod(
@@ -322,6 +345,8 @@ export async function readLinkableOfferForUser(params: {
   name: string;
   /** 記事に書いてよい価格・条件・機能（SPEC 9.6、E-12 が照合する） */
   facts: unknown;
+  /** `facts` を確かめ直した時刻。**`null` なら一度も確かめていない**（D-13） */
+  factsUpdatedAt: Date | null;
   affiliateUrl: string;
   linkMode: LinkMode;
   subIdParam: string | null;
@@ -342,6 +367,7 @@ export async function readLinkableOfferForUser(params: {
     blogId,
     name: row.name,
     facts: row.facts,
+    factsUpdatedAt: row.factsUpdatedAt,
     affiliateUrl: row.affiliateUrl,
     linkMode: row.linkMode as LinkMode,
     subIdParam: row.subIdParam,
