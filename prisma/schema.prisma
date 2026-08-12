@@ -149,6 +149,24 @@ enum LinkMode {
   DIRECT
 }
 
+/**
+ * WordPress のパーマリンク様式（TASKS C-9、作業指示書 W-8）。
+ * **4つから選ぶ。** 自由文字列にすると、`%postname%` の綴り違いのような
+ * 打ち間違いが実際のブログの設定と食い違ったまま残る。
+ * **スラッグは英数字にする。** 日本語スラッグはURLエンコードで長大になり、
+ * 共有されたときに読めない。
+ */
+enum PermalinkPattern {
+  /// `/%postname%/`
+  POSTNAME
+  /// `/%category%/%postname%/`
+  CATEGORY_POSTNAME
+  /// `/blog/%postname%/`
+  BLOG_POSTNAME
+  /// `/archives/%post_id%/`
+  ARCHIVES_POST_ID
+}
+
 enum BannerSlot {
   TOP
   AFTER_FIRST_HEADING
@@ -349,11 +367,11 @@ model MonitorProfile {
 // ============================================================
 
 model Blog {
-  id                     String      @id @default(uuid()) @db.Uuid
-  userId                 String      @map("user_id") @db.Uuid
+  id                     String           @id @default(uuid()) @db.Uuid
+  userId                 String           @map("user_id") @db.Uuid
   name                   String
   slug                   String
-  genreId                String?     @map("genre_id") @db.Uuid
+  genreId                String?          @map("genre_id") @db.Uuid
   /// どの分身の媒体か。**ブログは分身の媒体である**（A-2-R-3 で必須にした）。
   ///
   /// **`Restrict`。** 分身を消してもブログを道連れにしない。
@@ -363,15 +381,15 @@ model Blog {
   /// `affiliate_links` とまったく同じ形で、理由も同じ —
   /// **依存の向きが `personas → blogs` なので、`blogs` から
   /// 分身の持ち主を確かめられない**（MODULE_RULES 3）
-  personaId              String      @map("persona_id") @db.Uuid
-  penName                String?     @map("pen_name")
-  targetReader           String      @map("target_reader")
-  purpose                BlogPurpose @default(AFFILIATE)
-  status                 BlogStatus  @default(SETUP)
-  slotNumber             Int         @map("slot_number")
-  launchDate             DateTime?   @map("launch_date") @db.Date
-  articleRatio           Json        @map("article_ratio")
-  experimentGroupId      String?     @map("experiment_group_id") @db.Uuid
+  personaId              String           @map("persona_id") @db.Uuid
+  penName                String?          @map("pen_name")
+  targetReader           String           @map("target_reader")
+  purpose                BlogPurpose      @default(AFFILIATE)
+  status                 BlogStatus       @default(SETUP)
+  slotNumber             Int              @map("slot_number")
+  launchDate             DateTime?        @map("launch_date") @db.Date
+  articleRatio           Json             @map("article_ratio")
+  experimentGroupId      String?          @map("experiment_group_id") @db.Uuid
   /// クリック受信API（D-12）の認証。**ハッシュだけを持つ。**
   ///
   /// Bunshin は照合しかしないので、原文を持つ理由が無い。DBを読めた相手が
@@ -379,11 +397,32 @@ model Blog {
   ///
   /// **`@unique`。** 受信APIはこの1列でブログを引く — トークンが
   /// ブログを決めるので、他ブログのイベントを名乗れない
-  linkEventTokenHash     String?     @unique @map("link_event_token_hash")
+  linkEventTokenHash     String?          @unique @map("link_event_token_hash")
   /// いつ発行したか。**原文は二度と出せない**ので、画面はこれで「発行済み」を示す
-  linkEventTokenIssuedAt DateTime?   @map("link_event_token_issued_at") @db.Timestamptz(6)
-  createdAt              DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt              DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  linkEventTokenIssuedAt DateTime?        @map("link_event_token_issued_at") @db.Timestamptz(6)
+  /// 公開する曜日（0=日〜6=土）。**ブログごとに散らす**（C-9）。
+  ///
+  /// **空は「まだ割り当てていない」。** 割り当てる処理は C-9（コード）で、
+  /// それまでは既存行も新規行も空になりうる
+  publishWeekdays        Int[]            @map("publish_weekdays")
+  /// 公開時刻（JSTの壁掛け時計）。`time` 型にUTCへ直さずそのまま入れる。
+  ///
+  /// **nullable なのは割り当ての処理が C-9（コード）だから。**
+  /// 埋まったあとに `NOT NULL` にする（C-9-schema-2）。
+  /// 共通の既定値を置かないのは、**散らすものに既定値は無い**ため —
+  /// 既定値を置くと、割り当てを忘れた行が「9時のブログ」として紛れる
+  publishTime            DateTime?        @map("publish_time") @db.Time(6)
+  /// 実行時刻のゆらぎ（分）。**全ブログの投稿ジョブを同一時刻に集中させない**
+  publishJitterMin       Int              @default(0) @map("publish_jitter_min")
+  /// WordPress のパーマリンク様式。**初回設定後に変更しない**
+  ///
+  /// 変えるとURLが全部変わり、**それまでの被リンクと評価が切れる。**
+  /// 必要になったらリダイレクトを伴う別タスクで扱う（W-8）
+  permalinkPattern       PermalinkPattern @default(POSTNAME) @map("permalink_pattern")
+  /// 初期記事数（28〜34）。**ブログごとに散らす**
+  initialArticleCount    Int              @default(30) @map("initial_article_count")
+  createdAt              DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   user            User                     @relation(fields: [userId], references: [id], onDelete: Restrict)
   genre           Genre?                   @relation(fields: [genreId], references: [id], onDelete: SetNull)
