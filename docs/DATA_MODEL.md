@@ -131,7 +131,9 @@ writing_rules = { headingDepth: number; leadLength: number; bulletFrequency: "lo
 | 列 | 扱い |
 |---|---|
 | `target_reader` | **A-2-R-2d でコードから外した。** 読者像は `personas.audience` が持つ。列の削除は A-2-R-3 |
-| `allowed_experiences` | A-2-R-2e でコードから外す。列の削除は A-2-R-3 |
+| `allowed_experiences` | **A-2-R-2e でコードから外した。** 列の削除は A-2-R-3 |
+
+**「使ってよい体験」を媒体ごとに選び直さない**（A-2-R-2e）。記憶は分身に溜まり、その分身の媒体は1件なので、選ぶ対象がそもそも1組しかない。**記事生成は `persona_facts` を `user_id` +（`blog_id` または `null`）で引いており、`allowed_experiences` を読んでいなかった** — D-6 で入口だけを足し、読む側を作らないまま残っていた。
 
 **読者像を媒体側から上書きさせない。** 分身が「誰に向けて書く人か」を持ち、媒体はそれを変えない。**同じことを2か所に置くと、どちらが正か分からなくなる。** 読者を変えたいなら別の分身を立てる。
 

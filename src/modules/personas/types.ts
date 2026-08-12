@@ -121,13 +121,6 @@ export interface AppBlogPersonaSetting {
   /** 記事の署名に使う名前 */
   penName: string;
   toneOverride: ToneOverride;
-  /**
-   * 使ってよい体験（`persona_facts` のID）。
-   *
-   * **A-2-R-2e で外す。** 記憶は分身に溜まり、その分身の媒体は1つなので、
-   * 媒体ごとに選び直す意味が無くなった。列の削除は A-2-R-3。
-   */
-  allowedExperiences: string[];
   /** 触れない話題 */
   ngTopics: string[];
   writingRules: WritingRules;

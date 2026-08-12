@@ -202,7 +202,6 @@ interface BlogSettingRow {
   blogId: string;
   penName: string;
   toneOverride: unknown;
-  allowedExperiences: string[];
   ngTopics: string[];
   writingRules: unknown;
   createdAt: Date;
@@ -214,7 +213,6 @@ const BLOG_SETTING_SELECT = {
   blogId: true,
   penName: true,
   toneOverride: true,
-  allowedExperiences: true,
   ngTopics: true,
   writingRules: true,
   createdAt: true,
@@ -227,7 +225,6 @@ function toAppBlogSetting(row: BlogSettingRow): AppBlogPersonaSetting {
     blogId: row.blogId,
     penName: row.penName,
     toneOverride: row.toneOverride as ToneOverride,
-    allowedExperiences: row.allowedExperiences,
     ngTopics: row.ngTopics,
     writingRules: row.writingRules as WritingRules,
     createdAt: row.createdAt,
@@ -267,9 +264,8 @@ export async function findBlogPersonaSettingForUser(params: {
 /**
  * ブログ別設定を保存する（完了条件「ブログ別の上書き設定が保存される」）。
  *
- * **`allowed_experiences` は受け取らない。** 参照先の `persona_facts` は
- * D-6 で作る。所有権を確かめられないIDを受け取ると、他人の体験を
- * 引き当てられる（C-6 で見つけたのと同じ形）。**入口は D-6 で足す。**
+ * **媒体別の上書きだけを持つ**（A-2-R-2d・A-2-R-2e）。読者像は
+ * `personas.audience`、使ってよい体験は分身の `persona_facts` が全部。
  */
 export async function saveBlogPersonaSettingForUser(
   params: { userId: string; blogId: string },
@@ -536,8 +532,11 @@ export async function updatePersonaFactForUser(
  * 事実を消す。
  *
  * **物理削除する。** 本人の経験の記録で、間違って入れたものを残す理由が
- * 無い（投稿や案件と違い、外部に痕跡が残らない）。**参照している
- * `allowed_experiences` からも外す。**
+ * 無い（投稿や案件と違い、外部に痕跡が残らない）。
+ *
+ * **参照を掃除する相手がもう無い**（A-2-R-2e）。D-6 では
+ * `blog_persona_settings.allowed_experiences` から外していたが、
+ * その列を使うのをやめた。
  */
 export async function deletePersonaFactForUser(params: {
   userId: string;
@@ -545,67 +544,7 @@ export async function deletePersonaFactForUser(params: {
 }): Promise<void> {
   await requirePersonaFactForUser(params);
 
-  await prisma.$transaction(async (tx) => {
-    await tx.personaFact.deleteMany({
-      where: { id: params.factId, userId: params.userId },
-    });
-
-    // 消した事実へのIDが残ると、記事生成が引けない参照を掴む
-    const settings = await tx.blogPersonaSetting.findMany({
-      where: { allowedExperiences: { has: params.factId } },
-      select: { id: true, allowedExperiences: true },
-    });
-
-    for (const setting of settings) {
-      await tx.blogPersonaSetting.update({
-        where: { id: setting.id },
-        data: {
-          allowedExperiences: setting.allowedExperiences.filter(
-            (value) => value !== params.factId,
-          ),
-        },
-      });
-    }
+  await prisma.personaFact.deleteMany({
+    where: { id: params.factId, userId: params.userId },
   });
-}
-
-/**
- * ブログ別設定の「使ってよい体験」を設定する（D-5 で保留した入口）。
- *
- * **渡されたIDが自分の事実か確かめる。** 確かめずに保存すると、他人の
- * 体験を引き当てられる（C-6 で見つけたのと同じ形）。D-5 の時点では
- * `persona_facts` が無かったため入口を出さなかった。
- *
- * @throws {AppError} 他人のブログ・自分のものでない事実（404）
- */
-export async function setAllowedExperiencesForUser(
-  params: { userId: string; blogId: string },
-  factIds: readonly string[],
-): Promise<AppBlogPersonaSetting> {
-  const setting = await findBlogPersonaSettingForUser(params);
-
-  if (setting === null) {
-    throw personaNotFoundError();
-  }
-
-  const unique = [...new Set(factIds)];
-
-  if (unique.length > 0) {
-    const owned = await prisma.personaFact.findMany({
-      where: { id: { in: unique }, userId: params.userId },
-      select: { id: true },
-    });
-
-    if (owned.length !== unique.length) {
-      throw notFoundError('事実');
-    }
-  }
-
-  const row = await prisma.blogPersonaSetting.update({
-    where: { blogId: setting.blogId },
-    data: { allowedExperiences: unique },
-    select: BLOG_SETTING_SELECT,
-  });
-
-  return toAppBlogSetting(row);
 }
