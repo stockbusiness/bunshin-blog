@@ -335,7 +335,8 @@ B-1 が実装したのは**サーバー側のIDトークン検証**であり、�
 | H-3b-schema | リンク切れの状態を持つ列 | A-2 | マイグレーションのみ。`affiliate_offers` に `link_checked_at` / `link_broken_at`（Q-029） | `prisma/` |
 | H-3b | リンク切れの状態を保存して見せる | H-3b-schema, H-3 | 確認の結果を保存し、**いつから切れているか**が画面で分かる（SPEC 6.1「エラー」） | `src/modules/affiliate/` `src/app/liff/` |
 | H-12 | 監査ログを SPEC 14.4 に揃える | H-11 | **承認・公開・WordPress接続変更**が `audit_logs` に残る（Q-027）。残り4種類（ログイン・案件URL変更・ジョブ再実行・AIプロンプト変更）は後続 | `src/modules/approvals/` `src/modules/wordpress/` `src/app/api/jobs/` |
-| H-2 | オンボーディング（LIFF 10ステップ） | H-1, C-2, D-1, D-12 | 中断・再開ができる。**`/go/` 用スニペットの導入がステップに含まれる**（Q-001 の再決定） | `src/app/liff/onboarding/` |
+| D-14 | 分身のAPIと画面 | A-2-R-4-schema | `POST/GET/PATCH /api/personas`、使い始める・止める。LIFFで分身を作れる。**上限と段階解放の理由が画面に出る**（「上限です」だけにしない）。**H-2 の前に要る** — 分身が無いとブログを作れない（Q-035） | `src/app/api/personas/` `src/app/liff/personas/` |
+| H-2 | オンボーディング（LIFF 10ステップ） | H-1, C-2, D-1, D-12, D-14 | 中断・再開ができる。**`/go/` 用スニペットの導入がステップに含まれる**（Q-001 の再決定） | `src/app/liff/onboarding/` |
 | H-3 | エラー通知とサポート依頼 | F-2 | 接続切れ・リンク切れ・案件終了が緊急通知される | `src/modules/line/` |
 | H-4 | 退会・停止処理 | B-2 | 物理削除せずCLOSED。データエクスポートができる | `src/modules/users/` |
 | H-5 | バックアップ | A-2 | 日次バックアップと復旧手順が文書化されている | `docs/` |
