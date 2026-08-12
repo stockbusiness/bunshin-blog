@@ -20,6 +20,7 @@
  */
 
 import { prisma } from '@/lib/db';
+import { recordAuditInTx } from '@/modules/audit';
 import { setItemStatusInTx } from '@/modules/content-planning';
 import { buildIdempotencyKey, enqueueJobInTx } from '@/modules/jobs';
 import { findApprovalForUser, type AppApproval } from './repository';
@@ -209,6 +210,27 @@ async function decide(params: {
       from: ['READY_FOR_REVIEW'],
       to: params.itemStatus,
     });
+
+    // **承認だけを残す**（SPEC 14.4「承認」、H-12）。見送り・修正依頼は
+    // 14.4 の一覧に無く、全ての決定を残すと異常が埋もれる。
+    //
+    // **同じトランザクションで書く。** 承認が巻き戻ったのに
+    // 「承認した」記録だけが残ると、実験の記録が実際と食い違う。
+    // 二度押しはここへ来ない（上で同じ答えは早く返している）
+    if (params.to === 'APPROVED') {
+      await recordAuditInTx(tx, {
+        actorUserId: params.userId,
+        action: 'ARTICLE_APPROVED',
+        entityType: 'approval',
+        entityId: params.approvalId,
+        // **本文もタイトルも入れない。** 追えれば足りる（SPEC 14.2）
+        metadata: {
+          blogId: found.blogId,
+          contentItemId: found.contentItemId,
+          articleVersionId: found.articleVersionId,
+        },
+      });
+    }
 
     if (params.enqueuePost === true) {
       // **冪等キーは記事ID。** 同じ記事に二度積まない（C-4）

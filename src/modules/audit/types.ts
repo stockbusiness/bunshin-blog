@@ -1,17 +1,28 @@
 /**
  * 監査ログの語彙（TASKS H-11、SPEC 5.20、Q-018）。
  *
- * ## 何を残すのか
+ * ## 何を残すのか（SPEC 14.4 の8種類）
  *
- * SPEC が `audit_logs` への記録を求めているのは2か所。
- *
- * | 箇所 | 内容 |
+ * | 項目 | 状態 |
  * |---|---|
- * | SPEC 9.2.2 | 停止条件を**承知で進めた**選択（E-4） |
- * | Q-008 の決定 | ADMIN による介入 |
+ * | ログイン | 未（後続） |
+ * | WordPress接続変更 | **H-12** |
+ * | 案件URL変更 | 未（後続） |
+ * | 承認 | **H-12** |
+ * | 公開 | **H-12** |
+ * | 管理者介入 | H-1 |
+ * | ジョブ再実行 | 未（後続） |
+ * | AIプロンプト変更 | 未（後続） |
  *
- * どちらも「**普通ではないことが起きた**」記録である。正常系を全部
- * 残すログではない — 全部残すと、後から見たときに異常が埋もれる。
+ * 加えて SPEC 9.2.2 の「承知で進める」（14.4 の一覧には無い）。
+ *
+ * H-11 は「**普通ではないことが起きた**」記録だけを入れていたが、
+ * SPEC 14.4 は**正常系のうち後から辿れないと困るもの**も求めている
+ * （Q-027）。**承認と公開が最も重い** — 実験の結果を振り返るとき、
+ * 誰がいつ何を通したかが分からないと検証できない。
+ *
+ * それでも**全ての正常系を残すログにはしない。** 全部残すと、
+ * 後から見たときに異常が埋もれる。
  *
  * ## `action` を文字列の自由入力にしない
  *
@@ -35,12 +46,33 @@ export const AUDIT_ACTIONS = [
   'MONITOR_WITHDRAWN',
   /** ADMIN がブログの接続先を変えた（Q-008 の救済手順） */
   'BLOG_SITE_URL_CHANGED',
+  /** モニターが提案を承認した（H-12、SPEC 14.4「承認」） */
+  'ARTICLE_APPROVED',
+  /**
+   * 記事を WordPress へ送った（H-12、SPEC 14.4「公開」）。
+   *
+   * **Phase 0 で作るのは下書きだけ**（SPEC 7）。公開はモニターが
+   * WordPress 側で行うので、こちらが記録できるのはここまで
+   */
+  'ARTICLE_POSTED',
+  /** WordPress の接続情報を登録・更新した（H-12、SPEC 14.4） */
+  'WORDPRESS_CONNECTED',
+  /** WordPress の接続を切った（H-12、SPEC 14.4） */
+  'WORDPRESS_DISCONNECTED',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
 /** 記録の対象（SPEC 5.20 の `entity_type`） */
-export const AUDIT_ENTITY_TYPES = ['user', 'blog', 'planning_run'] as const;
+export const AUDIT_ENTITY_TYPES = [
+  'user',
+  'blog',
+  'planning_run',
+  /** 承認（H-12） */
+  'approval',
+  /** 記事（H-12。投稿の対象） */
+  'content_item',
+] as const;
 
 export type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number];
 

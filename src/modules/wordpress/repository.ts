@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { decryptSecret, encryptSecret, getEncryptionKey } from '@/lib/crypto';
+import { recordAudit } from '@/modules/audit';
 import { notFoundError, requireBlogForUser } from '@/modules/blogs';
 import { createWordpressClient, type WordpressClient } from './client';
 import {
@@ -162,7 +163,21 @@ export async function connectWordpressForUser(
 ): Promise<AppWordpressConnection> {
   const blogId = await requireOpenBlogId(params);
 
-  return connectWordpress({ blogId, input }, deps);
+  const connection = await connectWordpress({ blogId, input }, deps);
+
+  // **接続の変更を残す**（SPEC 14.4「WordPress接続変更」、H-12）。
+  // **接続情報は入れない** — ユーザー名もアプリケーションパスワードも
+  // 秘密で、監査ログに入れてよい値ではない（SPEC 14.2）。
+  // 残すのは「どのブログの接続が、いつ、どこへ向いたか」だけ
+  await recordAudit({
+    actorUserId: params.userId,
+    action: 'WORDPRESS_CONNECTED',
+    entityType: 'blog',
+    entityId: blogId,
+    metadata: { siteUrl: connection.siteUrl },
+  });
+
+  return connection;
 }
 
 /** 接続を切る。行は残し、`site_url` を保持する（Q-007） */
@@ -172,7 +187,18 @@ export async function disconnectWordpressForUser(params: {
 }): Promise<AppWordpressConnection> {
   const blogId = await requireOpenBlogId(params);
 
-  return disconnectWordpress({ blogId }, deps);
+  const connection = await disconnectWordpress({ blogId }, deps);
+
+  // **切ったことも「接続変更」**（SPEC 14.4、H-12）。投稿が止まった理由を
+  // 後から辿るのに要る
+  await recordAudit({
+    actorUserId: params.userId,
+    action: 'WORDPRESS_DISCONNECTED',
+    entityType: 'blog',
+    entityId: blogId,
+  });
+
+  return connection;
 }
 
 /** 接続の状態を返す。未接続なら `null`。認証情報は含まない */
@@ -337,7 +363,8 @@ export async function publishDraftForUser(
   });
 
   // **内容が同じなら記録も変えない**（C-5）。`posted_at` を進めると、
-  // 何もしていないのに投稿し直したように見える
+  // 何もしていないのに投稿し直したように見える。
+  // **監査ログも書かない** — 何も起きていないため
   if (result.skipped) {
     return toAppPost(existingRow as NonNullable<typeof existingRow>);
   }
@@ -363,6 +390,26 @@ export async function publishDraftForUser(
         },
         select: POST_SELECT,
       });
+
+  // **WordPress へ送ったことを残す**（SPEC 14.4「公開」、H-12）。
+  //
+  // **行為者は `null`。** 実際に送るのはジョブで、人が押した瞬間とは
+  // 別の時刻に動く。誰が通したかは直前の `ARTICLE_APPROVED` にある。
+  //
+  // **Phase 0 で作るのは下書きだけ**（SPEC 7）。`wpStatus` を残すので、
+  // 公開の運用が変わっても記録の読み方は変わらない
+  await recordAudit({
+    actorUserId: null,
+    action: 'ARTICLE_POSTED',
+    entityType: 'content_item',
+    entityId: params.contentItemId,
+    metadata: {
+      blogId,
+      wpPostId: saved.wpPostId,
+      wpStatus: saved.wpStatus,
+      created: result.created,
+    },
+  });
 
   return toAppPost(saved);
 }
