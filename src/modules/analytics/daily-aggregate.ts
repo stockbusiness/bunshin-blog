@@ -135,7 +135,11 @@ async function aggregateOneDay(blogId: string, date: JstDate): Promise<number> {
       total.aiReferrals += 1;
     }
 
-    const contentItemId = click.affiliateLink.contentItemId;
+    // `affiliateLink` は D-12 で nullable になった（バナーのクリックが
+    // 同じ表に入るため）。**この問い合わせは `affiliateLink: { blogId }` で
+    // 絞っているので、ここへ来る行は必ず持っている** — 型のために `?.` を置く。
+    // バナーのクリックを `banner_clicks` へ数えるのは D-12 の担当
+    const contentItemId = click.affiliateLink?.contentItemId ?? null;
 
     // **記事に紐づかないクリックは全体にだけ数える**
     if (contentItemId === null) {

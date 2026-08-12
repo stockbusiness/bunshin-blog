@@ -7,7 +7,16 @@
 
 export interface AppLinkClick {
   id: string;
-  affiliateLinkId: string;
+  /**
+   * 案件のリンクのクリックなら設定（D-12）。
+   *
+   * **`bannerId` とどちらか片方だけが入る**（CHECK 制約
+   * `link_clicks_target_exactly_one`）。両方 NULL は何のクリックか分からず、
+   * 両方入ると案件とバナーの両方で数えられてしまう。
+   */
+  affiliateLinkId: string | null;
+  /** バナーのクリックなら設定（D-12・Q-032） */
+  bannerId: string | null;
   /** 参照元のホスト名。取れなければ `null` */
   referrerHost: string | null;
   /**

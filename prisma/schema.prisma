@@ -349,11 +349,11 @@ model MonitorProfile {
 // ============================================================
 
 model Blog {
-  id                String      @id @default(uuid()) @db.Uuid
-  userId            String      @map("user_id") @db.Uuid
-  name              String
-  slug              String
-  genreId           String?     @map("genre_id") @db.Uuid
+  id                     String      @id @default(uuid()) @db.Uuid
+  userId                 String      @map("user_id") @db.Uuid
+  name                   String
+  slug                   String
+  genreId                String?     @map("genre_id") @db.Uuid
   /// どの分身の媒体か。**ブログは分身の媒体である**（A-2-R-3 で必須にした）。
   ///
   /// **`Restrict`。** 分身を消してもブログを道連れにしない。
@@ -363,17 +363,27 @@ model Blog {
   /// `affiliate_links` とまったく同じ形で、理由も同じ —
   /// **依存の向きが `personas → blogs` なので、`blogs` から
   /// 分身の持ち主を確かめられない**（MODULE_RULES 3）
-  personaId         String      @map("persona_id") @db.Uuid
-  penName           String?     @map("pen_name")
-  targetReader      String      @map("target_reader")
-  purpose           BlogPurpose @default(AFFILIATE)
-  status            BlogStatus  @default(SETUP)
-  slotNumber        Int         @map("slot_number")
-  launchDate        DateTime?   @map("launch_date") @db.Date
-  articleRatio      Json        @map("article_ratio")
-  experimentGroupId String?     @map("experiment_group_id") @db.Uuid
-  createdAt         DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  personaId              String      @map("persona_id") @db.Uuid
+  penName                String?     @map("pen_name")
+  targetReader           String      @map("target_reader")
+  purpose                BlogPurpose @default(AFFILIATE)
+  status                 BlogStatus  @default(SETUP)
+  slotNumber             Int         @map("slot_number")
+  launchDate             DateTime?   @map("launch_date") @db.Date
+  articleRatio           Json        @map("article_ratio")
+  experimentGroupId      String?     @map("experiment_group_id") @db.Uuid
+  /// クリック受信API（D-12）の認証。**ハッシュだけを持つ。**
+  ///
+  /// Bunshin は照合しかしないので、原文を持つ理由が無い。DBを読めた相手が
+  /// 他ブログのイベントを投入できるようにしない（`admin_login_tokens` と同じ）。
+  ///
+  /// **`@unique`。** 受信APIはこの1列でブログを引く — トークンが
+  /// ブログを決めるので、他ブログのイベントを名乗れない
+  linkEventTokenHash     String?     @unique @map("link_event_token_hash")
+  /// いつ発行したか。**原文は二度と出せない**ので、画面はこれで「発行済み」を示す
+  linkEventTokenIssuedAt DateTime?   @map("link_event_token_issued_at") @db.Timestamptz(6)
+  createdAt              DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   user            User                     @relation(fields: [userId], references: [id], onDelete: Restrict)
   genre           Genre?                   @relation(fields: [genreId], references: [id], onDelete: SetNull)
@@ -483,16 +493,15 @@ model Persona {
   @@map("personas")
 }
 
-
 model BlogPersonaSetting {
-  id                 String   @id @default(uuid()) @db.Uuid
-  blogId             String   @unique @map("blog_id") @db.Uuid
-  penName            String   @map("pen_name")
-  toneOverride       Json     @map("tone_override")
-  ngTopics           String[] @map("ng_topics")
-  writingRules       Json     @map("writing_rules")
-  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id           String   @id @default(uuid()) @db.Uuid
+  blogId       String   @unique @map("blog_id") @db.Uuid
+  penName      String   @map("pen_name")
+  toneOverride Json     @map("tone_override")
+  ngTopics     String[] @map("ng_topics")
+  writingRules Json     @map("writing_rules")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   blog Blog @relation(fields: [blogId], references: [id], onDelete: Cascade)
 
@@ -507,7 +516,7 @@ model BlogPersonaSetting {
 /// `user_id` と `blog_id` は **A-2-R-3 で落とす。** いま消すと参照している
 /// コードが一斉に壊れるため、移行のあいだだけ並存させる（Q-033）。
 model PersonaFact {
-  id String @id @default(uuid()) @db.Uuid
+  id                String           @id @default(uuid()) @db.Uuid
   /// どの分身の記憶か（A-2-R-4-schema で必須にした）。
   ///
   /// **記憶は媒体ではなく人格に溜まる。** 同じ分身が将来べつの媒体
@@ -594,6 +603,11 @@ model AffiliateOffer {
 model Banner {
   id               String       @id @default(uuid()) @db.Uuid
   blogId           String       @map("blog_id") @db.Uuid
+  /// `/go/{code}` を通すためのコード（D-12）。**バナーも案件と同じ経路で数える。**
+  ///
+  /// 別の経路を作ると、クリックの数え方が2つになり、
+  /// どちらが正しいのかを後から確かめられなくなる
+  code             String       @unique
   name             String
   imageUrl         String       @map("image_url")
   destinationUrl   String       @map("destination_url")
@@ -608,6 +622,7 @@ model Banner {
 
   blog           Blog            @relation(fields: [blogId], references: [id], onDelete: Cascade)
   affiliateOffer AffiliateOffer? @relation(fields: [affiliateOfferId], references: [id], onDelete: SetNull)
+  clicks         LinkClick[]
 
   @@index([blogId, status])
   @@map("banners")
@@ -976,17 +991,27 @@ model AffiliateLink {
 }
 
 /// クリック生イベント。日次で metrics_daily へ集計する
+/// クリックの記録（D-8・D-12）。
+///
+/// **案件のリンクとバナーを同じ表で数える。** 別の表に分けると、
+/// 「クリック」の数え方が2つになり、どちらが正しいのかを後から確かめられない。
+///
+/// **どちらか片方だけが入る**（CHECK 制約 `link_clicks_target_exactly_one`）。
+/// 両方 NULL の行は何のクリックか分からず、両方入った行は二重に数えられる。
 model LinkClick {
   id              String   @id @default(uuid()) @db.Uuid
-  affiliateLinkId String   @map("affiliate_link_id") @db.Uuid
+  affiliateLinkId String?  @map("affiliate_link_id") @db.Uuid
+  bannerId        String?  @map("banner_id") @db.Uuid
   referrerHost    String?  @map("referrer_host")
   isAiReferral    Boolean  @default(false) @map("is_ai_referral")
   userAgentHash   String?  @map("user_agent_hash")
   clickedAt       DateTime @default(now()) @map("clicked_at") @db.Timestamptz(6)
 
-  affiliateLink AffiliateLink @relation(fields: [affiliateLinkId], references: [id], onDelete: Cascade)
+  affiliateLink AffiliateLink? @relation(fields: [affiliateLinkId], references: [id], onDelete: Cascade)
+  banner        Banner?        @relation(fields: [bannerId], references: [id], onDelete: Cascade)
 
   @@index([affiliateLinkId, clickedAt])
+  @@index([bannerId, clickedAt])
   @@map("link_clicks")
 }
 

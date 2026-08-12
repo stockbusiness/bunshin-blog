@@ -37,6 +37,7 @@ export async function recordLinkClick(
     select: {
       id: true,
       affiliateLinkId: true,
+      bannerId: true,
       referrerHost: true,
       isAiReferral: true,
       userAgentHash: true,

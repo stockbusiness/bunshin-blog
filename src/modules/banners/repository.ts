@@ -19,7 +19,7 @@
  */
 
 import { prisma } from '@/lib/db';
-import { findOfferForUser } from '@/modules/affiliate';
+import { findOfferForUser, generateRedirectCode } from '@/modules/affiliate';
 import { notFoundError, requireBlogForUser } from '@/modules/blogs';
 import type {
   AppBanner,
@@ -197,6 +197,8 @@ export async function createBannerForUser(
   const row = await prisma.banner.create({
     data: {
       blogId,
+      // `/go/{code}` を通すためのコード（D-12）。**案件のリンクと同じ作り方**
+      code: generateRedirectCode(),
       name: data.name,
       imageUrl: data.imageUrl,
       destinationUrl: data.destinationUrl,
