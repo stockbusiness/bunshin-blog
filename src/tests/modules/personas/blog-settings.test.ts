@@ -6,19 +6,21 @@ import {
   LEAD_LENGTH_MAX,
   LEAD_LENGTH_MIN,
   PERSONA_ERROR_CODES,
-  normalizeTargetReader,
   normalizeToneOverride,
   normalizeWritingRules,
   resolveEffectivePersona,
   type AppBlogPersonaSetting,
-  type AppUserPersona,
+  type AppPersona,
 } from '@/modules/personas';
 
 /**
- * ブログ別設定と重ね合わせ（TASKS D-5、DATA_MODEL 3章）。
+ * ブログ別設定と重ね合わせ（TASKS D-5、A-2-R-2d、DATA_MODEL 3章）。
  *
  * 完了条件は「**ブログ別の上書き設定が保存される**」。ここで確かめるのは
- * **`tone_override` の未指定項目が共通人格を継承するか**。
+ * **`tone_override` の未指定項目が分身のものを継承するか**。
+ *
+ * **重ねる相手は `Persona`**（A-2-R-2d）。旧 `user_personas` ではない。
+ * 読者像（`audience`）は分身が持ち、媒体側から上書きできない。
  */
 
 const TONE = {
@@ -28,26 +30,43 @@ const TONE = {
   politeness: 'ですます',
 };
 
-const PERSONA: AppUserPersona = {
-  id: 'persona-1',
-  userId: 'user-1',
-  baseProfile: {
-    ageRange: '30代',
-    position: '会社員',
-    firstPerson: '私',
-    background: '美容が好き',
-  },
-  tone: TONE,
-  values: { priorities: ['正直さ'], avoid: ['煽り'] },
-  ngExpressions: ['絶対に'],
-  createdAt: new Date('2026-08-01T00:00:00Z'),
-  updatedAt: new Date('2026-08-01T00:00:00Z'),
-};
-
-const TARGET_READER = {
+const AUDIENCE = {
   ageRange: '20代',
   situation: '初めて選ぶ',
   knowledgeLevel: 'beginner' as const,
+  problems: ['どれを選べばいいか分からない'],
+  searchIntents: ['化粧水 比較'],
+};
+
+const PERSONA: AppPersona = {
+  id: 'persona-1',
+  userId: 'user-1',
+  name: '美容の人',
+  personaType: 'SELF',
+  identity: {
+    name: 'あおい',
+    firstPerson: '私',
+    background: '美容が好き',
+    tone: TONE,
+    values: { priorities: ['正直さ'], avoid: ['煽り'] },
+    ngExpressions: ['絶対に'],
+  },
+  expertise: {
+    fields: ['スキンケア'],
+    sources: ['成分表示'],
+    evaluationCriteria: ['自分で使ったか'],
+  },
+  audience: AUDIENCE,
+  business: {
+    revenuePolicy: '使ったものだけ紹介する',
+    monthlyGoalYen: 30_000,
+    kpis: ['成果件数'],
+    exitCriteria: '3か月で表示回数が伸びなければ畳む',
+  },
+  status: 'ACTIVE',
+  activatedAt: new Date('2026-08-01T00:00:00Z'),
+  createdAt: new Date('2026-08-01T00:00:00Z'),
+  updatedAt: new Date('2026-08-01T00:00:00Z'),
 };
 
 const WRITING_RULES = {
@@ -64,7 +83,6 @@ function setting(
     blogId: 'blog-1',
     penName: 'あおい',
     toneOverride: {},
-    targetReader: TARGET_READER,
     allowedExperiences: [],
     ngTopics: ['医療行為'],
     writingRules: WRITING_RULES,
@@ -116,39 +134,6 @@ describe('normalizeToneOverride', () => {
   });
 });
 
-describe('normalizeTargetReader', () => {
-  it('3項目を整える', () => {
-    expect(normalizeTargetReader(TARGET_READER)).toEqual(TARGET_READER);
-  });
-
-  it.each([['beginner'], ['intermediate'], ['advanced']])(
-    '知識レベル %s を通す',
-    (knowledgeLevel) => {
-      expect(
-        normalizeTargetReader({ ...TARGET_READER, knowledgeLevel })
-          .knowledgeLevel,
-      ).toBe(knowledgeLevel);
-    },
-  );
-
-  it.each([['expert'], ['BEGINNER'], [null]])(
-    '知らない知識レベル %o を拒否する',
-    (knowledgeLevel) => {
-      expect(
-        codeOf(() =>
-          normalizeTargetReader({ ...TARGET_READER, knowledgeLevel }),
-        ),
-      ).toBe(PERSONA_ERROR_CODES.invalidPersona);
-    },
-  );
-
-  it('項目が欠けていれば拒否する', () => {
-    expect(
-      codeOf(() => normalizeTargetReader({ knowledgeLevel: 'beginner' })),
-    ).toBe(PERSONA_ERROR_CODES.invalidPersona);
-  });
-});
-
 describe('normalizeWritingRules', () => {
   it('3項目を整える', () => {
     expect(normalizeWritingRules(WRITING_RULES)).toEqual(WRITING_RULES);
@@ -192,7 +177,7 @@ describe('normalizeWritingRules', () => {
 });
 
 describe('resolveEffectivePersona（完了条件の中心）', () => {
-  /** **未指定の項目は共通人格を継承する**（DATA_MODEL 3章） */
+  /** **未指定の項目は分身のものを継承する**（DATA_MODEL 3章） */
   it('上書きされた項目だけ差し替わる', () => {
     const result = resolveEffectivePersona(
       PERSONA,
@@ -200,12 +185,12 @@ describe('resolveEffectivePersona（完了条件の中心）', () => {
     );
 
     expect(result.tone).toEqual({ ...TONE, emojiLevel: 'none' });
-    // 上書きしていない項目は共通人格のまま
+    // 上書きしていない項目は分身のまま
     expect(result.tone.style).toBe(TONE.style);
     expect(result.tone.politeness).toBe(TONE.politeness);
   });
 
-  it('上書きが空なら共通人格そのまま', () => {
+  it('上書きが空なら分身のまま', () => {
     expect(resolveEffectivePersona(PERSONA, setting()).tone).toEqual(TONE);
   });
 
@@ -227,21 +212,35 @@ describe('resolveEffectivePersona（完了条件の中心）', () => {
     const result = resolveEffectivePersona(PERSONA, setting());
 
     expect(result.penName).toBe('あおい');
-    expect(result.targetReader).toEqual(TARGET_READER);
     expect(result.writingRules).toEqual(WRITING_RULES);
     expect(result.ngTopics).toEqual(['医療行為']);
   });
 
-  // 共通人格の側は上書きの対象外
-  it('共通人格の項目はそのまま渡る', () => {
+  // 分身の側は上書きの対象外
+  it('分身の項目はそのまま渡る', () => {
     const result = resolveEffectivePersona(
       PERSONA,
       setting({ toneOverride: { emojiLevel: 'none' } }),
     );
 
-    expect(result.baseProfile).toEqual(PERSONA.baseProfile);
-    expect(result.values).toEqual(PERSONA.values);
-    expect(result.ngExpressions).toEqual(PERSONA.ngExpressions);
+    expect(result.personaId).toBe(PERSONA.id);
+    expect(result.name).toBe(PERSONA.name);
+    expect(result.firstPerson).toBe(PERSONA.identity.firstPerson);
+    expect(result.background).toBe(PERSONA.identity.background);
+    expect(result.values).toEqual(PERSONA.identity.values);
+    expect(result.ngExpressions).toEqual(PERSONA.identity.ngExpressions);
+    expect(result.expertise).toEqual(PERSONA.expertise);
+  });
+
+  /**
+   * **読者像は分身が持つ**（A-2-R-2d）。旧 `blog_persona_settings.target_reader`
+   * を置き換えたもので、媒体側から上書きできない。
+   */
+  it('読者像は分身のものが渡り、媒体では上書きされない', () => {
+    expect(resolveEffectivePersona(PERSONA, setting()).audience).toEqual(
+      AUDIENCE,
+    );
+    expect(resolveEffectivePersona(PERSONA, null).audience).toEqual(AUDIENCE);
   });
 
   /**
@@ -253,7 +252,6 @@ describe('resolveEffectivePersona（完了条件の中心）', () => {
 
     expect(result.tone).toEqual(TONE);
     expect(result.penName).toBeNull();
-    expect(result.targetReader).toBeNull();
     expect(result.writingRules).toBeNull();
     expect(result.ngTopics).toEqual([]);
   });

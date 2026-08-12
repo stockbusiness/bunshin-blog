@@ -25,6 +25,7 @@ import {
   type KnowledgeLevel,
   type LineBreakStyle,
   type Tone,
+  type WritingRules,
 } from './types';
 
 /** 分身の種類（ROADMAP 2章） */
@@ -108,6 +109,37 @@ export interface AppPersona {
   activatedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+/**
+ * 記事生成が実際に使う人格（E-8 の入力）。
+ *
+ * **分身にブログ別の上書きを重ねたもの**（A-2-R-2d）。呼び出し側に
+ * 「どちらを見るか」を判断させない。
+ *
+ * **読者像（`audience`）は分身が持つ。** 旧 `blog_persona_settings.target_reader`
+ * を置き換えたもので、**同じことを2か所に置かない**（DATA_MODEL 3章）。
+ */
+export interface EffectivePersona {
+  personaId: string;
+  /** 分身の名前。**記事の署名（`penName`）とは別** */
+  name: string;
+  personaType: PersonaType;
+  /** 一人称。記事の文体を決める中心 */
+  firstPerson: string;
+  background: string;
+  /** `identity.tone` に `tone_override` を重ねた結果 */
+  tone: Tone;
+  values: PersonaIdentity['values'];
+  /** 使わない表現 */
+  ngExpressions: string[];
+  expertise: PersonaExpertise;
+  /** 読者像。**分身が持つ**（旧 `blog_persona_settings.target_reader`） */
+  audience: PersonaAudience;
+  /** ブログ別設定が無ければ `null` */
+  penName: string | null;
+  writingRules: WritingRules | null;
+  ngTopics: string[];
 }
 
 export interface CreatePersonaInput {

@@ -55,23 +55,32 @@ export interface CreatedBlog {
   id: string;
   userId: string;
   slotNumber: number;
+  /** この媒体を書く分身（A-2-R-2c） */
+  personaId: string;
 }
 
 /**
  * ブログを作る。
  *
  * `slot_number` は 1〜3 のみ（DB の CHECK 制約 `blogs_slot_range`）。
+ *
+ * **分身も一緒に作る**（A-2-R-2c・A-2-R-2d）。ブログは分身の媒体で、
+ * `persona_id` が無いと記事生成が書き手を決められない。
+ * `personaId` を渡せばその分身に紐づける。
  */
 export async function createBlog(
   prisma: PrismaClient,
   userId: string,
-  overrides: { slotNumber?: number; name?: string } = {},
+  overrides: { slotNumber?: number; name?: string; personaId?: string } = {},
 ): Promise<CreatedBlog> {
   const suffix = nextSuffix();
+  const personaId =
+    overrides.personaId ?? (await createPersona(prisma, userId)).id;
 
   const blog = await prisma.blog.create({
     data: {
       userId,
+      personaId,
       name: overrides.name ?? `ブログ${suffix}`,
       slug: `blog-${suffix}`,
       targetReader: 'テスト読者',
@@ -80,7 +89,12 @@ export async function createBlog(
     },
   });
 
-  return { id: blog.id, userId: blog.userId, slotNumber: blog.slotNumber };
+  return {
+    id: blog.id,
+    userId: blog.userId,
+    slotNumber: blog.slotNumber,
+    personaId,
+  };
 }
 
 /**
@@ -95,7 +109,17 @@ export async function createBlog(
 export async function createPersona(
   prisma: PrismaClient,
   userId: string,
-  overrides: { name?: string; status?: 'DRAFT' | 'ACTIVE' | 'PAUSED' } = {},
+  overrides: {
+    name?: string;
+    status?: 'DRAFT' | 'ACTIVE' | 'PAUSED';
+    /** 文体。**重ね合わせ（A-2-R-2d）を確かめるテストが固定する** */
+    tone?: {
+      style: string;
+      emojiLevel: string;
+      lineBreak: string;
+      politeness: string;
+    };
+  } = {},
 ): Promise<{ id: string }> {
   const suffix = nextSuffix();
 
@@ -108,7 +132,7 @@ export async function createPersona(
         name: `まこと${suffix}`,
         firstPerson: '私',
         background: '30代の会社員',
-        tone: {
+        tone: overrides.tone ?? {
           style: 'やわらかい',
           emojiLevel: 'low',
           lineBreak: 'normal',

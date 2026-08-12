@@ -19,6 +19,8 @@ import {
   resolveEffectivePersona,
 } from './blog-settings';
 import { personaNotFoundError } from './errors';
+import { requirePersonaForUser } from './persona-repository';
+import type { EffectivePersona } from './persona';
 import {
   normalizeCreatePersonaFact,
   normalizeUpdatePersonaFact,
@@ -34,10 +36,8 @@ import type {
   AppUserPersona,
   BaseProfile,
   CreateUserPersonaInput,
-  EffectivePersona,
   PersonaValues,
   SaveBlogPersonaSettingInput,
-  TargetReader,
   Tone,
   ToneOverride,
   UpdateBlogPersonaSettingInput,
@@ -202,7 +202,6 @@ interface BlogSettingRow {
   blogId: string;
   penName: string;
   toneOverride: unknown;
-  targetReader: unknown;
   allowedExperiences: string[];
   ngTopics: string[];
   writingRules: unknown;
@@ -215,7 +214,6 @@ const BLOG_SETTING_SELECT = {
   blogId: true,
   penName: true,
   toneOverride: true,
-  targetReader: true,
   allowedExperiences: true,
   ngTopics: true,
   writingRules: true,
@@ -229,7 +227,6 @@ function toAppBlogSetting(row: BlogSettingRow): AppBlogPersonaSetting {
     blogId: row.blogId,
     penName: row.penName,
     toneOverride: row.toneOverride as ToneOverride,
-    targetReader: row.targetReader as TargetReader,
     allowedExperiences: row.allowedExperiences,
     ngTopics: row.ngTopics,
     writingRules: row.writingRules as WritingRules,
@@ -284,7 +281,9 @@ export async function saveBlogPersonaSettingForUser(
   const write = {
     penName: data.penName,
     toneOverride: data.toneOverride as unknown as Prisma.InputJsonObject,
-    targetReader: data.targetReader as unknown as Prisma.InputJsonObject,
+    // **もう読まない列**（A-2-R-2d）。読者像は `Persona.audience` が持つ。
+    // まだ NOT NULL なので空で埋める。列の削除は A-2-R-3
+    targetReader: {},
     ngTopics: data.ngTopics,
     writingRules: data.writingRules as unknown as Prisma.InputJsonObject,
   };
@@ -326,12 +325,6 @@ export async function updateBlogPersonaSettingForUser(
             toneOverride:
               data.toneOverride as unknown as Prisma.InputJsonObject,
           }),
-      ...(data.targetReader === undefined
-        ? {}
-        : {
-            targetReader:
-              data.targetReader as unknown as Prisma.InputJsonObject,
-          }),
       ...(data.ngTopics === undefined ? {} : { ngTopics: data.ngTopics }),
       ...(data.writingRules === undefined
         ? {}
@@ -349,15 +342,31 @@ export async function updateBlogPersonaSettingForUser(
 /**
  * 記事生成が使う人格を組み立てる（E-8 の入力）。
  *
- * **共通人格が未登録なら404。** ブログ別設定は無くてもよい
- * （設定前のブログでも記事は書けるべき）。
+ * **どの分身で書くかはブログが持つ**（`blogs.persona_id`・A-2-R-2c）。
+ * 利用者に1つしか人格が無かった頃（`user_personas`）は引数に要らなかったが、
+ * **1ユーザーが複数の分身を持つようになったので、媒体から辿る。**
+ *
+ * ブログ別設定は無くてもよい（設定前のブログでも記事は書けるべき）。
+ *
+ * @throws {AppError} 他人のブログ（404）、分身の割り当てが無いブログ（404）
  */
 export async function resolveEffectivePersonaForUser(params: {
   userId: string;
   blogId: string;
 }): Promise<EffectivePersona> {
-  const persona = await requireUserPersonaForUser(params.userId);
-  const setting = await findBlogPersonaSettingForUser(params);
+  const blog = await requireBlogForUser(params);
+
+  // **A-2-R-2c より前に作られたブログだけがここへ来る。**
+  // `blogs.persona_id` は A-2-R-3 で NOT NULL になり、この分岐は消える。
+  // **推測で既定の分身を当てない** — 誰が書いた記事なのかが分からなくなる
+  if (blog.personaId === null) {
+    throw personaNotFoundError();
+  }
+
+  const [persona, setting] = await Promise.all([
+    requirePersonaForUser({ userId: params.userId, personaId: blog.personaId }),
+    findBlogPersonaSettingForUser(params),
+  ]);
 
   return resolveEffectivePersona(persona, setting);
 }

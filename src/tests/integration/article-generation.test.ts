@@ -143,14 +143,22 @@ beforeEach(async () => {
   blogId = blog.id;
 
   // **人格が無いと生成できない**（SPEC 5。D-4）。実際の運用でも
-  // オンボーディングで必ず登録される
-  await prisma.userPersona.create({
+  // オンボーディングで必ず登録される。
+  //
+  // 分身はブログと一緒に作られる（A-2-R-2c）。ここでは
+  // **禁止表現（E-13）だけを、このテストが使う語に差し替える**
+  const persona = await prisma.persona.findUniqueOrThrow({
+    where: { id: blog.personaId },
+    select: { identity: true },
+  });
+
+  await prisma.persona.update({
+    where: { id: blog.personaId },
     data: {
-      userId,
-      baseProfile: { age: '30代', occupation: '会社員' },
-      tone: { politeness: 'desu_masu' },
-      values: { priorities: ['節約'] },
-      ngExpressions: ['絶対に'],
+      identity: {
+        ...(persona.identity as Record<string, unknown>),
+        ngExpressions: ['絶対に'],
+      },
     },
   });
 
