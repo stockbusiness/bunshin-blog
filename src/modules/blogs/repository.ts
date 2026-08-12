@@ -29,7 +29,7 @@ import type { AppBlog, CreateBlogInput, UpdateBlogInput } from './types';
 interface BlogRecord {
   id: string;
   userId: string;
-  personaId: string | null;
+  personaId: string;
   name: string;
   slug: string;
   targetReader: string;

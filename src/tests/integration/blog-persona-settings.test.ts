@@ -290,21 +290,12 @@ describe('記事生成が使う人格', () => {
   });
 
   /**
-   * **分身の割り当てが無いブログでは書き手が決まらない。**
-   * A-2-R-2c より前に作られた行だけがこの状態になりうる
-   * （`blogs.persona_id` は A-2-R-3 で NOT NULL）。
-   * **推測で既定の分身を当てない** — 誰が書いた記事か分からなくなる
+   * **分身の割り当てが無いブログは作れない**（A-2-R-3）。
+   *
+   * A-2-R-2d では「割り当てが無ければ404」を確かめていたが、
+   * `blogs.persona_id` が `NOT NULL` になり、**その状態を作れなくなった。**
+   * 判定はDBへ移ったので、アプリ層のテストは残さない。
    */
-  it('分身の割り当てが無いブログは404', async () => {
-    await prisma.blog.update({
-      where: { id: blog2 },
-      data: { personaId: null },
-    });
-
-    await expect(
-      resolveEffectivePersonaForUser({ userId: owner.id, blogId: blog2 }),
-    ).rejects.toMatchObject({ status: 404 });
-  });
 
   it('他人のブログでは組み立てられない', async () => {
     await expect(
