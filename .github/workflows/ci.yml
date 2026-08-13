@@ -131,15 +131,16 @@ jobs:
                ('blogs_slot_range','content_items_outbound_max',
                 'admin_login_tokens_expiry_after_creation',
                 'admin_login_tokens_used_after_creation',
-                'app_settings_secret_column','app_settings_key_format')")
+                'app_settings_secret_column','app_settings_key_format',
+                'fact_issues_description_not_empty')")
           echo "テーブル数: $TABLES / enum型数: $TYPES / CHECK制約: $CHECKS"
           if [ "$TABLES" -lt 1 ]; then
             echo "::error::テーブルが作成されていない"
             exit 1
           fi
-          # DATA_MODEL 4章でDB側にも入れると定めた6件
-          if [ "$CHECKS" -ne 6 ]; then
-            echo "::error::CHECK制約が6件そろっていない（$CHECKS 件）"
+          # DATA_MODEL 4章でDB側にも入れると定めた6件＋ fact_issues（J-7）
+          if [ "$CHECKS" -ne 7 ]; then
+            echo "::error::CHECK制約が7件そろっていない（$CHECKS 件）"
             exit 1
           fi
 
@@ -225,6 +226,61 @@ jobs:
             exit 1
           fi
           echo "空の公開曜日は拒否された"
+
+          # ── fact_issues（J-7）──────────────────────────
+          #
+          # **記録が空でも通ってしまうと、分母だけが増える。**
+          # 「何か誤りがあった」だけでは数えられても直せない
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c \
+            "insert into content_plans (id, blog_id, plan_type, version,
+                                        strategy_snapshot, updated_at)
+             values ('00000000-0000-0000-0000-0000000000b1',
+                     '00000000-0000-0000-0000-000000000002',
+                     'INITIAL',1,'{}'::jsonb,now())"
+
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c \
+            "insert into content_items (id, content_plan_id, blog_id, sequence_no,
+                                        content_type, title, search_intent, objective,
+                                        inbound_link_item_ids, outbound_link_item_ids,
+                                        publish_priority, updated_at)
+             values ('00000000-0000-0000-0000-0000000000c1',
+                     '00000000-0000-0000-0000-0000000000b1',
+                     '00000000-0000-0000-0000-000000000002',
+                     1,'INFORMATIONAL','t','i','TRAFFIC','{}','{}',1,now())"
+
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c \
+            "insert into article_versions (id, content_item_id, version_no, title,
+                                           excerpt, answer_capsule, body_html,
+                                           faq_json, structured_data_json,
+                                           fact_check_status, risk_flags,
+                                           used_fact_ids, unverified_claims,
+                                           model_provider, model_name, prompt_version,
+                                           input_tokens, output_tokens,
+                                           estimated_cost_usd, content_hash)
+             values ('00000000-0000-0000-0000-0000000000d1',
+                     '00000000-0000-0000-0000-0000000000c1',1,'t','e','a','<p>b</p>',
+                     '[]'::jsonb,'[]'::jsonb,'PASSED','[]'::jsonb,'{}','[]'::jsonb,
+                     'anthropic','m','v1',1,1,0,'x')"
+
+          if psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c \
+            "insert into fact_issues (id, article_version_id, severity, description,
+                                      caught_before_publish, found_at, updated_at)
+             values (gen_random_uuid(),
+                     '00000000-0000-0000-0000-0000000000d1',
+                     'MAJOR','   ',false,now(),now())" \
+            > /dev/null 2>&1; then
+            echo "::error::説明が空の事実誤認が登録できてしまった"
+            exit 1
+          fi
+          echo "空の説明は拒否された"
+
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c \
+            "insert into fact_issues (id, article_version_id, severity, description,
+                                      caught_before_publish, found_at, updated_at)
+             values (gen_random_uuid(),
+                     '00000000-0000-0000-0000-0000000000d1',
+                     'MAJOR','価格が誤っていた',false,now(),now())"
+          echo "中身のある記録は登録できた"
 
       - name: 統合テスト
         run: |

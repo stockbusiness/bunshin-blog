@@ -322,6 +322,7 @@ model User {
   auditLogs      AuditLog[]        @relation("AuditActor")
   loginTokens    AdminLoginToken[]
   appSettings    AppSetting[]      @relation("AppSettingEditor")
+  factIssues     FactIssue[]
 
   @@index([status])
   @@map("users")
@@ -805,6 +806,7 @@ model ArticleVersion {
 
   contentItem ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
   approvals   Approval[]
+  factIssues  FactIssue[]
 
   @@unique([contentItemId, versionNo])
   @@index([factCheckStatus])
@@ -973,6 +975,48 @@ model Job {
   @@index([status, jobType])
   @@index([blogId])
   @@map("jobs")
+}
+
+/// 事実誤認の記録（TASKS J-7、OPEN_QUESTIONS Q-044、SPEC 16.2）。
+///
+/// **「承認・公開前に100%検知」を確かめるための分母。**
+///
+/// これまで記録されていたのは `article_versions.risk_flags` と
+/// `unverified_claims`、つまり**機械が見つけたものだけ**だった。
+/// **見逃したものはどこにも残らず、100%かどうかを言えなかった。**
+///
+/// **公開前に気づいたものも、公開後に見つかったものも、同じ表に入れる。**
+/// 分けると、分母を組み立てるのに2か所を足し合わせることになり、
+/// **片方を数え忘れたときに率が良く出る。**
+model FactIssue {
+  id                  String        @id @default(uuid()) @db.Uuid
+  /// どの版の記事にあった誤りか。**記事ではなく版**（作り直せば直る）
+  articleVersionId    String        @map("article_version_id") @db.Uuid
+  /// SPEC 16.2 が見るのは「**重大な**事実誤認」。軽微なものと分ける
+  severity            IssueSeverity
+  /// 何が誤っていたか。**あとから読んで分かる長さで書く**
+  description         String
+  /// **公開前に気づいたか。** これが分子と分母を分ける唯一の列
+  caughtBeforePublish Boolean       @map("caught_before_publish")
+  /// いつ見つけたか。**記録した時刻ではない**（後からまとめて入れうる）
+  foundAt             DateTime      @map("found_at") @db.Timestamptz(6)
+  /// 誰が見つけたか。**分からなければ `null`**（読者からの指摘など）
+  foundByUserId       String?       @map("found_by_user_id") @db.Uuid
+  createdAt           DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  articleVersion ArticleVersion @relation(fields: [articleVersionId], references: [id], onDelete: Cascade)
+  /// **見つけた人を消しても記録は残す。** 誤りがあった事実は消えない
+  foundBy        User?          @relation(fields: [foundByUserId], references: [id], onDelete: SetNull)
+
+  @@index([articleVersionId])
+  @@index([caughtBeforePublish, severity])
+  @@map("fact_issues")
+}
+
+enum IssueSeverity {
+  MAJOR
+  MINOR
 }
 
 model AuditLog {
