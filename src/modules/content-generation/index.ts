@@ -169,3 +169,15 @@ export {
   MIN_HEADINGS,
   type ThicknessInput,
 } from './thickness';
+
+export {
+  recordFactIssueForAdmin,
+  summarizeFactIssuesForAdmin,
+  listFactIssuesForAdmin,
+  ISSUE_SEVERITIES,
+  ISSUE_DESCRIPTION_MAX_LENGTH,
+  type IssueSeverity,
+  type AppFactIssue,
+  type FactIssueSummary,
+  type RecordFactIssueInput,
+} from './fact-issue';
