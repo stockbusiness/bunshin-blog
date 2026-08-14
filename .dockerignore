@@ -1,0 +1,18 @@
+# 像に入れないもの（Q-045）。
+#
+# **秘密を最優先で外す。** `.env*` を写すと、`docker history` から
+# 読める形で像に残る（SPEC 14.2）。
+
+.git
+.github
+node_modules
+.next
+coverage
+*.tsbuildinfo
+
+.env
+.env.*
+!.env.example
+
+Dockerfile
+.dockerignore

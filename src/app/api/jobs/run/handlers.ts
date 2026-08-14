@@ -397,7 +397,7 @@ export function createJobHandlers(
      * 公開ペースの見直し（G-8b、作業指示書 W-8）。
      *
      * **全ブログを横断する**ので `user_id` を取らない。
-     * 積むのは2週間ごと（`vercel.json` の cron）。
+     * 積むのは2週間ごと（cron から積む・E-1）。
      *
      * **止めたブログは ADMIN へ通知される**（黙って止めない）。
      */

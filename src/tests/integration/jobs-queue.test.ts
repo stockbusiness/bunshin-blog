@@ -175,7 +175,7 @@ describe('取得', () => {
     expect((await claimNextJob(TYPES))?.id).toBe(first.job.id);
   });
 
-  // Vercel の関数は並行して起動しうる。同じ行を二重に取ってはならない
+  // ワーカーは並行して起動しうる。同じ行を二重に取ってはならない
   it('同時に取り合っても同じ行を2回取らない', async () => {
     for (let index = 0; index < 3; index += 1) {
       await enqueueJob({

@@ -197,38 +197,59 @@ npm run build
 
 同時実行は `SELECT ... FOR UPDATE SKIP LOCKED` で取り合う。
 
-### Vercel（サーバーレス）での制約
+### リクエストの中で動かすことの制約
 
-**常駐ワーカーを持てない。** Vercel Cron が `GET /api/jobs/run` を叩き、1回の起動でキューを消化する。設計上の要点は3つ。
+**常駐ワーカーを持てない。** Cloud Scheduler が `GET /api/jobs/run` を叩き、1回の起動でキューを消化する。設計上の要点は3つ。
 
 | 事情 | 対応 |
 |---|---|
-| 関数に実行時間の上限がある | **締め切りを持って抜ける。** 残りは次の起動に回す |
-| 上限を超えると関数が殺される | **`RUNNING` のまま残った行を回収する**（`started_at` が `LEASE_SECONDS` より古いものを `QUEUED` へ戻す） |
+| リクエストに実行時間の上限がある | **締め切りを持って抜ける。** 残りは次の起動に回す |
+| 上限を超えると途中で殺される | **`RUNNING` のまま残った行を回収する**（`started_at` が `LEASE_SECONDS` より古いものを `QUEUED` へ戻す） |
 | 1件が長引くと全体を巻き込む | **ジョブ単位でも時間を区切る** |
 
 再試行の待ち時間は**専用の列を持たず** `updated_at` と `attempt_count` から求める（`backoff.ts` と取得SQLで同じ式）。
 
-**`vercel.json` の cron は毎分。これには Vercel Pro が要る**（Hobby は1日1回まで）。**Pro を使う**（Q-016、2026-08-09）。Hobby だと承認された記事が最大24時間投稿されず、承認の意味が薄れる。
+**cron は毎分**（Cloud Scheduler、Q-045）。承認された記事が数分で投稿されるため。1日1回だと最大24時間投稿されず、承認の意味が薄れる（Q-016 の判断はそのまま生きている）。
 
-### 実行リージョンとデータベース
+### 実行先とデータベース
 
-**アプリもデータベースも東京に置く**（OPEN_QUESTIONS Q-028、2026-08-11）。
+**アプリもデータベースも東京に置く**（OPEN_QUESTIONS Q-028、2026-08-11）。**実行先は Cloud Run**（Q-045、2026-08-14）。
 
 | | 選択 |
 |---|---|
-| アプリ | Vercel Pro、実行リージョン **`hnd1`（東京）** |
+| アプリ | **Google Cloud Run、`asia-northeast1`（東京）** |
 | データベース | **Google Cloud SQL for PostgreSQL（東京）** |
+| つなぎ方 | **Unix ソケット `/cloudsql/<接続名>`。承認済みネットワークは空** |
 
 **同じリージョンに置くことが要点。** ジョブは1件ずつ順番にクエリを投げるため（G-2 の取り込み、G-6 の集計）、アプリとDBが離れていると**1往復ぶんの遅延が何十回も積み上がる**。
 
 **東京にした理由は保管場所。** DBには `line_user_id` と記事本文が入る（SPEC 14.2）。**プロバイダの乗り換えは `pg_dump` で済むが、保管場所を国外から国内へ移すのは同意の取り直しになりうる**（SPEC 6.1 のオンボーディング3）。後から変えると高くつく選択がこれだけなので、最初から国内にする。
 
-**接続プールは拡大したときに足す。** Vercel は関数が同時に何本も立ち上がるため、利用者が増えると**PostgreSQL の接続数を使い切る**。30ブログでは起きない。起きたら PgBouncer か Cloud SQL Auth Proxy を挟む — **これは「足す」変更であって「移す」変更ではない**ので、いま用意しない。
+**Cloud Run にした理由は、DBを公開範囲から外せること。** 接続元のIPが固定されない実行先だと、Cloud SQL の承認済みネットワークに実質 `0.0.0.0/0` を入れることになり、**守りがデータベースのパスワード1つだけ**になる（Q-045）。Cloud Run は Cloud SQL Auth Proxy を内側で動かす — **こちらは承認済みネットワークを通らず、IAM の認証と一時証明書で繋ぐ**ので、**承認済みネットワークを空のままにできる**（`docs/DEPLOY.md` 2.2）。
 
-`CRON_SECRET` が未設定なら**ワーカーは動かない**（fail closed）。`src/lib/env.ts` の必須には入れていない。cron の設定漏れでアプリ全体を止めないため。
+**インスタンスのパブリックIP自体は有効にする。** Cloud SQL はどちらかのIPが必須で、プライベートIPは VPC の設定を要する。**守っているのは承認済みネットワークが空であることで、IPの有無ではない。**
 
-**記事生成（E-10）は関数の上限に収まらない可能性がある。** AI呼び出しは分単位になり得る。E-1 の基盤は1件ごとに時間を区切って失敗として記録するところまでで、**分割は E-10 の課題**として残っている。
+**接続プールは拡大したときに足す。** インスタンスが同時に何本も立ち上がるため、利用者が増えると**PostgreSQL の接続数を使い切る**。30ブログでは起きない。起きたら PgBouncer を挟む — **これは「足す」変更であって「移す」変更ではない**ので、いま用意しない。
+
+`CRON_SECRET` が未設定なら**ワーカーは動かない**（fail closed）。`src/lib/env.ts` の必須には入れていない。cron の設定漏れでアプリ全体を止めないため。**Cloud Scheduler は `Authorization` ヘッダを自分で設定できる**ので、この作りを変えずに済む。
+
+**記事生成（E-10）が長引く問題は、天井だけが外れた。** AI呼び出しは分単位になり得る。Cloud Run のリクエスト上限は最大60分で、**プラットフォーム側の制約は無くなった。** ただし `DRAIN_BUDGET_MS`（50秒）は**cron の間隔に合わせてある**もので、延ばすと消化が重なり**AI呼び出しが同時に何本も走る**。費用と流量の判断なので、実測してから決める（Q-045 の「残る課題」、E-10）。
+
+### 像とデプロイ
+
+| | |
+|---|---|
+| ビルド | `Dockerfile`（Next.js の `output: 'standalone'`）。3段に分ける |
+| 配布 | Artifact Registry |
+| 自動デプロイ | `cloudbuild.yaml`。**`main` への push で像を作り Cloud Run へ出す** |
+
+**段をすべて同じ土台から作る。** Prisma のクエリエンジンは OS と OpenSSL の版に合わせて選ばれる（`binaryTargets` の既定は `native`）。生成した段と実行する段で土台が違うと、**ビルドは通るのに起動して最初のクエリで落ちる。**
+
+**`gcloud run deploy` には `--image` だけを渡す。** 環境変数・Cloud SQL の接続・リクエスト上限は画面で設定したものを残す。指定すると**画面で入れた秘密が毎回消える。**
+
+**マイグレーションは像に入れない。** ビルドは何度も走るので、**その全部が本番DBを触る**ことになる（`docs/DEPLOY.md` 2.2 で手で流す）。
+
+**プレビュー環境は無い**（Q-045 で失うものとして受け入れた）。画面の変更は `npm run dev` で見る。
 
 ---
 
@@ -278,12 +299,12 @@ npm run build
 ```
 POST   /api/auth/liff
 GET    /api/blogs                       POST /api/blogs
-GET    /api/blogs/:id                   PATCH /api/blogs/:id     DELETE /api/blogs/:id
-POST   /api/blogs/:id/wordpress/connect
-POST   /api/blogs/:id/wordpress/test
-DELETE /api/blogs/:id/wordpress/disconnect
+GET    /api/blogs/:blogId               PATCH /api/blogs/:blogId DELETE /api/blogs/:blogId
+POST   /api/blogs/:blogId/wordpress/connect
+POST   /api/blogs/:blogId/wordpress/test
+DELETE /api/blogs/:blogId/wordpress/disconnect
 POST   /api/admin/login                 POST /api/admin/login/verify
-GET    /api/jobs/run                    ← Vercel Cron 専用
+GET    /api/jobs/run                    ← Cloud Scheduler 専用
 GET    /go/:code                        ← アフィリエイトリダイレクタ（認証なし）
 ```
 

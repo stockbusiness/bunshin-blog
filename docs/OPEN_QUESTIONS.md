@@ -2114,7 +2114,7 @@ WordPress 5.6 より前や `wp-admin` を移したサイトでは開けない。
 
   | | 案 | 内容 |
   |---|---|---|
-  | (a) | **Cloud Run（東京）へ移す** | Cloud SQL に**公開IPなしで**繋がる。上限60分。**Dockerfile が要る** |
+  | (a) | **Cloud Run（東京）へ移す** | Cloud SQL に**承認済みネットワークを開けずに**繋がる。上限60分。**Dockerfile が要る** |
   | (b) | Vercel のまま `0.0.0.0/0` を開ける | いま動く。**DBがパスワード1つで守られる** |
   | (c) | Vercel のまま固定IPを買う | Vercel の Secure Compute。**Enterprise が要る** |
   | (d) | DBを Vercel 側の提供元へ戻す | **Q-028 を覆す。保管場所が国外になりうる** |
@@ -2129,10 +2129,21 @@ WordPress 5.6 より前や `wp-admin` を移したサイトでは開けない。
 - **Google Cloud Run、`asia-northeast1`（東京）**
 - **Cloud SQL へは Unix ソケット（`/cloudsql/<接続名>`）で繋ぐ。**
   Cloud Run が Cloud SQL Auth Proxy を内側で動かす。
-  **Cloud SQL のパブリックIPは使わない**
+  **Cloud SQL の承認済みネットワークは空のままにする**
 - **cron は Cloud Scheduler**。毎分 `GET /api/jobs/run` を叩き、
   ヘッダに `Authorization: Bearer <CRON_SECRET>` を自分で付ける
 - **デプロイは Cloud Build のトリガー**。`main` への push で自動
+
+**2026-08-14 訂正：** 当初ここに「**Cloud SQL のパブリックIPは使わない**」と
+書いたが、**誤り**だった。**Cloud SQL はパブリックIPかプライベートIPの
+どちらかが必須**で、両方外すと保存できない（プライベートIPは VPC の設定を
+要するので Phase 0 では使わない）。
+
+**守っているのは承認済みネットワークが空であることで、IPの有無ではない。**
+Cloud SQL Auth Proxy は**承認済みネットワークを通らず**、IAM の認証と
+一時証明書で繋ぐ。**この判断（Cloud Run を選ぶ理由）は変わらない** —
+Vercel だと承認済みネットワークに `0.0.0.0/0` を入れることになる、
+という点がそのまま残る。
 
 理由：
 
