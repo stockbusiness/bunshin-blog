@@ -65,8 +65,11 @@ const STEP_VIEWS: Record<OnboardingStep, StepView> = {
   },
   BLOG: {
     title: 'ブログの枠をつくる',
+    // **作る画面を指す。** ここが一覧を指していて、一覧が
+    // 「オンボーディングから登録してください」と書いていたため、
+    // 段5がどこからも通せなかった（実地で判明）
     description: '分身が書く媒体です。分身1体につき1つ',
-    href: '/liff/blogs',
+    href: '/liff/blogs/new',
   },
   WORDPRESS: {
     title: 'WordPress をつなぐ',

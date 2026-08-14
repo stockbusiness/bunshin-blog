@@ -117,6 +117,24 @@ describe('はじめの設定', () => {
   });
 
   /**
+   * **段5は一覧ではなく、作る画面を指す。**
+   *
+   * 元は `/liff/blogs` を指していた。その一覧には
+   * 「オンボーディングから登録してください」と書いてあり、
+   * **互いが相手を指していて段5を通せなかった**（実地で判明）。
+   * 段5が塞がると段6以降へ一歩も進めない。
+   */
+  it('ブログの枠をつくる段は、作る画面を指す', async () => {
+    vi.mocked(fetchOnboarding).mockResolvedValue(progress(4));
+
+    render(<OnboardingPage />);
+
+    const blog = (await screen.findByText('ブログの枠をつくる')).closest('li');
+
+    expect(blog?.querySelector('a')).toHaveAttribute('href', '/liff/blogs/new');
+  });
+
+  /**
    * **`LINE_LOGIN` には行き先が要らない。** この画面が見えている時点で
    * 済んでいるので、押せないボタンも「まだありません」も出さない
    */
