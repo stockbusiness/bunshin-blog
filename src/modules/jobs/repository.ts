@@ -153,6 +153,25 @@ export async function enqueueJob(
   // 別の種類の同じ対象と衝突し、後から積んだほうが黙って捨てられる
   assertIdempotencyKey(input.jobType, input.idempotencyKey);
 
+  // **先に引く。** 決まった間隔のジョブは cron が毎分積み直すため、
+  // そのたびに INSERT を失敗させると **Prisma Client 自身が
+  // `prisma:error` を吐く**（こちらの `catch` では止まらない）。
+  // 毎分のノイズで**本物の異常が埋もれる** — 本番で実際に、
+  // メール送信の失敗を探すのに邪魔になった。
+  //
+  // **`upsert` にはしない。** 空の `update` でも `updated_at` が動き、
+  // 再試行の待ち時間がそこから求まる（`backoff.ts`）。毎分触ると
+  // **失敗したジョブが永久に再試行されなくなる。**
+  const found = await prisma.job.findUnique({
+    where: { idempotencyKey: input.idempotencyKey },
+    select: SELECT,
+  });
+
+  if (found !== null) {
+    return { job: toAppJob(found), created: false };
+  }
+
+  // 引いてから作るまでの間に割り込まれることはある。**`catch` は残す**
   try {
     const created = await prisma.job.create({
       data: {
