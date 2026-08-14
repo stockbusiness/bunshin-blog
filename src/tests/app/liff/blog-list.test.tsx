@@ -87,7 +87,12 @@ describe('ブログ一覧', () => {
     expect(await screen.findByText(/ジャンル未設定/)).toBeVisible();
   });
 
-  it('1件も無いときは次にすることを書く', async () => {
+  /**
+   * **元は「オンボーディングから登録してください」と書いてあった。**
+   * だが段5はこの画面を指していたので、**どこにも作る場所が無かった。**
+   * 案内ではなく、行ける入口を出す。
+   */
+  it('1件も無いときは、つくる入口を出す', async () => {
     vi.mocked(fetchBlogs).mockResolvedValue(
       listJson({
         blogs: [],
@@ -98,8 +103,26 @@ describe('ブログ一覧', () => {
     render(<BlogListPage />);
 
     expect(
-      await screen.findByText(/オンボーディングから登録してください/),
-    ).toBeVisible();
+      await screen.findByRole('link', { name: 'ブログをつくる' }),
+    ).toHaveAttribute('href', '/liff/blogs/new');
+  });
+
+  /**
+   * **押しても断られる入口を置かない。** 枠の上限（B-4）が
+   * 「壊れている」に見える。
+   */
+  it('枠が空いていないときは、つくる入口を出さない', async () => {
+    vi.mocked(fetchBlogs).mockResolvedValue(
+      listJson({ slots: { limit: 3, available: [], remaining: 0 } }),
+    );
+
+    render(<BlogListPage />);
+
+    await screen.findByText('節約ブログ');
+
+    expect(
+      screen.queryByRole('link', { name: 'ブログをつくる' }),
+    ).not.toBeInTheDocument();
   });
 
   it('読み込みに失敗すると理由を出す', async () => {

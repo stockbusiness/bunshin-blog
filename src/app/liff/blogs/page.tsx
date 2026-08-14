@@ -12,7 +12,12 @@ import { STATUS_LABELS } from '../_lib/labels';
  * `CLOSED` は一覧に出ないため、`blogs.length` から空きを計算できない
  * （OPEN_QUESTIONS Q-008）。
  *
- * SPEC 6.1 の「追加」はオンボーディング STEP 5（H-2）が担う。
+ * ## 「追加」はここが持つ
+ *
+ * 元は「SPEC 6.1 の『追加』はオンボーディング STEP 5（H-2）が担う」と
+ * 書いてあり、**段5はこの画面を指していた。** 互いに相手が持つと思って
+ * いて、**作る画面はどこにも無かった**（実地で段5が通れず判明）。
+ * いまは `/liff/blogs/new` が持ち、ここと段5の両方から行ける。
  */
 export default function BlogListPage() {
   const [data, setData] = useState<BlogListJson | null>(null);
@@ -59,7 +64,7 @@ export default function BlogListPage() {
 
       {data.blogs.length === 0 ? (
         <p className="mt-6 text-sm leading-relaxed">
-          まだブログがありません。オンボーディングから登録してください。
+          まだブログがありません。下から1つめをつくれます。
         </p>
       ) : (
         <ul className="mt-4 flex flex-col gap-3">
@@ -81,6 +86,19 @@ export default function BlogListPage() {
           ))}
         </ul>
       )}
+
+      {/*
+        **空きがあるときだけ出す。** 押しても断られる入口を置くと、
+        枠の上限が「壊れている」に見える（B-4）
+      */}
+      {data.slots.remaining > 0 ? (
+        <Link
+          href="/liff/blogs/new"
+          className="mt-4 block rounded-lg border p-4 text-center text-sm font-bold"
+        >
+          ブログをつくる
+        </Link>
+      ) : null}
     </main>
   );
 }

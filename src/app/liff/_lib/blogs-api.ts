@@ -53,6 +53,22 @@ export interface BlogListJson {
   slots: { limit: number; available: number[]; remaining: number };
 }
 
+/**
+ * つくるときに送る項目。
+ *
+ * **設定画面より少ない。** `penName` `purpose` `status` は既定のまま作り、
+ * 直したい人だけ設定画面で触る。**枠（`slotNumber`）も送らない** —
+ * 空いている最小の枠をサーバーが割り当てる（B-4）。
+ *
+ * 最初の1つを作るまでに聞くことを増やすと、**そこで止まる**（Q-047）。
+ */
+export interface CreateBlogInput {
+  personaId: string;
+  name: string;
+  slug: string;
+  targetReader: string;
+}
+
 /** 設定画面から送れる項目。ジャンルと算出値は含めない（Q-009・Q-011） */
 export interface BlogSettingsInput {
   name: string;
@@ -114,6 +130,16 @@ export function fetchBlogs(): Promise<BlogListJson> {
 
 export function fetchBlog(blogId: string): Promise<BlogDetailJson> {
   return request<BlogDetailJson>(`/api/blogs/${encodeURIComponent(blogId)}`);
+}
+
+export function createBlog(
+  input: CreateBlogInput,
+): Promise<{ blog: BlogJson }> {
+  return request<{ blog: BlogJson }>('/api/blogs', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+  });
 }
 
 export function saveBlogSettings(
