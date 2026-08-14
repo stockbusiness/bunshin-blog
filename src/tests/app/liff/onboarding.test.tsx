@@ -174,6 +174,39 @@ describe('はじめの設定', () => {
     });
   });
 
+  it('ブログが1つなら、案件の段はそのブログを指す', async () => {
+    vi.mocked(fetchOnboarding).mockResolvedValue(progress(7));
+    vi.mocked(fetchBlogs).mockResolvedValue(ONE_BLOG);
+
+    render(<OnboardingPage />);
+
+    const item = (await screen.findByText('案件を登録する')).closest('li');
+
+    await vi.waitFor(() => {
+      expect(item?.querySelector('a')).toHaveAttribute(
+        'href',
+        '/liff/blogs/blog-1/offers',
+      );
+    });
+  });
+
+  /**
+   * **画面の無い段は一覧のまま。** 存在しない住所を作ると、
+   * 押した先が白い画面になる（段6で実際に起きていた）
+   */
+  it('画面の無い段は、ブログが1つでも一覧のまま', async () => {
+    vi.mocked(fetchOnboarding).mockResolvedValue(progress(6));
+    vi.mocked(fetchBlogs).mockResolvedValue(ONE_BLOG);
+
+    render(<OnboardingPage />);
+
+    const genre = (await screen.findByText('ジャンルを決める')).closest('li');
+    const snippet = screen.getByText('リンク計測を入れる').closest('li');
+
+    expect(genre?.querySelector('a')).toHaveAttribute('href', '/liff/blogs');
+    expect(snippet?.querySelector('a')).toHaveAttribute('href', '/liff/blogs');
+  });
+
   /**
    * **2つ以上あるとき、どのブログの話かを画面が決めない。**
    * 勝手に決めると、別のブログを設定してしまう。
