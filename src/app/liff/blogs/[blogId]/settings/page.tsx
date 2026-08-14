@@ -169,6 +169,12 @@ export default function BlogSettingsPage({
       >
         案件
       </Link>
+      <Link
+        href={`/liff/blogs/${blog.id}/snippet`}
+        className="mt-2 block rounded-lg border p-4 text-sm"
+      >
+        リンク計測のファイル
+      </Link>
 
       <BrokenLinkSection links={brokenLinks} />
 

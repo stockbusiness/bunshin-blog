@@ -114,6 +114,7 @@ const STEP_VIEWS: Record<OnboardingStep, StepView> = {
 const BLOG_STEP_PATHS: Partial<Record<OnboardingStep, string>> = {
   WORDPRESS: 'wordpress',
   OFFER: 'offers',
+  SNIPPET: 'snippet',
 };
 
 function resolveHref(

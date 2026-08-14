@@ -201,10 +201,24 @@ describe('はじめの設定', () => {
     render(<OnboardingPage />);
 
     const genre = (await screen.findByText('ジャンルを決める')).closest('li');
-    const snippet = screen.getByText('リンク計測を入れる').closest('li');
 
     expect(genre?.querySelector('a')).toHaveAttribute('href', '/liff/blogs');
-    expect(snippet?.querySelector('a')).toHaveAttribute('href', '/liff/blogs');
+  });
+
+  it('ブログが1つなら、リンク計測の段はそのブログを指す', async () => {
+    vi.mocked(fetchOnboarding).mockResolvedValue(progress(9));
+    vi.mocked(fetchBlogs).mockResolvedValue(ONE_BLOG);
+
+    render(<OnboardingPage />);
+
+    const item = (await screen.findByText('リンク計測を入れる')).closest('li');
+
+    await vi.waitFor(() => {
+      expect(item?.querySelector('a')).toHaveAttribute(
+        'href',
+        '/liff/blogs/blog-1/snippet',
+      );
+    });
   });
 
   /**
