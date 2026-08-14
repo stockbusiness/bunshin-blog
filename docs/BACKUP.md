@@ -42,7 +42,7 @@ PostgreSQL 16。**これが本体。** すべての業務データが入る。
 | `ENCRYPTION_KEY` | **上記のとおり致命的。** 最優先で別途保管 |
 | `SESSION_SECRET` | 全員がログアウトする。作り直せる（`openssl rand -base64 32`） |
 | `DATABASE_URL` | 接続先。復旧先に合わせて書き換える |
-| `LINE_LOGIN_CHANNEL_ID` | LINEの管理画面から再取得できる |
+| `LINE_LOGIN_CHANNEL_ID` | **環境変数ではなく `app_settings`**（Q-046）。LINEの管理画面から再取得できる |
 
 `app_settings` に入る値（AIのAPIキー、LINEのチャネルアクセストークン、
 Resend のAPIキー）は**DBの中**にあるので、DBのバックアップに含まれる。

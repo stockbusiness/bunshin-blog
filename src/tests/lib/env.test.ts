@@ -7,7 +7,6 @@ import {
 } from '@/lib/env';
 
 const VALID_DATABASE_URL = 'postgresql://user:s3cr3t-pw@localhost:5432/bunshin';
-const VALID_CHANNEL_ID = '1234567890';
 const VALID_SESSION_SECRET = 'x'.repeat(48);
 /** base64 の32バイト。AES-256-GCM の鍵（C-1） */
 const VALID_ENCRYPTION_KEY = Buffer.alloc(32, 9).toString('base64');
@@ -16,7 +15,6 @@ const VALID_ENCRYPTION_KEY = Buffer.alloc(32, 9).toString('base64');
 function validEnv(overrides: Record<string, string | undefined> = {}) {
   return {
     DATABASE_URL: VALID_DATABASE_URL,
-    LINE_LOGIN_CHANNEL_ID: VALID_CHANNEL_ID,
     SESSION_SECRET: VALID_SESSION_SECRET,
     ENCRYPTION_KEY: VALID_ENCRYPTION_KEY,
     ...overrides,
@@ -60,7 +58,6 @@ describe('parseServerEnv', () => {
     const env = parseServerEnv(validEnv());
 
     expect(env.DATABASE_URL).toBe(VALID_DATABASE_URL);
-    expect(env.LINE_LOGIN_CHANNEL_ID).toBe(VALID_CHANNEL_ID);
     expect(env.SESSION_SECRET).toBe(VALID_SESSION_SECRET);
     expect(env.ENCRYPTION_KEY).toBe(VALID_ENCRYPTION_KEY);
   });
@@ -83,12 +80,11 @@ describe('parseServerEnv', () => {
       expect(envError.missing).toEqual([
         'DATABASE_URL',
         'ENCRYPTION_KEY',
-        'LINE_LOGIN_CHANNEL_ID',
         'SESSION_SECRET',
       ]);
       expect(envError.invalid).toEqual([]);
       expect(envError.message).toContain('DATABASE_URL');
-      expect(envError.message).toContain('LINE_LOGIN_CHANNEL_ID');
+      expect(envError.message).toContain('SESSION_SECRET');
       expect(envError.message).toContain('未設定の環境変数');
     }
   });
@@ -152,15 +148,18 @@ describe('parseServerEnv', () => {
     }
   });
 
-  it('数字以外のチャネルIDを拒否する', () => {
-    try {
-      parseServerEnv(validEnv({ LINE_LOGIN_CHANNEL_ID: 'not-a-number' }));
-      expect.unreachable('例外が投げられていない');
-    } catch (error) {
-      expect((error as EnvValidationError).invalid).toEqual([
-        'LINE_LOGIN_CHANNEL_ID',
-      ]);
-    }
+  /**
+   * **チャネルIDは管理画面へ移した**（Q-046）。起動には要らない。
+   * ここに残っていると、LINE のチャネルを作る前にアプリを立てられない。
+   */
+  it('LINE_LOGIN_CHANNEL_ID を起動必須にしていない', () => {
+    expect(() => parseServerEnv(validEnv())).not.toThrow();
+
+    const env = parseServerEnv(
+      validEnv({ LINE_LOGIN_CHANNEL_ID: 'not-a-number' }),
+    );
+
+    expect(env).not.toHaveProperty('LINE_LOGIN_CHANNEL_ID');
   });
 
   it('複数の変数が同時に不正なら全ての名前を報告する', () => {
@@ -172,7 +171,6 @@ describe('parseServerEnv', () => {
       expect(envError.missing).toEqual([
         'DATABASE_URL',
         'ENCRYPTION_KEY',
-        'LINE_LOGIN_CHANNEL_ID',
         'SESSION_SECRET',
       ]);
       expect(envError.invalid).toEqual(['NODE_ENV']);

@@ -25,19 +25,10 @@ const serverEnvSchema = z.object({
       { message: 'postgresql:// または postgres:// で始まる必要があります' },
     ),
 
-  /**
-   * LINE Login チャネルID（B-1）。
-   *
-   * LIFF の IDトークン検証で `client_id` として送り、`aud` の一致確認にも使う。
-   * 数字のみのID。チャネルシークレットではないため秘密ではないが、
-   * 環境ごとに変わるため環境変数で持つ。
-   */
-  LINE_LOGIN_CHANNEL_ID: z
-    .string()
-    .min(1)
-    .refine((value) => /^\d+$/.test(value), {
-      message: '数字のみのチャネルIDである必要があります',
-    }),
+  // `LINE_LOGIN_CHANNEL_ID` はここに無い。**管理画面へ移した**（Q-046）。
+  // 使うのは LIFF の利用者がログインするときで、起動には要らない。
+  // LIFF のエンドポイントにはアプリの公開URLが要るため、**LINE の設定は
+  // アプリを立てた後**にしかできない。起動必須にすると鶏と卵になる。
 
   /**
    * セッションCookieの署名鍵（B-2）。

@@ -22,6 +22,8 @@ export const AUTH_ERROR_CODES = {
   adminRequired: 'AUTH_ADMIN_REQUIRED',
   /** ログインリンクが無効（未登録・期限切れ・使用済み。区別しない・B-11） */
   invalidLoginLink: 'AUTH_INVALID_LOGIN_LINK',
+  /** LINEログインのチャネルIDが未設定（Q-046。**401 に混ぜない**） */
+  liffChannelNotConfigured: 'AUTH_LIFF_CHANNEL_NOT_CONFIGURED',
 } as const;
 
 export type AuthErrorCode =
@@ -52,5 +54,22 @@ export function verificationUnavailableError(cause?: unknown): AppError {
     503,
     '認証サーバーへ接続できませんでした。時間をおいて再度お試しください',
     cause === undefined ? {} : { cause },
+  );
+}
+
+/**
+ * LINEログインのチャネルIDが設定されていないことを表す。
+ *
+ * **`invalidIdTokenError`（401）に混ぜない**（Q-046）。混ぜると、
+ * **こちらの設定漏れが「利用者のトークンがおかしい」に見える。**
+ * 利用者は何度やり直しても入れず、管理者は原因に辿り着けない。
+ *
+ * 500 ではなく 503 にする。**壊れているのではなく、まだ設定していない。**
+ */
+export function liffChannelNotConfiguredError(): AppError {
+  return new AppError(
+    AUTH_ERROR_CODES.liffChannelNotConfigured,
+    503,
+    'LINEログインの設定が済んでいません。管理者にお問い合わせください',
   );
 }
