@@ -96,6 +96,44 @@ describe('投入', () => {
     expect(await prisma.job.count()).toBe(1);
   });
 
+  /**
+   * **積み直しで `updated_at` を動かさない。**
+   *
+   * 再試行の待ち時間は専用の列を持たず `updated_at` と `attempt_count`
+   * から求める（`backoff.ts`）。cron は決まった間隔のジョブを**毎分
+   * 積み直す**ので、そこで `updated_at` に触れると
+   * **失敗したジョブが永久に再試行されなくなる。**
+   *
+   * `upsert` に書き換えると、空の `update` でもここが動いて壊れる。
+   */
+  it('積み直しても updated_at を動かさない', async () => {
+    const first = await enqueueJob({
+      jobType: 'WORDPRESS_POST',
+      idempotencyKey: 'WORDPRESS_POST:item-updated-at',
+      input: { n: 1 },
+    });
+
+    const before = await prisma.job.findUniqueOrThrow({
+      where: { id: first.job.id },
+      select: { updatedAt: true },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    await enqueueJob({
+      jobType: 'WORDPRESS_POST',
+      idempotencyKey: 'WORDPRESS_POST:item-updated-at',
+      input: { n: 2 },
+    });
+
+    const after = await prisma.job.findUniqueOrThrow({
+      where: { id: first.job.id },
+      select: { updatedAt: true },
+    });
+
+    expect(after.updatedAt.getTime()).toBe(before.updatedAt.getTime());
+  });
+
   it('同時に投入しても1件しか積まれない', async () => {
     const results = await Promise.allSettled(
       Array.from({ length: 5 }, () =>
