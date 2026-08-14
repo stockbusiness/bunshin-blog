@@ -4,7 +4,7 @@ import { createOfferForUser, listOffersForUser } from '@/modules/affiliate';
 import { requireConsentedUser } from '@/modules/auth';
 
 /**
- * `GET|POST /api/blogs/:id/offers`（SPEC 13.4、TASKS I-3）
+ * `GET|POST /api/blogs/:blogId/offers`（SPEC 13.4、TASKS I-3）
  *
  * **D-1 でモジュールは作ったが、HTTPの入口が無かった。** D-1 の完了条件が
  * 「ブログ別に分離される」までで、画面から呼べることを含んでいなかった
@@ -53,7 +53,7 @@ const createSchema = z.object({
   endsAt: z.string().datetime().optional(),
 });
 
-type Context = { params: Promise<{ id: string }> };
+type Context = { params: Promise<{ blogId: string }> };
 
 export async function GET(
   request: Request,
@@ -61,9 +61,9 @@ export async function GET(
 ): Promise<Response> {
   try {
     const user = await requireConsentedUser(request.headers.get('cookie'));
-    const { id } = await context.params;
+    const { blogId } = await context.params;
 
-    const offers = await listOffersForUser({ userId: user.id, blogId: id });
+    const offers = await listOffersForUser({ userId: user.id, blogId });
 
     return Response.json({ offers });
   } catch (error) {
@@ -77,7 +77,7 @@ export async function POST(
 ): Promise<Response> {
   try {
     const user = await requireConsentedUser(request.headers.get('cookie'));
-    const { id } = await context.params;
+    const { blogId } = await context.params;
 
     let body: unknown;
     try {
@@ -94,7 +94,7 @@ export async function POST(
     const input = parsed.data;
 
     const offer = await createOfferForUser(
-      { userId: user.id, blogId: id },
+      { userId: user.id, blogId },
       {
         name: input.name,
         aspName: input.aspName,

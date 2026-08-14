@@ -3,7 +3,7 @@ import { requireConsentedUser } from '@/modules/auth';
 import { testWordpressConnectionForUser } from '@/modules/wordpress';
 
 /**
- * `POST /api/blogs/:id/wordpress/test`（SPEC 13.3・7.2、TASKS C-2）
+ * `POST /api/blogs/:blogId/wordpress/test`（SPEC 13.3・7.2、TASKS C-2）
  *
  * **7項目の結果を全て返す。** 「接続できません」だけでは、モニターが
  * 何を直せばよいか分からない（完了条件「権限不足を個別のエラーコードで返す」）。
@@ -15,7 +15,7 @@ import { testWordpressConnectionForUser } from '@/modules/wordpress';
 
 export const runtime = 'nodejs';
 
-type Context = { params: Promise<{ id: string }> };
+type Context = { params: Promise<{ blogId: string }> };
 
 export async function POST(
   request: Request,
@@ -23,11 +23,11 @@ export async function POST(
 ): Promise<Response> {
   try {
     const user = await requireConsentedUser(request.headers.get('cookie'));
-    const { id } = await context.params;
+    const { blogId } = await context.params;
 
     const result = await testWordpressConnectionForUser({
       userId: user.id,
-      blogId: id,
+      blogId,
     });
 
     return Response.json({ result });

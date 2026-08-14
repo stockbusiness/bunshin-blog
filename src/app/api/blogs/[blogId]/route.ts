@@ -11,7 +11,7 @@ import {
 } from '@/modules/blogs';
 
 /**
- * `GET|PATCH|DELETE /api/blogs/:id`（SPEC 13.2、TASKS B-3）
+ * `GET|PATCH|DELETE /api/blogs/:blogId`（SPEC 13.2、TASKS B-3）
  *
  * **他人のブログは 404 を返す。** 403 だと「そのIDは存在する」と伝わり、
  * IDの総当たりで他ユーザーの資源の有無を調べられる。
@@ -41,7 +41,7 @@ const updateSchema = z.object({
     .optional(),
 });
 
-type Context = { params: Promise<{ id: string }> };
+type Context = { params: Promise<{ blogId: string }> };
 
 export async function GET(
   request: Request,
@@ -49,14 +49,14 @@ export async function GET(
 ): Promise<Response> {
   try {
     const user = await requireConsentedUser(request.headers.get('cookie'));
-    const { id } = await context.params;
-    const blog = await requireBlogForUser({ userId: user.id, blogId: id });
+    const { blogId } = await context.params;
+    const blog = await requireBlogForUser({ userId: user.id, blogId });
 
     // **リンク切れは `affiliate` から取る**（MODULE_RULES 1。`blogs` は
     // `affiliate_offers` を触らない）。組み合わせるのは `src/app/` の役目
     const brokenLinks = await listBrokenOfferLinksForUser({
       userId: user.id,
-      blogId: id,
+      blogId,
     });
 
     return Response.json({ blog, brokenLinks });
@@ -71,7 +71,7 @@ export async function PATCH(
 ): Promise<Response> {
   try {
     const user = await requireConsentedUser(request.headers.get('cookie'));
-    const { id } = await context.params;
+    const { blogId } = await context.params;
 
     let body: unknown;
     try {
@@ -86,7 +86,7 @@ export async function PATCH(
     }
 
     const blog = await updateBlogForUser(
-      { userId: user.id, blogId: id },
+      { userId: user.id, blogId },
       parsed.data,
     );
 
@@ -103,8 +103,8 @@ export async function DELETE(
 ): Promise<Response> {
   try {
     const user = await requireConsentedUser(request.headers.get('cookie'));
-    const { id } = await context.params;
-    const blog = await closeBlogForUser({ userId: user.id, blogId: id });
+    const { blogId } = await context.params;
+    const blog = await closeBlogForUser({ userId: user.id, blogId });
 
     return Response.json({ blog });
   } catch (error) {

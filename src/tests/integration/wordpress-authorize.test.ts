@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
-import { GET as authorized } from '@/app/api/blogs/[id]/wordpress/authorized/route';
-import { POST as authorize } from '@/app/api/blogs/[id]/wordpress/authorize/route';
+import { GET as authorized } from '@/app/api/blogs/[blogId]/wordpress/authorized/route';
+import { POST as authorize } from '@/app/api/blogs/[blogId]/wordpress/authorize/route';
 import { buildSessionCookie, createSessionToken } from '@/modules/auth';
 import { createAuthorizeState } from '@/modules/wordpress';
 import {
@@ -110,7 +110,7 @@ describe('承認画面へ送る', () => {
         },
         body: JSON.stringify({ siteUrl: SITE }),
       }),
-      { params: Promise.resolve({ id: ownerBlogId }) },
+      { params: Promise.resolve({ blogId: ownerBlogId }) },
     );
 
     expect(response.status).toBe(200);
@@ -142,7 +142,7 @@ describe('承認画面へ送る', () => {
         },
         body: JSON.stringify({ siteUrl: SITE }),
       }),
-      { params: Promise.resolve({ id: ownerBlogId }) },
+      { params: Promise.resolve({ blogId: ownerBlogId }) },
     );
 
     expect(response.status).toBe(404);
@@ -156,7 +156,7 @@ describe('承認から戻る', () => {
         owner.id,
         approved(stateFor({ userId: owner.id, blogId: ownerBlogId })),
       ),
-      { params: Promise.resolve({ id: ownerBlogId }) },
+      { params: Promise.resolve({ blogId: ownerBlogId }) },
     );
 
     expect(response.status).toBe(302);
@@ -178,7 +178,7 @@ describe('承認から戻る', () => {
         owner.id,
         approved(stateFor({ userId: owner.id, blogId: ownerBlogId })),
       ),
-      { params: Promise.resolve({ id: ownerBlogId }) },
+      { params: Promise.resolve({ blogId: ownerBlogId }) },
     );
 
     const connection = await prisma.wordpressConnection.findFirstOrThrow({
@@ -195,7 +195,7 @@ describe('承認から戻る', () => {
         owner.id,
         approved(stateFor({ userId: owner.id, blogId: ownerBlogId })),
       ),
-      { params: Promise.resolve({ id: ownerBlogId }) },
+      { params: Promise.resolve({ blogId: ownerBlogId }) },
     );
 
     const logs = await prisma.auditLog.findMany({
@@ -216,7 +216,7 @@ describe('受け付けない戻り', () => {
       callbackRequest(owner.id, {
         state: stateFor({ userId: owner.id, blogId: ownerBlogId }),
       }),
-      { params: Promise.resolve({ id: ownerBlogId }) },
+      { params: Promise.resolve({ blogId: ownerBlogId }) },
     );
 
     expect(
@@ -241,7 +241,7 @@ describe('受け付けない戻り', () => {
         owner.id,
         approved(stateFor({ userId: owner.id, blogId: secondBlog })),
       ),
-      { params: Promise.resolve({ id: ownerBlogId }) },
+      { params: Promise.resolve({ blogId: ownerBlogId }) },
     );
 
     expect(
@@ -258,7 +258,7 @@ describe('受け付けない戻り', () => {
         owner.id,
         approved(stateFor({ userId: other.id, blogId: otherBlogId })),
       ),
-      { params: Promise.resolve({ id: otherBlogId }) },
+      { params: Promise.resolve({ blogId: otherBlogId }) },
     );
 
     expect(await connectionCount()).toBe(0);
@@ -274,7 +274,7 @@ describe('受け付けない戻り', () => {
           site_url: 'https://evil.example',
         }),
       ),
-      { params: Promise.resolve({ id: ownerBlogId }) },
+      { params: Promise.resolve({ blogId: ownerBlogId }) },
     );
 
     expect(
@@ -294,7 +294,7 @@ describe('受け付けない戻り', () => {
           site_url: '',
         }),
       ),
-      { params: Promise.resolve({ id: ownerBlogId }) },
+      { params: Promise.resolve({ blogId: ownerBlogId }) },
     );
 
     expect(await connectionCount()).toBe(0);
@@ -307,7 +307,9 @@ describe('受け付けない戻り', () => {
     );
 
     await authorized(callbackRequest(owner.id, approved(forged)), {
-      params: Promise.resolve({ id: ownerBlogId }) as Promise<{ id: string }>,
+      params: Promise.resolve({ blogId: ownerBlogId }) as Promise<{
+        blogId: string;
+      }>,
     });
 
     expect(await connectionCount()).toBe(0);
@@ -320,7 +322,7 @@ describe('受け付けない戻り', () => {
     );
 
     const response = await authorized(new Request(url), {
-      params: Promise.resolve({ id: ownerBlogId }),
+      params: Promise.resolve({ blogId: ownerBlogId }),
     });
 
     expect(response.status).toBe(401);

@@ -12,7 +12,7 @@ import {
 } from '@/modules/banners';
 
 /**
- * `GET|POST /api/blogs/:id/banners`（SPEC 13.5、TASKS I-3）
+ * `GET|POST /api/blogs/:blogId/banners`（SPEC 13.5、TASKS I-3）
  *
  * **D-3 でモジュールは作ったが、HTTPの入口が無かった**（棚卸し・2026-08-12）。
  *
@@ -36,7 +36,7 @@ const createSchema = z.object({
   endsAt: z.string().datetime().optional(),
 });
 
-type Context = { params: Promise<{ id: string }> };
+type Context = { params: Promise<{ blogId: string }> };
 
 export async function GET(
   request: Request,
@@ -44,9 +44,9 @@ export async function GET(
 ): Promise<Response> {
   try {
     const user = await requireConsentedUser(request.headers.get('cookie'));
-    const { id } = await context.params;
+    const { blogId } = await context.params;
 
-    const banners = await listBannersForUser({ userId: user.id, blogId: id });
+    const banners = await listBannersForUser({ userId: user.id, blogId });
 
     return Response.json({ banners });
   } catch (error) {
@@ -60,7 +60,7 @@ export async function POST(
 ): Promise<Response> {
   try {
     const user = await requireConsentedUser(request.headers.get('cookie'));
-    const { id } = await context.params;
+    const { blogId } = await context.params;
 
     let body: unknown;
     try {
@@ -77,7 +77,7 @@ export async function POST(
     const input = parsed.data;
 
     const banner = await createBannerForUser(
-      { userId: user.id, blogId: id },
+      { userId: user.id, blogId },
       {
         name: input.name,
         imageUrl: input.imageUrl,

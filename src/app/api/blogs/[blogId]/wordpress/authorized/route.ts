@@ -9,7 +9,7 @@ import {
 } from '@/modules/wordpress';
 
 /**
- * `GET /api/blogs/:id/wordpress/authorized`（SPEC 7.1 v2.3、TASKS I-8）
+ * `GET /api/blogs/:blogId/wordpress/authorized`（SPEC 7.1 v2.3、TASKS I-8）
  *
  * WordPress の承認画面からの戻り先。
  *
@@ -44,7 +44,7 @@ import {
 
 export const runtime = 'nodejs';
 
-type Context = { params: Promise<{ id: string }> };
+type Context = { params: Promise<{ blogId: string }> };
 
 /** 画面へ戻す。**結果だけを載せ、受け取った値は載せない** */
 function backToBlog(
@@ -64,7 +64,7 @@ export async function GET(
   request: Request,
   context: Context,
 ): Promise<Response> {
-  const { id } = await context.params;
+  const { blogId } = await context.params;
 
   try {
     const user = await requireConsentedUser(request.headers.get('cookie'));
@@ -76,7 +76,7 @@ export async function GET(
     // 失敗ではなく「拒否」として画面へ戻す
     const password = query.get('password');
     if (state === null || password === null || password === '') {
-      return backToBlog(id, 'rejected');
+      return backToBlog(blogId, 'rejected');
     }
 
     const verified = verifyAuthorizeState(state, {
@@ -88,26 +88,26 @@ export async function GET(
     if (
       verified === null ||
       verified.userId !== user.id ||
-      verified.blogId !== id ||
+      verified.blogId !== blogId ||
       !matchesRequestedSite(verified, query.get('site_url'))
     ) {
       // **受け取った値を添えない**（SPEC 14.2）
-      logger.warn('WordPressの認可の戻りを受け付けなかった', { blogId: id });
+      logger.warn('WordPressの認可の戻りを受け付けなかった', { blogId });
 
-      return backToBlog(id, 'failed');
+      return backToBlog(blogId, 'failed');
     }
 
     const userLogin = query.get('user_login');
     if (userLogin === null || userLogin === '') {
-      logger.warn('WordPressの認可の戻りに利用者名が無い', { blogId: id });
+      logger.warn('WordPressの認可の戻りに利用者名が無い', { blogId });
 
-      return backToBlog(id, 'failed');
+      return backToBlog(blogId, 'failed');
     }
 
     // **保存は手で貼ったときと同じ経路を通る**（`connectWordpressForUser`）。
     // 接続先の変更の拒否（Q-007）も監査ログ（H-12）もそこが持つ
     await connectWordpressForUser(
-      { userId: user.id, blogId: id },
+      { userId: user.id, blogId },
       {
         siteUrl: verified.siteUrl,
         wpUsername: userLogin,
@@ -115,7 +115,7 @@ export async function GET(
       },
     );
 
-    return backToBlog(id, 'connected');
+    return backToBlog(blogId, 'connected');
   } catch (error) {
     // **セッションが無い・切れているときだけは、画面へ戻さない。**
     // どのブログの話かを名乗る前に、まずログインしてもらう
@@ -129,10 +129,10 @@ export async function GET(
     // **原因を画面へ出さない。** 接続先の変更の拒否も、
     // WordPress 側の不備も、ここでは同じ「失敗」
     logger.error('WordPressの認可の戻りを処理できなかった', {
-      blogId: id,
+      blogId,
       cause: error,
     });
 
-    return backToBlog(id, 'failed');
+    return backToBlog(blogId, 'failed');
   }
 }
