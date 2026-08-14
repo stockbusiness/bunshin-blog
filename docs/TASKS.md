@@ -414,7 +414,9 @@ B-1 が実装したのは**サーバー側のIDトークン検証**であり、�
 
 | 環境変数のまま | 画面から設定 |
 |---|---|
-| `DATABASE_URL` `ENCRYPTION_KEY` `SESSION_SECRET` `LINE_LOGIN_CHANNEL_ID` `APP_BASE_URL` `CRON_SECRET` `NEXT_PUBLIC_*` | `AI_PROVIDER` `AI_MODEL_*` `AI_PRICE_*` `AI_BUDGET_*` `ANTHROPIC_API_KEY` `RESEND_API_KEY` `MAIL_FROM` LINE Messaging API のトークン |
+| `DATABASE_URL` `ENCRYPTION_KEY` `SESSION_SECRET` `APP_BASE_URL` `CRON_SECRET` `NEXT_PUBLIC_*` | `AI_PROVIDER` `AI_MODEL_*` `AI_PRICE_*` `AI_BUDGET_*` `ANTHROPIC_API_KEY` `RESEND_API_KEY` `MAIL_FROM` `LINE_LOGIN_CHANNEL_ID` LINE Messaging API のトークン |
+
+**`LINE_LOGIN_CHANNEL_ID` は 2026-08-14 に画面側へ移した**（Q-046）。LIFF のエンドポイントにはアプリの公開URLが要るため、**LINE の設定はアプリを立てた後**にしかできない。起動必須にすると鶏と卵になっていた。
 
 画面から設定できるのは、**アプリが動いた後で初めて要るもの**に限る。`NEXT_PUBLIC_*` は
 ビルド時にブラウザへ埋め込まれるため、DBに置いても効かない。

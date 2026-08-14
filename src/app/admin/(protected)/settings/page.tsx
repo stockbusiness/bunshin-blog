@@ -41,7 +41,6 @@ const ENV_ONLY: readonly { name: string; reason: string }[] = [
   { name: 'ENCRYPTION_KEY', reason: '保存された秘密を復号する鍵です' },
   { name: 'SESSION_SECRET', reason: 'この画面へ入る認証に使います' },
   { name: 'APP_BASE_URL', reason: 'ログインのリンクを組み立てます' },
-  { name: 'LINE_LOGIN_CHANNEL_ID', reason: 'LIFF の認証に使います' },
   { name: 'CRON_SECRET', reason: 'アプリの外（cron）から使います' },
   {
     name: 'NEXT_PUBLIC_LIFF_ID',

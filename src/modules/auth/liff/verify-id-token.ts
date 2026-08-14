@@ -1,7 +1,11 @@
 import { z } from 'zod';
-import { getServerEnv } from '@/lib/env';
 import { logger as defaultLogger, type Logger } from '@/lib/logger';
-import { invalidIdTokenError, verificationUnavailableError } from '../errors';
+import { getRuntimeEnv } from '@/modules/settings';
+import {
+  invalidIdTokenError,
+  liffChannelNotConfiguredError,
+  verificationUnavailableError,
+} from '../errors';
 
 /**
  * LIFF の IDトークン検証（TASKS B-1）。
@@ -54,7 +58,10 @@ const verifyResponseSchema = z.object({
 });
 
 export interface VerifyLiffIdTokenOptions {
-  /** 期待するチャネルID。既定は環境変数 `LINE_LOGIN_CHANNEL_ID` */
+  /**
+   * 期待するチャネルID。省くと**管理画面の設定**（`LINE_LOGIN_CHANNEL_ID`）
+   * から読む（Q-046）。
+   */
   channelId?: string;
   /** テストから差し替えるための `fetch` */
   fetchImpl?: typeof fetch;
@@ -63,8 +70,29 @@ export interface VerifyLiffIdTokenOptions {
   logger?: Logger;
 }
 
-function resolveChannelId(options: VerifyLiffIdTokenOptions): string {
-  return options.channelId ?? getServerEnv().LINE_LOGIN_CHANNEL_ID;
+/**
+ * チャネルIDを決める。
+ *
+ * **管理画面 → 環境変数の順**（`getRuntimeEnv`）。DBを先にするのは
+ * 「画面で設定したのに効かない」が最も原因を追いにくいため（H-7）。
+ *
+ * **未設定を「不正なトークン」として扱わない**（Q-046）。混ぜると、
+ * こちらの設定漏れが**利用者のトークンの問題に見える。**
+ */
+async function resolveChannelId(
+  options: VerifyLiffIdTokenOptions,
+): Promise<string> {
+  if (options.channelId !== undefined) {
+    return options.channelId;
+  }
+
+  const configured = (await getRuntimeEnv())['LINE_LOGIN_CHANNEL_ID'];
+
+  if (configured === undefined || configured.trim() === '') {
+    throw liffChannelNotConfiguredError();
+  }
+
+  return configured;
 }
 
 /**
@@ -74,6 +102,7 @@ function resolveChannelId(options: VerifyLiffIdTokenOptions): string {
  *
  * @throws {AppError} 検証に失敗した場合（401）。理由はログにのみ残す
  * @throws {AppError} LINEへ到達できなかった場合（503）
+ * @throws {AppError} チャネルIDが未設定の場合（503・Q-046）
  */
 export async function verifyLiffIdToken(
   idToken: string,
@@ -87,7 +116,7 @@ export async function verifyLiffIdToken(
     throw invalidIdTokenError('IDトークンが空');
   }
 
-  const channelId = resolveChannelId(options);
+  const channelId = await resolveChannelId(options);
 
   let response: Response;
   try {

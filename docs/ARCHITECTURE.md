@@ -99,7 +99,9 @@ SPEC 4.2 のツリーに従い、ソースは全て `src/` 配下に置く（OPE
 
 `src/instrumentation.ts` がサーバー起動時に `getServerEnv()` を呼ぶ。欠落があれば**変数名を表示して `exit 1`** する。`next build` では実行されない。
 
-検証対象は `DATABASE_URL` `LINE_LOGIN_CHANNEL_ID` `SESSION_SECRET` `ENCRYPTION_KEY` `NODE_ENV`。**変数は「それを使うタスク」で追加する。** 未実装機能の変数を先回りして定義しない。
+検証対象は `DATABASE_URL` `SESSION_SECRET` `ENCRYPTION_KEY` `NODE_ENV`。**変数は「それを使うタスク」で追加する。** 未実装機能の変数を先回りして定義しない。
+
+**`LINE_LOGIN_CHANNEL_ID` はここに無い**（Q-046）。使うのは LIFF の利用者がログインするときで、起動には要らない。**LIFF のエンドポイントにはアプリの公開URLが要る**ため、LINE の設定はアプリを立てた後にしかできない — 起動必須にすると鶏と卵になる。管理画面（`/admin/settings` の LINE 群）で設定する。
 
 `APP_BASE_URL` `RESEND_API_KEY` `MAIL_FROM`（B-11）は**あえて必須にしていない**。未設定でも LIFF 側は動く必要があり、メールの設定漏れでサービス全体を止めない。`NEXT_PUBLIC_LIFF_ID`（B-8）はビルド時にバンドルへ焼き付くため、起動時検証に含めない。
 

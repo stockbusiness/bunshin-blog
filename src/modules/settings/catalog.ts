@@ -15,7 +15,13 @@
  * | `ENCRYPTION_KEY` | 保存された秘密を復号する鍵 |
  * | `SESSION_SECRET` | 管理画面へ入るための認証に要る |
  * | `APP_BASE_URL` | 管理者ログインのリンクを組み立てる。画面へ入る前に要る |
+ * | `CRON_SECRET` | cron の呼び出し検証。アプリの外から使う |
  * | `NEXT_PUBLIC_*` | ブラウザ向けはビルド時に埋め込まれる。DBに置いても効かない |
+ *
+ * **`LINE_LOGIN_CHANNEL_ID` はここではなく画面側**（Q-046）。
+ * 使うのは LIFF の利用者がログインするときで、起動にも管理画面の利用にも
+ * 要らない。**LIFF のエンドポイントにはアプリの公開URLが要る**ため、
+ * LINE の設定はアプリを立てた後にしかできない。
  *
  * ## 使う側が無い設定を置かない
  *
@@ -275,6 +281,19 @@ export const SETTING_DEFINITIONS: readonly SettingDefinition[] = [
     description: 'Resend で認証済みのドメインのアドレス',
     secret: false,
     schema: mailAddress,
+  },
+  {
+    key: 'LINE_LOGIN_CHANNEL_ID',
+    group: 'LINE',
+    label: 'LINEログイン チャネルID',
+    description:
+      'LIFF の本人確認に使います。数字のみ。**Messaging API のIDと取り違えないこと**（B-1）',
+    secret: false,
+    // **秘密ではない。** ブラウザにも配られる値で、伏せる意味が無い。
+    // 伏せると、取り違えたときに画面で見比べられなくなる
+    schema: text.refine((value) => /^\d+$/.test(value), {
+      message: '数字のみのチャネルIDを入力してください',
+    }),
   },
   {
     key: 'LINE_CHANNEL_ACCESS_TOKEN',

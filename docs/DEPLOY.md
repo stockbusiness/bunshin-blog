@@ -27,7 +27,9 @@ Cloud Run の環境変数だけに置くと、サービスを消したときに�
 
 ### 0.2 順序を守る
 
-**DB → マイグレーション → サービスの箱 → 環境変数 → デプロイ → cron → 管理者** の順。
+**DB → マイグレーション → サービスの箱 → 環境変数 → デプロイ → cron → 管理者 → 管理画面の設定** の順。
+
+**LINE・AI・メールの設定は最後**（3.3）。**LINE のチャネルは先に作らなくてよい** — LIFF のエンドポイントにはアプリの公開URLが要るので、**アプリが先**（Q-046）。
 
 入れ替えると次のように失敗する。
 
@@ -182,7 +184,6 @@ DATABASE_URL="postgresql://..." npx prisma migrate status
 | 変数 | 作り方 |
 |---|---|
 | `DATABASE_URL` | 2.3（**Cloud Run 用の書き方**） |
-| `LINE_LOGIN_CHANNEL_ID` | LINE Developers → Login チャネル → チャネルID（数字のみ） |
 | `SESSION_SECRET` | `openssl rand -base64 48` |
 | `ENCRYPTION_KEY` | `openssl rand -base64 32`（**0.1 を読んでから**） |
 
@@ -208,7 +209,7 @@ Cloud Run の環境変数に入れても LIFF画面は設定漏れの案内を�
 
 | チャネル | 使うもの | どこに入れるか |
 |---|---|---|
-| **LINE Login** | チャネルID | 環境変数 `LINE_LOGIN_CHANNEL_ID` |
+| **LINE Login** | チャネルID | **管理画面**（`LINE_LOGIN_CHANNEL_ID`。Q-046） |
 | **Messaging API** | チャネルアクセストークン・チャネルシークレット | 管理画面（`LINE_CHANNEL_ACCESS_TOKEN` / `LINE_CHANNEL_SECRET`） |
 
 **Login のチャネルシークレットは使わない。** 署名の検証に使うのは
@@ -233,6 +234,7 @@ Cloud Run の環境変数に入れても LIFF画面は設定漏れの案内を�
 | AI | `AI_PRICE_*` | 費用が計算されず、予算通知（E-15）が鳴らない。**入力と出力の両方**を入れる |
 | AI | `AI_BUDGET_*` | 未設定なら通知しない。**Phase 0 は超過しても停止しない**（SPEC 12.2） |
 | MAIL | `RESEND_API_KEY` `MAIL_FROM` `ADMIN_ALERT_EMAIL` | 管理者ログインと各種通知 |
+| LINE | `LINE_LOGIN_CHANNEL_ID` | **LIFF に誰もログインできない**（503 と専用のコードが返る・Q-046） |
 | LINE | `LINE_CHANNEL_ACCESS_TOKEN` `LINE_CHANNEL_SECRET` `LIFF_BASE_URL` | **提案が届かない。Webhook が 401 になる** |
 | SEARCH_CONSOLE | `GOOGLE_SERVICE_ACCOUNT_KEY` | 検索データが取れない（**後からでよい**） |
 

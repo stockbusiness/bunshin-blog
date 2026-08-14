@@ -28,7 +28,6 @@ describe('設定できる名前', () => {
     ['ENCRYPTION_KEY', '保存された秘密を復号する鍵'],
     ['SESSION_SECRET', '管理画面へ入る認証に要る'],
     ['APP_BASE_URL', 'ログインリンクの組み立て。画面へ入る前に要る'],
-    ['LINE_LOGIN_CHANNEL_ID', 'LIFF の認証に要る'],
     ['CRON_SECRET', 'アプリの外から使う'],
     ['NEXT_PUBLIC_LIFF_ID', 'ビルド時に埋め込まれる'],
     ['NODE_ENV', ''],
@@ -70,7 +69,18 @@ describe('設定できる名前', () => {
    * （webhook の署名検証）で読み手ができたので足した。
    */
   it('まだ誰も読まない設定を並べていない', () => {
-    expect(isSettingKey('LINE_LOGIN_CHANNEL_ID')).toBe(false);
+    expect(isSettingKey('WORDPRESS_APP_PASSWORD')).toBe(false);
+  });
+
+  /**
+   * **チャネルIDはここにある**（Q-046）。起動には要らず、LIFF の
+   * 利用者がログインするときに初めて要る。LIFF のエンドポイントには
+   * アプリの公開URLが要るので、**LINE の設定はアプリを立てた後**にしかできない。
+   */
+  it('LINEログインのチャネルIDが並んでいる', () => {
+    expect(isSettingKey('LINE_LOGIN_CHANNEL_ID')).toBe(true);
+    // **ブラウザにも配られる値。** 伏せると取り違えたときに見比べられない
+    expect(isSecretSetting('LINE_LOGIN_CHANNEL_ID')).toBe(false);
   });
 
   /** 通知に使うトークンは伏せる。飛び先のURLは伏せない（F-2・D-7b） */
