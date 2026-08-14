@@ -8,7 +8,7 @@ import {
 import { requireConsentedUser } from '@/modules/auth';
 
 /**
- * `GET|PATCH|DELETE /api/blogs/:id/offers/:offerId`（SPEC 13.4、TASKS I-3）
+ * `GET|PATCH|DELETE /api/blogs/:blogId/offers/:offerId`（SPEC 13.4、TASKS I-3）
  *
  * **SPEC 13.4 は `/api/offers/:offerId` と書いているが、ブログ配下に置く。**
  * 案件はブログに属し（D-1）、**IDだけで引くと他ブログの案件が取れる**
@@ -61,7 +61,7 @@ const updateSchema = z.object({
   endsAt: z.string().datetime().nullable().optional(),
 });
 
-type Context = { params: Promise<{ id: string; offerId: string }> };
+type Context = { params: Promise<{ blogId: string; offerId: string }> };
 
 function toDate(value: string | null | undefined): Date | null | undefined {
   if (value === undefined || value === null) {
@@ -77,11 +77,11 @@ export async function GET(
 ): Promise<Response> {
   try {
     const user = await requireConsentedUser(request.headers.get('cookie'));
-    const { id, offerId } = await context.params;
+    const { blogId, offerId } = await context.params;
 
     const offer = await requireOfferForUser({
       userId: user.id,
-      blogId: id,
+      blogId,
       offerId,
     });
 
@@ -97,7 +97,7 @@ export async function PATCH(
 ): Promise<Response> {
   try {
     const user = await requireConsentedUser(request.headers.get('cookie'));
-    const { id, offerId } = await context.params;
+    const { blogId, offerId } = await context.params;
 
     let body: unknown;
     try {
@@ -114,7 +114,7 @@ export async function PATCH(
     const input = parsed.data;
 
     const offer = await updateOfferForUser(
-      { userId: user.id, blogId: id, offerId },
+      { userId: user.id, blogId, offerId },
       {
         // **送られた項目だけを渡す。** 省いた項目を `undefined` で
         // 上書きすると、モジュール側が「変えない」と解釈できなくなる
@@ -165,12 +165,12 @@ export async function DELETE(
 ): Promise<Response> {
   try {
     const user = await requireConsentedUser(request.headers.get('cookie'));
-    const { id, offerId } = await context.params;
+    const { blogId, offerId } = await context.params;
 
     // **物理削除しない。** 記事に埋め込んだリンクが残っている（D-1）
     const offer = await endOfferForUser({
       userId: user.id,
-      blogId: id,
+      blogId,
       offerId,
     });
 

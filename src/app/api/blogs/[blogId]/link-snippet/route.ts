@@ -7,7 +7,7 @@ import {
 } from '@/modules/blogs';
 
 /**
- * `POST /api/blogs/:id/link-snippet`（TASKS I-9、D-12）
+ * `POST /api/blogs/:blogId/link-snippet`（TASKS I-9、D-12）
  *
  * **そのブログ専用の `bunshin-go.php` を、値を埋めた形で渡す。**
  *
@@ -35,7 +35,7 @@ import {
 
 export const runtime = 'nodejs';
 
-type Context = { params: Promise<{ id: string }> };
+type Context = { params: Promise<{ blogId: string }> };
 
 export async function POST(
   request: Request,
@@ -43,7 +43,7 @@ export async function POST(
 ): Promise<Response> {
   try {
     const user = await requireConsentedUser(request.headers.get('cookie'));
-    const { id } = await context.params;
+    const { blogId } = await context.params;
 
     const appBaseUrl = process.env['APP_BASE_URL'];
 
@@ -65,7 +65,7 @@ export async function POST(
 
     const issued = await issueLinkEventTokenForUser({
       userId: user.id,
-      blogId: id,
+      blogId,
     });
 
     const snippet = buildLinkSnippet({ token: issued.token, endpoint });

@@ -4,7 +4,7 @@ import { requireConsentedUser } from '@/modules/auth';
 import { syncWordpressPostForUser } from '@/modules/wordpress';
 
 /**
- * `POST /api/blogs/:id/wordpress/sync`（SPEC 13.3、TASKS I-3）
+ * `POST /api/blogs/:blogId/wordpress/sync`（SPEC 13.3、TASKS I-3）
  *
  * **C-5 で同期処理は作ったが、HTTPの入口が無かった**（棚卸し・2026-08-12）。
  *
@@ -26,7 +26,7 @@ const syncSchema = z.object({
   contentItemId: z.string().uuid(),
 });
 
-type Context = { params: Promise<{ id: string }> };
+type Context = { params: Promise<{ blogId: string }> };
 
 export async function POST(
   request: Request,
@@ -34,7 +34,7 @@ export async function POST(
 ): Promise<Response> {
   try {
     const user = await requireConsentedUser(request.headers.get('cookie'));
-    const { id } = await context.params;
+    const { blogId } = await context.params;
 
     let body: unknown;
     try {
@@ -50,7 +50,7 @@ export async function POST(
 
     const post = await syncWordpressPostForUser({
       userId: user.id,
-      blogId: id,
+      blogId,
       contentItemId: parsed.data.contentItemId,
     });
 

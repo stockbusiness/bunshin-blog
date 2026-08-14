@@ -3,13 +3,13 @@ import type { PrismaClient } from '@prisma/client';
 import {
   POST as createOffer,
   GET as listOffers,
-} from '@/app/api/blogs/[id]/offers/route';
+} from '@/app/api/blogs/[blogId]/offers/route';
 import {
   DELETE as endOffer,
   PATCH as patchOffer,
-} from '@/app/api/blogs/[id]/offers/[offerId]/route';
-import { POST as createBanner } from '@/app/api/blogs/[id]/banners/route';
-import { DELETE as endBanner } from '@/app/api/blogs/[id]/banners/[bannerId]/route';
+} from '@/app/api/blogs/[blogId]/offers/[offerId]/route';
+import { POST as createBanner } from '@/app/api/blogs/[blogId]/banners/route';
+import { DELETE as endBanner } from '@/app/api/blogs/[blogId]/banners/[bannerId]/route';
 import { createBlogForUser } from '@/modules/blogs';
 import { buildSessionCookie, createSessionToken } from '@/modules/auth';
 import {
@@ -99,13 +99,13 @@ beforeEach(async () => {
 describe('案件の登録（オンボーディング STEP 8）', () => {
   it('作れて、一覧に出る', async () => {
     const created = await createOffer(request(owner.id, offerBody()), {
-      params: Promise.resolve({ id: ownerBlogId }),
+      params: Promise.resolve({ blogId: ownerBlogId }),
     });
 
     expect(created.status).toBe(201);
 
     const listed = await listOffers(request(owner.id), {
-      params: Promise.resolve({ id: ownerBlogId }),
+      params: Promise.resolve({ blogId: ownerBlogId }),
     });
     const body = (await listed.json()) as { offers: { name: string }[] };
 
@@ -124,7 +124,7 @@ describe('案件の登録（オンボーディング STEP 8）', () => {
   ])('%s は受け取らない', async (key) => {
     const response = await createOffer(
       request(owner.id, offerBody({ [key]: 'REDIRECT' })),
-      { params: Promise.resolve({ id: ownerBlogId }) },
+      { params: Promise.resolve({ blogId: ownerBlogId }) },
     );
 
     expect(response.status).toBe(201);
@@ -144,7 +144,7 @@ describe('案件の登録（オンボーディング STEP 8）', () => {
   it('内容が不正なら422', async () => {
     const response = await createOffer(
       request(owner.id, offerBody({ conversionType: 'UNKNOWN' })),
-      { params: Promise.resolve({ id: ownerBlogId }) },
+      { params: Promise.resolve({ blogId: ownerBlogId }) },
     );
 
     expect(response.status).toBe(422);
@@ -155,7 +155,7 @@ describe('案件の登録（オンボーディング STEP 8）', () => {
 describe('テナント分離（SPEC 14.1）', () => {
   it('他人のブログに案件を作れない', async () => {
     const response = await createOffer(request(other.id, offerBody()), {
-      params: Promise.resolve({ id: ownerBlogId }),
+      params: Promise.resolve({ blogId: ownerBlogId }),
     });
 
     expect(response.status).toBe(404);
@@ -164,11 +164,11 @@ describe('テナント分離（SPEC 14.1）', () => {
 
   it('他人のブログの案件は一覧に出ない', async () => {
     await createOffer(request(owner.id, offerBody()), {
-      params: Promise.resolve({ id: ownerBlogId }),
+      params: Promise.resolve({ blogId: ownerBlogId }),
     });
 
     const listed = await listOffers(request(other.id), {
-      params: Promise.resolve({ id: otherBlogId }),
+      params: Promise.resolve({ blogId: otherBlogId }),
     });
     const body = (await listed.json()) as { offers: unknown[] };
 
@@ -181,12 +181,12 @@ describe('テナント分離（SPEC 14.1）', () => {
    */
   it('他人の案件IDを自分のブログ配下で更新できない', async () => {
     const created = await createOffer(request(owner.id, offerBody()), {
-      params: Promise.resolve({ id: ownerBlogId }),
+      params: Promise.resolve({ blogId: ownerBlogId }),
     });
     const { offer } = (await created.json()) as { offer: { id: string } };
 
     const response = await patchOffer(request(other.id, { name: '書き換え' }), {
-      params: Promise.resolve({ id: otherBlogId, offerId: offer.id }),
+      params: Promise.resolve({ blogId: otherBlogId, offerId: offer.id }),
     });
 
     expect(response.status).toBe(404);
@@ -208,12 +208,12 @@ describe('テナント分離（SPEC 14.1）', () => {
 describe('削除は終了にする', () => {
   it('案件は ENDED になり、行は残る', async () => {
     const created = await createOffer(request(owner.id, offerBody()), {
-      params: Promise.resolve({ id: ownerBlogId }),
+      params: Promise.resolve({ blogId: ownerBlogId }),
     });
     const { offer } = (await created.json()) as { offer: { id: string } };
 
     await endOffer(request(owner.id), {
-      params: Promise.resolve({ id: ownerBlogId, offerId: offer.id }),
+      params: Promise.resolve({ blogId: ownerBlogId, offerId: offer.id }),
     });
 
     expect(
@@ -234,7 +234,7 @@ describe('削除は終了にする', () => {
         destinationUrl: 'https://lp.example.com/offer',
         slot: 'TOP',
       }),
-      { params: Promise.resolve({ id: ownerBlogId }) },
+      { params: Promise.resolve({ blogId: ownerBlogId }) },
     );
 
     expect(created.status).toBe(201);
@@ -242,7 +242,7 @@ describe('削除は終了にする', () => {
     const { banner } = (await created.json()) as { banner: { id: string } };
 
     await endBanner(request(owner.id), {
-      params: Promise.resolve({ id: ownerBlogId, bannerId: banner.id }),
+      params: Promise.resolve({ blogId: ownerBlogId, bannerId: banner.id }),
     });
 
     expect(

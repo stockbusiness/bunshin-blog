@@ -13,7 +13,7 @@ import {
 } from '@/modules/banners';
 
 /**
- * `GET|PATCH|DELETE /api/blogs/:id/banners/:bannerId`（SPEC 13.5、TASKS I-3）
+ * `GET|PATCH|DELETE /api/blogs/:blogId/banners/:bannerId`（SPEC 13.5、TASKS I-3）
  *
  * **ブログ配下に置く**（案件と同じ理由）。`banners.id` は全ブログで
  * 一意なので、IDだけで引くと他ブログのバナーが取れる（SPEC 14.1）。
@@ -42,7 +42,7 @@ const updateSchema = z.object({
   endsAt: z.string().datetime().nullable().optional(),
 });
 
-type Context = { params: Promise<{ id: string; bannerId: string }> };
+type Context = { params: Promise<{ blogId: string; bannerId: string }> };
 
 function toDate(value: string | null | undefined): Date | null | undefined {
   if (value === undefined || value === null) {
@@ -58,11 +58,11 @@ export async function GET(
 ): Promise<Response> {
   try {
     const user = await requireConsentedUser(request.headers.get('cookie'));
-    const { id, bannerId } = await context.params;
+    const { blogId, bannerId } = await context.params;
 
     const banner = await requireBannerForUser({
       userId: user.id,
-      blogId: id,
+      blogId,
       bannerId,
     });
 
@@ -78,7 +78,7 @@ export async function PATCH(
 ): Promise<Response> {
   try {
     const user = await requireConsentedUser(request.headers.get('cookie'));
-    const { id, bannerId } = await context.params;
+    const { blogId, bannerId } = await context.params;
 
     let body: unknown;
     try {
@@ -95,7 +95,7 @@ export async function PATCH(
     const input = parsed.data;
 
     const banner = await updateBannerForUser(
-      { userId: user.id, blogId: id, bannerId },
+      { userId: user.id, blogId, bannerId },
       {
         ...(input.name === undefined ? {} : { name: input.name }),
         ...(input.imageUrl === undefined ? {} : { imageUrl: input.imageUrl }),
@@ -131,12 +131,12 @@ export async function DELETE(
 ): Promise<Response> {
   try {
     const user = await requireConsentedUser(request.headers.get('cookie'));
-    const { id, bannerId } = await context.params;
+    const { blogId, bannerId } = await context.params;
 
     // **物理削除しない。** 記事に埋め込んだバナーが残っている（D-3）
     const banner = await endBannerForUser({
       userId: user.id,
-      blogId: id,
+      blogId,
       bannerId,
     });
 

@@ -3,7 +3,7 @@ import { requireConsentedUser } from '@/modules/auth';
 import { issueLinkEventTokenForUser } from '@/modules/blogs';
 
 /**
- * `POST /api/blogs/:id/link-token` 受信APIのトークンを発行する（TASKS D-12）。
+ * `POST /api/blogs/:blogId/link-token` 受信APIのトークンを発行する（TASKS D-12）。
  *
  * **原文を返すのはここだけ。** DBにはハッシュしか無いので、二度と出せない。
  * 画面は「もう一度見る」を作らず、**必要なら作り直す**。
@@ -16,7 +16,7 @@ import { issueLinkEventTokenForUser } from '@/modules/blogs';
 
 export const runtime = 'nodejs';
 
-type Context = { params: Promise<{ id: string }> };
+type Context = { params: Promise<{ blogId: string }> };
 
 export async function POST(
   request: Request,
@@ -24,11 +24,11 @@ export async function POST(
 ): Promise<Response> {
   try {
     const user = await requireConsentedUser(request.headers.get('cookie'));
-    const { id } = await context.params;
+    const { blogId } = await context.params;
 
     const issued = await issueLinkEventTokenForUser({
       userId: user.id,
-      blogId: id,
+      blogId,
     });
 
     return Response.json({

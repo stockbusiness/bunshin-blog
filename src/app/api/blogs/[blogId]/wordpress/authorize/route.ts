@@ -6,7 +6,7 @@ import { requireBlogForUser } from '@/modules/blogs';
 import { buildAuthorizeUrl, createAuthorizeState } from '@/modules/wordpress';
 
 /**
- * `POST /api/blogs/:id/wordpress/authorize`（SPEC 7.1 v2.3、TASKS I-8）
+ * `POST /api/blogs/:blogId/wordpress/authorize`（SPEC 7.1 v2.3、TASKS I-8）
  *
  * WordPress の承認画面へ送るURLを組み立てて返す。
  *
@@ -26,7 +26,7 @@ const authorizeSchema = z.object({
   siteUrl: z.string().min(1).max(255),
 });
 
-type Context = { params: Promise<{ id: string }> };
+type Context = { params: Promise<{ blogId: string }> };
 
 export async function POST(
   request: Request,
@@ -34,12 +34,12 @@ export async function POST(
 ): Promise<Response> {
   try {
     const user = await requireConsentedUser(request.headers.get('cookie'));
-    const { id } = await context.params;
+    const { blogId } = await context.params;
 
     // **自分のブログであることを先に確かめる**（SPEC 14.1）。
     // 確かめずに `state` を発行すると、**署名付きの依頼そのものが
     // 他人のブログを指せる**
-    const blog = await requireBlogForUser({ userId: user.id, blogId: id });
+    const blog = await requireBlogForUser({ userId: user.id, blogId });
 
     let body: unknown;
     try {

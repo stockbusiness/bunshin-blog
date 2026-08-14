@@ -353,7 +353,7 @@ B-1 が実装したのは**サーバー側のIDトークン検証**であり、�
 | I-5 | E2E の通し試験 | I-1〜I-4 | SPEC 15.3 の流れが、AI・WordPress・LINE を差し替えて**1本の試験で通る** | `src/tests/integration/` |
 | I-6 | 負荷試験 | I-5 | SPEC 15.4（10利用者・30ブログ・30件同時生成・1日60件通知・再実行で重複なし）を満たすことを確かめる | `src/tests/integration/` |
 | I-7 | デプロイ手順書 | — | Vercel の設定・環境変数・cron・DB・`ENCRYPTION_KEY` の作り方が文書化されている | `docs/` |
-| I-8 | WordPress接続の認可フロー | C-2 | モニターが**アプリケーションパスワードを手で発行せず**にブログをつなげる（SPEC 7.1・v2.3）。**手で貼る経路も残る** | `src/app/api/blogs/[id]/wordpress/` `src/modules/wordpress/` |
+| I-8 | WordPress接続の認可フロー | C-2 | モニターが**アプリケーションパスワードを手で発行せず**にブログをつなげる（SPEC 7.1・v2.3）。**手で貼る経路も残る** | `src/app/api/blogs/[blogId]/wordpress/` `src/modules/wordpress/` |
 | I-9 | スニペットが設定を取りに来る | D-12, I-8 | `bunshin-go.php` の導入が**ファイルを1つ置くだけ**になる。トークンの貼り付けとパーマリンクの保存し直しが要らない | `docs/WORDPRESS_SNIPPET.md` `src/app/api/link-events/` |
 | I-10 | 初期構成表を積む経路 | E-9, H-2a | オンボーディングが終わったブログの `PLAN_GENERATION` が積まれる。**整っていないブログは飛ばす** | `src/app/api/onboarding/` |
 

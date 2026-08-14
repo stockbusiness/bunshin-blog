@@ -9,7 +9,7 @@ import {
 } from '@/modules/wordpress';
 
 /**
- * `POST /api/blogs/:id/wordpress/connect`（SPEC 13.3、TASKS C-1）
+ * `POST /api/blogs/:blogId/wordpress/connect`（SPEC 13.3、TASKS C-1）
  *
  * **レスポンスに認証情報を含めない**（SPEC 5.4・14.2）。
  * 返すのは `AppWordpressConnection` で、暗号文の列も復号値も持たない。
@@ -30,7 +30,7 @@ const connectSchema = z.object({
     .max(APP_PASSWORD_MAX_LENGTH * 2),
 });
 
-type Context = { params: Promise<{ id: string }> };
+type Context = { params: Promise<{ blogId: string }> };
 
 export async function POST(
   request: Request,
@@ -38,7 +38,7 @@ export async function POST(
 ): Promise<Response> {
   try {
     const user = await requireConsentedUser(request.headers.get('cookie'));
-    const { id } = await context.params;
+    const { blogId } = await context.params;
 
     let body: unknown;
     try {
@@ -55,7 +55,7 @@ export async function POST(
     }
 
     const connection = await connectWordpressForUser(
-      { userId: user.id, blogId: id },
+      { userId: user.id, blogId },
       parsed.data,
     );
 
