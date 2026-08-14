@@ -163,6 +163,18 @@ export default function BlogSettingsPage({
       >
         WordPress の接続
       </Link>
+      <Link
+        href={`/liff/blogs/${blog.id}/offers`}
+        className="mt-2 block rounded-lg border p-4 text-sm"
+      >
+        案件
+      </Link>
+      <Link
+        href={`/liff/blogs/${blog.id}/snippet`}
+        className="mt-2 block rounded-lg border p-4 text-sm"
+      >
+        リンク計測のファイル
+      </Link>
 
       <BrokenLinkSection links={brokenLinks} />
 

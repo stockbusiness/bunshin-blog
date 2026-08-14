@@ -110,18 +110,27 @@ const STEP_VIEWS: Record<OnboardingStep, StepView> = {
  * **1つに決まらないときは一覧のまま。** 2つ以上あるとき、どのブログの
  * 話かを画面が勝手に決めると、**別のブログを設定してしまう。**
  */
+/** ブログ別の画面がある段。**無い段はここに書かない**（一覧のまま） */
+const BLOG_STEP_PATHS: Partial<Record<OnboardingStep, string>> = {
+  WORDPRESS: 'wordpress',
+  OFFER: 'offers',
+  SNIPPET: 'snippet',
+};
+
 function resolveHref(
   step: OnboardingStep,
   view: StepView,
   onlyBlogId: string | null,
 ): Route | null {
-  if (onlyBlogId === null || step !== 'WORDPRESS') {
+  const path = BLOG_STEP_PATHS[step];
+
+  if (onlyBlogId === null || path === undefined) {
     return view.href;
   }
 
   // 型付きルートは `Link` に直接書いたときだけ形を見てくれる。
   // 関数の戻り値では判定できないため、ここだけ明示する
-  return `/liff/blogs/${onlyBlogId}/wordpress` as Route;
+  return `/liff/blogs/${onlyBlogId}/${path}` as Route;
 }
 
 export default function OnboardingPage() {
