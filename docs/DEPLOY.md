@@ -260,6 +260,29 @@ gcloud artifacts repositories create bunshin-blog \
 **マイグレーションは像に入っていない**（2.4 で手で流す）。ビルドは何度も
 走るので、入れると**その全部が本番DBを触る**。
 
+### 4.1b 最初の1回は手で像を作る
+
+**トリガーを作る前に、手で1回通しておく。** GitHub の接続（OAuth）が
+要らないので、**`Dockerfile` が通ることだけを先に確かめられる。**
+
+```sh
+gcloud builds submit --region=asia-northeast1 \
+  --tag asia-northeast1-docker.pkg.dev/<プロジェクトID>/bunshin-blog/bunshin-blog:manual-1 .
+
+gcloud run deploy bunshin-blog \
+  --image=asia-northeast1-docker.pkg.dev/<プロジェクトID>/bunshin-blog/bunshin-blog:manual-1 \
+  --region=asia-northeast1
+```
+
+**ビルドのサービスアカウントに権限が要る**（既定の Compute SA）。
+
+| 権限 | 無いとどうなるか |
+|---|---|
+| `roles/logging.logWriter` | **ビルドが即座に失敗する**（ログを書けない） |
+| `roles/artifactregistry.writer` | 像を置けない |
+| `roles/run.admin` | Cloud Run へ出せない |
+| `roles/iam.serviceAccountUser` | 同上 |
+
 ### 4.2 自動デプロイ（Cloud Build のトリガー）
 
 **GitHub の `main` への push で、像を作って Cloud Run へ出す。**
@@ -317,9 +340,42 @@ gcloud run deploy bunshin-blog \
 **「Cloud SQL 接続」を追加して初めて `/cloudsql/<接続名>` が現れる。**
 追加を忘れると、`DATABASE_URL` が正しくても**起動して最初のクエリで落ちる。**
 
+**サービスアカウントに `roles/cloudsql.client` が要る。**
+新しいプロジェクトでは**既定の Compute サービスアカウントに何も
+付いていない。** 接続設定も `DATABASE_URL` も正しいのに繋がらない、
+という形で出るので気づきにくい。
+
+```sh
+gcloud projects add-iam-policy-binding <プロジェクトID> \
+  --member="serviceAccount:<プロジェクト番号>-compute@developer.gserviceaccount.com" \
+  --role="roles/cloudsql.client"
+```
+
 **環境変数が欠けているとコンテナが起動しない**（`src/lib/env.ts`）。
 Cloud Run は「コンテナが待ち受けを開始しませんでした」と出す。
 **変数名はログに出る**（値は出さない）。
+
+**まとめて入れるなら、秘密を画面に出さずに済む。**
+
+```sh
+umask 077 && cat > /tmp/env.yaml <<EOF
+DATABASE_URL: "$URL"
+SESSION_SECRET: "$S1"
+ENCRYPTION_KEY: "$S2"
+CRON_SECRET: "$S3"
+APP_BASE_URL: "https://<公開URL>"
+EOF
+gcloud run services update <サービス名> --region=asia-northeast1 \
+  --env-vars-file=/tmp/env.yaml \
+  --add-cloudsql-instances=<接続名> \
+  --timeout=300 --min-instances=0 --max-instances=2
+rm -f /tmp/env.yaml
+```
+
+値は `read -s` で変数へ入れる。**画面にも履歴にも残らない。**
+
+**`--env-vars-file` は全ての環境変数を置き換える。** 後から1つ足すときは
+`--update-env-vars` を使う。ファイルで入れ直すと**前の分が消える。**
 
 ### 4.4 cron（Cloud Scheduler）
 
@@ -430,9 +486,6 @@ VALUES (
 
 ## 8. まだできていないこと
 
-**この手順書は本番環境で実行して確かめていない。**
-実行した結果と食い違ったら、**この文書のほうを直す。**
-
 **いちばん大きいのは、AI・WordPress・LINE を一度も実物で呼んでいないこと。**
 試験はすべて差し替えた相手に対するもので、**実物との最初の接触は本番になる。**
 
@@ -440,14 +493,29 @@ VALUES (
 |---|---|
 | 実AI・実WordPress・実LINEアプリでの確認 | **未実施。** 差し替えた相手としか話していない |
 | 実ブラウザでの画面確認 | 未実施 |
-| この手順書自体の実行 | 未実施 |
-| **`Dockerfile` の実ビルド** | **未実施。** 初回の Cloud Build で分かる |
+| 実物のAIでの記事生成 | 未実施 |
 
-**`Dockerfile` について確かめたところまで：** `output: 'standalone'` の
-ビルドが通ること、**Prisma のクエリエンジンが出力に含まれること**
-（`libquery_engine-debian-openssl-3.0.x.so.node`）、
-その出力を**本番と同じ形で起動してリクエストが通ること**。
-**像そのものを組み立ててはいない。**
+### 済んだところ（2026-08-14）
+
+**2〜4章は実際に実行して確かめた。** 食い違いはその場で直した。
+
+| | |
+|---|---|
+| Cloud SQL の作成と `migrate deploy` | **27本すべて適用。** 2回目は `No pending migrations` |
+| `Dockerfile` の実ビルド | **`STATUS: SUCCESS`**（Cloud Build・3分） |
+| Cloud Run への配置と起動 | **起動した。** 環境変数が欠けていれば起動しない |
+
+**この過程で直したもの：**
+
+- **「パブリックIP を無効にする」は誤りだった。** Cloud SQL は
+  どちらかのIPが必須。**守るのは承認済みネットワークが空であること**（2.2）
+- **サービスの箱を先に作る手順が抜けていた。** `cloudbuild.yaml` は
+  像だけを差し替えるので、箱が無いと最初のビルドが失敗する（4.3）
+- **`LINE_LOGIN_CHANNEL_ID` が起動必須だった**（Q-046）。LIFF の
+  エンドポイントにはアプリの公開URLが要るため、**LINE の設定は
+  アプリを立てた後**にしかできない。鶏と卵になっていた
+- **Cloud Run のサービスアカウントに `roles/cloudsql.client` が要る。**
+  新しいプロジェクトでは既定で付いていない
 
 **10人へ配る前に、1人・1ブログで通しておくことを強く勧める。**
 自分たちで WordPress を1つ立て、実AIで1本書かせ、実LINEに流し、
