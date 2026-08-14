@@ -218,7 +218,8 @@ export async function reclaimStuckJobs(): Promise<number> {
  * 次に実行するジョブを1件取り、`RUNNING` にする。
  *
  * **`FOR UPDATE SKIP LOCKED` を使う。** 同時に複数のワーカーが動いても、
- * 同じ行を二重に取らない。Vercel の関数は並行して起動しうる。
+ * 同じ行を二重に取らない。ワーカーは並行して起動しうる（Cloud Run は
+ * インスタンスを複数立てる）。
  *
  * 取得条件は次の3つ。
  *

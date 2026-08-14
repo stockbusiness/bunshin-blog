@@ -1,0 +1,70 @@
+# `main` への push で像を作り、Cloud Run へ出す（OPEN_QUESTIONS Q-045）。
+#
+# **Cloud Run の「リポジトリから継続的にデプロイ」が自動生成する設定を
+# 使わない。** あちらはビルド引数を渡せず、`NEXT_PUBLIC_LIFF_ID` が
+# 空のまま焼き付いてしまう（ブラウザ向けの値はビルド時に埋め込まれる）。
+#
+# **マイグレーションはここで流さない**（`docs/DEPLOY.md` 2.2）。
+# ビルドは何度も走るので、入れると**その全部が本番DBを触る**。
+
+substitutions:
+  _REGION: asia-northeast1
+  _SERVICE: bunshin-blog
+  # Artifact Registry のリポジトリ名（`docs/DEPLOY.md` 4.1 で作る）
+  _REPOSITORY: bunshin-blog
+  # **秘密ではない。** LIFF ID は公開されるもので、ブラウザに配られる
+  _NEXT_PUBLIC_LIFF_ID: ''
+
+steps:
+  # **前回の像を土台に使う。** 無ければ黙って進む（初回）
+  - id: 前回の像を取る
+    name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        docker pull ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:latest || exit 0
+
+  - id: 像を作る
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --build-arg
+      - NEXT_PUBLIC_LIFF_ID=${_NEXT_PUBLIC_LIFF_ID}
+      - --cache-from
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:latest
+      - --tag
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:$COMMIT_SHA
+      - --tag
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:latest
+      - .
+
+  - id: 像を置く
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}
+
+  # **`--image` だけを渡す。** 環境変数・Cloud SQL の接続・
+  # リクエスト上限は**画面で設定したものをそのまま残す**。
+  # ここで指定すると、画面で入れた秘密が毎回消える
+  - id: Cloud Run へ出す
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:$COMMIT_SHA
+      - --region=${_REGION}
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:$COMMIT_SHA
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:latest
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+
+timeout: 1800s

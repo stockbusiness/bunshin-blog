@@ -107,7 +107,7 @@ export default async function AdminSettingsPage() {
         <h2 className="text-base font-bold">この画面に置けない設定</h2>
         <p className="mt-1 text-sm leading-relaxed">
           設定はデータベースにあり、データベースを読むには設定が要ります。
-          次の値は環境変数（Vercel の設定）で変更してください。
+          次の値は環境変数（Cloud Run の設定）で変更してください。
         </p>
         <dl className="mt-3 flex flex-col gap-2 text-sm">
           {ENV_ONLY.map((item) => (

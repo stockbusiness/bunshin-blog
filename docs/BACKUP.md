@@ -201,7 +201,7 @@ update jobs set status = 'QUEUED' where status = 'RUNNING';
 
 ## 5. 未決事項
 
-- **接続プールを持っていない。** 拡大して Vercel の同時実行が増えると
+- **接続プールを持っていない。** 拡大してインスタンスの同時実行が増えると
   PostgreSQL の接続数を使い切る。30ブログでは起きない
   （`docs/ARCHITECTURE.md`「実行リージョンとデータベース」）
 - **鍵の入れ替え手順が無い。** `ENCRYPTION_KEY` を変える必要が生じた場合の

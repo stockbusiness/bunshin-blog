@@ -9,19 +9,20 @@ import { enqueueDailySchedule, enqueueProposalNotify } from './schedule';
 /**
  * `GET /api/jobs/run` — キューの消化（TASKS E-1、SPEC 4.3）
  *
- * **Vercel Cron から呼ばれる。** Vercel Cron は GET で叩き、
- * `Authorization: Bearer $CRON_SECRET` を付ける。定義は `vercel.json`。
+ * **Cloud Scheduler から呼ばれる**（Q-045）。GET で叩き、
+ * `Authorization: Bearer $CRON_SECRET` を**ヘッダとして設定してもらう**
+ * （`docs/DEPLOY.md` 4.3）。
  *
  * **`CRON_SECRET` が未設定なら実行しない**（fail closed）。設定漏れで
  * 誰でもワーカーを起動できる状態にしない。`src/lib/env.ts` の必須には
  * 入れていない。cron の設定漏れでアプリ全体を止めないため（B-11 と同じ方針）。
  *
- * **締め切りを持って抜ける。** 関数の実行時間の上限を超えると途中で
+ * **締め切りを持って抜ける。** リクエストの上限を超えると途中で
  * 殺され、実行結果が記録されない。残ったジョブは次の起動で処理する。
  *
  * ## 決まった間隔のジョブをここで積む
  *
- * **cron はこの1つだけ**（`vercel.json`）。間隔ごとに cron を増やすより、
+ * **cron はこの1つだけ。** 間隔ごとに cron を増やすより、
  * **間隔を冪等キーに持たせて**ここから積むほうが、設定が1か所で済む
  * （G-8b・I-1・I-2）。毎分呼ばれても、**同じ回のジョブは1件しか
  * 積まれない**（C-4）。
@@ -38,16 +39,21 @@ import { enqueueDailySchedule, enqueueProposalNotify } from './schedule';
 export const runtime = 'nodejs';
 
 /**
- * 関数の最大実行時間（秒）。
+ * 消化を打ち切るまでの時間（ミリ秒）。
  *
- * **Vercel のプランで上限が変わる。** ここを延ばす場合は、
- * `LEASE_SECONDS`（中断されたジョブを戻すまでの時間）がこれより
- * 十分に長いことを確認すること。
+ * **Cloud Run のリクエスト上限ではなく、cron の間隔に合わせてある**
+ * （Q-045）。毎分呼ばれるので、**次の起動が来る前に抜ける。**
+ *
+ * 延ばすと消化が重なる。同じジョブを二重に取ることは無いが
+ * （`SELECT ... FOR UPDATE SKIP LOCKED`）、**AI呼び出しが同時に
+ * 何本も走る。** 費用と流量の判断が要るので、実際に記事生成を
+ * 回してから決める（Q-045 の「残る課題」）。
+ *
+ * 延ばすときは `LEASE_SECONDS`（中断されたジョブを戻すまでの時間）が
+ * これより十分に長いことと、**Cloud Run のリクエスト上限**
+ * （`docs/DEPLOY.md` 4.2）がこれより長いことを確認する。
  */
-export const maxDuration = 60;
-
-/** 実際に抜ける時刻。関数の上限より手前に取る */
-const DRAIN_BUDGET_MS = (maxDuration - 10) * 1000;
+const DRAIN_BUDGET_MS = 50_000;
 
 /**
  * 秘密の照合。**長さの違いも含めて一定時間で比べる。**
