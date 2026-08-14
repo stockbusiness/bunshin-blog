@@ -3,6 +3,7 @@
 import type { Route } from 'next';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { fetchBlogs } from '../_lib/blogs-api';
 import {
   OnboardingApiError,
   fetchOnboarding,
@@ -74,6 +75,7 @@ const STEP_VIEWS: Record<OnboardingStep, StepView> = {
   WORDPRESS: {
     title: 'WordPress をつなぐ',
     description: '接続テストが通るまでが1つの作業です',
+    // ブログが1つに決まれば、そのブログの画面へ差し替える（下記）
     href: '/liff/blogs',
   },
   GENRE: {
@@ -99,8 +101,32 @@ const STEP_VIEWS: Record<OnboardingStep, StepView> = {
   },
 };
 
+/**
+ * ブログが要る段の行き先を、そのブログの画面へ差し替える。
+ *
+ * **`STEP_VIEWS` は静的な住所しか持てない。** ブログ別の画面は
+ * `/liff/blogs/:blogId/...` なので、ここで組み立てる。
+ *
+ * **1つに決まらないときは一覧のまま。** 2つ以上あるとき、どのブログの
+ * 話かを画面が勝手に決めると、**別のブログを設定してしまう。**
+ */
+function resolveHref(
+  step: OnboardingStep,
+  view: StepView,
+  onlyBlogId: string | null,
+): Route | null {
+  if (onlyBlogId === null || step !== 'WORDPRESS') {
+    return view.href;
+  }
+
+  // 型付きルートは `Link` に直接書いたときだけ形を見てくれる。
+  // 関数の戻り値では判定できないため、ここだけ明示する
+  return `/liff/blogs/${onlyBlogId}/wordpress` as Route;
+}
+
 export default function OnboardingPage() {
   const [progress, setProgress] = useState<OnboardingProgressJson | null>(null);
+  const [onlyBlogId, setOnlyBlogId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -118,6 +144,19 @@ export default function OnboardingPage() {
               : '読み込めませんでした',
           );
         }
+      },
+    );
+
+    // **失敗しても握りつぶす。** 行き先が一覧に戻るだけで、
+    // ここで止めると10段すべてが見られなくなる
+    void fetchBlogs().then(
+      (result) => {
+        if (!cancelled && result.blogs.length === 1) {
+          setOnlyBlogId(result.blogs[0]?.id ?? null);
+        }
+      },
+      () => {
+        // 何もしない
       },
     );
 
@@ -154,6 +193,7 @@ export default function OnboardingPage() {
       <ol className="mt-4 flex flex-col gap-3">
         {progress.steps.map((state, index) => {
           const view = STEP_VIEWS[state.step];
+          const href = resolveHref(state.step, view, onlyBlogId);
 
           return (
             <li
@@ -168,12 +208,12 @@ export default function OnboardingPage() {
               <p className="mt-1 text-base font-bold">{view.title}</p>
               <p className="mt-1 text-xs leading-relaxed">{view.description}</p>
 
-              {view.href === null ? (
+              {href === null ? (
                 state.done ? null : (
                   <p className="mt-2 text-xs">この画面はまだありません</p>
                 )
               ) : (
-                <Link href={view.href} className="mt-2 block text-xs underline">
+                <Link href={href} className="mt-2 block text-xs underline">
                   {state.done ? '見直す' : '開く'}
                 </Link>
               )}

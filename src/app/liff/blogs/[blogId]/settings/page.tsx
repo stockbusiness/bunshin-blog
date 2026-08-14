@@ -152,6 +152,18 @@ export default function BlogSettingsPage({
       </Link>
       <h1 className="mt-3 text-lg font-bold">{blog.name} の設定</h1>
 
+      {/*
+        **ここからも WordPress へ行けるようにする。** はじめの設定を
+        終えた後に繋ぎ直したくなったとき、オンボーディングを開かないと
+        たどり着けない、ということにしない
+      */}
+      <Link
+        href={`/liff/blogs/${blog.id}/wordpress`}
+        className="mt-3 block rounded-lg border p-4 text-sm"
+      >
+        WordPress の接続
+      </Link>
+
       <BrokenLinkSection links={brokenLinks} />
 
       <form

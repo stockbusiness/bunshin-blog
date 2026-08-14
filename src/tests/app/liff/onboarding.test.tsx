@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import OnboardingPage from '@/app/liff/onboarding/page';
+import { fetchBlogs, type BlogJson } from '@/app/liff/_lib/blogs-api';
 import {
   fetchOnboarding,
   type OnboardingProgressJson,
@@ -20,6 +21,23 @@ vi.mock('@/app/liff/_lib/onboarding-api', async (importOriginal) => {
 
   return { ...actual, fetchOnboarding: vi.fn() };
 });
+
+vi.mock('@/app/liff/_lib/blogs-api', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@/app/liff/_lib/blogs-api')>();
+
+  return { ...actual, fetchBlogs: vi.fn() };
+});
+
+const NO_BLOGS = {
+  blogs: [] as BlogJson[],
+  slots: { limit: 3, available: [1, 2, 3], remaining: 3 },
+};
+
+const ONE_BLOG = {
+  blogs: [{ id: 'blog-1' } as BlogJson],
+  slots: { limit: 3, available: [2, 3], remaining: 2 },
+};
 
 const STEPS: OnboardingStep[] = [
   'LINE_LOGIN',
@@ -53,6 +71,7 @@ function progress(doneUpTo: number): OnboardingProgressJson {
 
 beforeEach(() => {
   vi.mocked(fetchOnboarding).mockResolvedValue(progress(3));
+  vi.mocked(fetchBlogs).mockResolvedValue(NO_BLOGS);
 });
 
 afterEach(() => {
@@ -132,6 +151,58 @@ describe('はじめの設定', () => {
     const blog = (await screen.findByText('ブログの枠をつくる')).closest('li');
 
     expect(blog?.querySelector('a')).toHaveAttribute('href', '/liff/blogs/new');
+  });
+
+  /**
+   * **段6はそのブログの画面へ落とす。** `/liff/blogs`（一覧）のままだと、
+   * 一覧→ブログ→設定→WordPress と辿ることになり、**どこにあるのか
+   * 分からない。**
+   */
+  it('ブログが1つなら、WordPress の段はそのブログを指す', async () => {
+    vi.mocked(fetchOnboarding).mockResolvedValue(progress(5));
+    vi.mocked(fetchBlogs).mockResolvedValue(ONE_BLOG);
+
+    render(<OnboardingPage />);
+
+    const item = (await screen.findByText('WordPress をつなぐ')).closest('li');
+
+    await vi.waitFor(() => {
+      expect(item?.querySelector('a')).toHaveAttribute(
+        'href',
+        '/liff/blogs/blog-1/wordpress',
+      );
+    });
+  });
+
+  /**
+   * **2つ以上あるとき、どのブログの話かを画面が決めない。**
+   * 勝手に決めると、別のブログを設定してしまう。
+   */
+  it('ブログが複数なら、WordPress の段は一覧のまま', async () => {
+    vi.mocked(fetchOnboarding).mockResolvedValue(progress(5));
+    vi.mocked(fetchBlogs).mockResolvedValue({
+      blogs: [{ id: 'blog-1' } as BlogJson, { id: 'blog-2' } as BlogJson],
+      slots: { limit: 3, available: [3], remaining: 1 },
+    });
+
+    render(<OnboardingPage />);
+
+    const item = (await screen.findByText('WordPress をつなぐ')).closest('li');
+
+    expect(item?.querySelector('a')).toHaveAttribute('href', '/liff/blogs');
+  });
+
+  /**
+   * **ブログの取得に失敗しても10段は出す。** 行き先が一覧に戻るだけで、
+   * ここで止めると設定そのものが見られなくなる。
+   */
+  it('ブログが読めなくても10段は出る', async () => {
+    vi.mocked(fetchBlogs).mockRejectedValue(new Error('boom'));
+
+    render(<OnboardingPage />);
+
+    expect(await screen.findByText('分身をつくる')).toBeInTheDocument();
+    expect(screen.getByText('WordPress をつなぐ')).toBeInTheDocument();
   });
 
   /**
