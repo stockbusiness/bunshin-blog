@@ -11,6 +11,7 @@
  */
 
 import { safeFetch, type SafeFetchResponse } from '@/lib/http';
+import { restStyleOf } from './site-url';
 import type { WordpressCredentials } from './types';
 
 /** WordPress の応答が JSON でなければ、そもそも REST API ではない */
@@ -42,6 +43,38 @@ export interface WordpressRequest {
 
 export interface WordpressClient {
   request(input: WordpressRequest): Promise<WordpressApiResponse>;
+}
+
+/**
+ * 宛先の組み立て方（Q-052）。
+ *
+ * | | ベース | 例 |
+ * |---|---|---|
+ * | `pretty` | `.../wp-json` | `.../wp-json/wp/v2/posts?per_page=1` |
+ * | `plain` | `.../index.php` | `.../index.php?rest_route=/wp/v2/posts&per_page=1` |
+ *
+ * **`plain` は書き換えを通らない。** パーマリンクが「基本」のサイトや
+ * `.htaccess` が効いていないサイトでも届く。
+ */
+function buildRequestUrl(apiBaseUrl: string, path: string): string {
+  if (restStyleOf(apiBaseUrl) === 'pretty') {
+    return `${apiBaseUrl}${path}`;
+  }
+
+  // **`?` の前後を組み替える。** `path` に付いている問い合わせ文字列は
+  // `rest_route` と**併記**しないと落ちる（`?` が2つになる）
+  const separator = path.indexOf('?');
+  const route = separator === -1 ? path : path.slice(0, separator);
+  const rest = separator === -1 ? '' : path.slice(separator + 1);
+
+  const query = new URLSearchParams(rest);
+  // **`rest_route` を先頭に置く。** 読むときに人が分かりやすい
+  const merged = new URLSearchParams({ rest_route: route });
+  for (const [key, value] of query) {
+    merged.append(key, value);
+  }
+
+  return `${apiBaseUrl}?${merged.toString()}`;
 }
 
 export interface WordpressClientOptions {
@@ -95,15 +128,18 @@ export function createWordpressClient(
           : { authorization: basicAuthHeader(options.credentials) }),
       };
 
-      const response = await fetchFn(`${options.apiBaseUrl}${input.path}`, {
-        method,
-        headers,
-        body,
-        timeoutMs,
-        maxBytes,
-        // JSON以外が返る場合は REST API ではない（WAFのブロック画面など）
-        allowedContentTypes: JSON_CONTENT_TYPES,
-      });
+      const response = await fetchFn(
+        buildRequestUrl(options.apiBaseUrl, input.path),
+        {
+          method,
+          headers,
+          body,
+          timeoutMs,
+          maxBytes,
+          // JSON以外が返る場合は REST API ではない（WAFのブロック画面など）
+          allowedContentTypes: JSON_CONTENT_TYPES,
+        },
+      );
 
       return {
         status: response.status,

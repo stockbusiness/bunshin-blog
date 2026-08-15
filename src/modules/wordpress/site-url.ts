@@ -13,13 +13,25 @@ import { invalidSiteUrlError, siteUrlImmutableError } from './errors';
 export const SITE_URL_MAX_LENGTH = 255;
 
 /**
- * REST API のベース。
+ * REST API のベース（書き換えが効くサイト）。
  *
- * パーマリンク設定が「基本」のサイトでは `/wp-json/` が使えず
- * `?rest_route=` になるが、その場合は C-2 の到達確認で落ちる。
- * モニターにはパーマリンクを変更してもらう（WordPress の標準的な案内）。
+ * パーマリンク設定が「基本」のサイトでは、WordPress が `/wp-json/` の
+ * 書き換え規則を作らないため**この道は404になる。** その場合は
+ * `PLAIN_REST_PATH` を使う（Q-052）。
  */
 const REST_PATH = '/wp-json';
+
+/**
+ * 書き換えが効かないサイト向けの REST API のベース。
+ *
+ * **WordPress が自分でこの形を案内する。** パーマリンクが「基本」のとき、
+ * `/wp-json/` の応答にある `_links.self` は
+ * `index.php?rest_route=/` になっている。
+ *
+ * **`/index.php` は書き換えを通らない**ので、`.htaccess` が効いていない
+ * サイトでも届く。
+ */
+const PLAIN_REST_PATH = '/index.php';
 
 /** IPv4 リテラル。ホスト名として受け付けない */
 const IPV4 = /^\d{1,3}(\.\d{1,3}){3}$/;
@@ -115,6 +127,21 @@ export function normalizeSiteUrl(input: string): string {
  */
 export function deriveApiBaseUrl(normalizedSiteUrl: string): string {
   return `${normalizedSiteUrl}${REST_PATH}`;
+}
+
+/** 書き換えを通らない REST のベース（Q-052） */
+export function derivePlainApiBaseUrl(normalizedSiteUrl: string): string {
+  return `${normalizedSiteUrl}${PLAIN_REST_PATH}`;
+}
+
+/**
+ * 保存済みのベースがどちらの形かを判定する。
+ *
+ * **列を増やさない。** ベースの末尾で決まるので、保存した文字列から
+ * 一意に読み取れる（`api_base_url` は SPEC 5.4 の既存列）。
+ */
+export function restStyleOf(apiBaseUrl: string): 'pretty' | 'plain' {
+  return apiBaseUrl.endsWith(PLAIN_REST_PATH) ? 'plain' : 'pretty';
 }
 
 /** 正規化済みの2つが同じサイトを指すか */

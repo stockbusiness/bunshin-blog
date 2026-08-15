@@ -326,3 +326,63 @@ describe('テナント分離（SPEC 14.1）', () => {
     expect(theirs?.lastTestedAt).toBeNull();
   });
 });
+
+/**
+ * パーマリンクが「基本」のサイト（Q-052）。
+ *
+ * **`/wp-json/` は404になるが、サイトも REST も生きている。**
+ * WordPress がその書き換え規則を作らないだけ。
+ * `/index.php?rest_route=` なら届く。
+ *
+ * **本番のサイトが実際にこの状態だった**（2026-08-15）。
+ */
+describe('書き換えが効いていないサイト', () => {
+  /** ベースの形で応答を変える。`/wp-json` は落とす */
+  function byBase(apiBaseUrl: string) {
+    return (input: WordpressRequest): Partial<WordpressApiResponse> => {
+      if (apiBaseUrl.endsWith('/wp-json')) {
+        // LiteSpeed などが返す素の404。**JSONではない**
+        return { status: 404, json: null };
+      }
+
+      return healthyResponder(input);
+    };
+  }
+
+  it('/index.php?rest_route= で通り、その形を覚える', async () => {
+    const result = await testWordpressConnectionForUser(
+      { userId: owner.id, blogId: ownerBlogId },
+      (input) => createFactory(byBase(input.apiBaseUrl))(input),
+    );
+
+    expect(result.ok).toBe(true);
+
+    const connection = await findWordpressConnectionForUser({
+      userId: owner.id,
+      blogId: ownerBlogId,
+    });
+
+    // **届いた形を覚える。** 次からは1回で当たる
+    expect(connection?.apiBaseUrl).toBe(`${SITE_URL}/index.php`);
+    expect(connection?.connectionStatus).toBe('CONNECTED');
+  });
+
+  /**
+   * **逃げ道で通っても、そのままにしない。** 書き換えが効いていないと
+   * 段10で入れる `/go/{code}` も404になる。
+   */
+  it('通っても、リンクが404になることを伝える', async () => {
+    const result = await testWordpressConnectionForUser(
+      { userId: owner.id, blogId: ownerBlogId },
+      (input) => createFactory(byBase(input.apiBaseUrl))(input),
+    );
+
+    const reachable = result.checks.find(
+      (check) => check.id === 'REST_REACHABLE',
+    );
+
+    expect(reachable?.status).toBe('PASSED');
+    expect(reachable?.message).toContain('/go/');
+    expect(reachable?.message).toContain('パーマリンク');
+  });
+});
