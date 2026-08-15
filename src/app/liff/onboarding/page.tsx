@@ -80,7 +80,9 @@ const STEP_VIEWS: Record<OnboardingStep, StepView> = {
   },
   GENRE: {
     title: 'ジャンルを決める',
-    description: '何について書くブログかを決めます',
+    // **運営が決める**（Q-049）。モニターは希望を出して待つ。
+    // **案件が0件だと審査は必ず止まる**ので、段8が先に要る
+    description: '何について書くかを運営が確認して決めます',
     href: '/liff/blogs',
   },
   OFFER: {
@@ -101,6 +103,14 @@ const STEP_VIEWS: Record<OnboardingStep, StepView> = {
   },
 };
 
+/** ブログ別の画面がある段。**無い段はここに書かない**（一覧のまま） */
+const BLOG_STEP_PATHS: Partial<Record<OnboardingStep, string>> = {
+  WORDPRESS: 'wordpress',
+  GENRE: 'genre',
+  OFFER: 'offers',
+  SNIPPET: 'snippet',
+};
+
 /**
  * ブログが要る段の行き先を、そのブログの画面へ差し替える。
  *
@@ -110,13 +120,6 @@ const STEP_VIEWS: Record<OnboardingStep, StepView> = {
  * **1つに決まらないときは一覧のまま。** 2つ以上あるとき、どのブログの
  * 話かを画面が勝手に決めると、**別のブログを設定してしまう。**
  */
-/** ブログ別の画面がある段。**無い段はここに書かない**（一覧のまま） */
-const BLOG_STEP_PATHS: Partial<Record<OnboardingStep, string>> = {
-  WORDPRESS: 'wordpress',
-  OFFER: 'offers',
-  SNIPPET: 'snippet',
-};
-
 function resolveHref(
   step: OnboardingStep,
   view: StepView,

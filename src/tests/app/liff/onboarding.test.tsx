@@ -190,19 +190,20 @@ describe('はじめの設定', () => {
     });
   });
 
-  /**
-   * **画面の無い段は一覧のまま。** 存在しない住所を作ると、
-   * 押した先が白い画面になる（段6で実際に起きていた）
-   */
-  it('画面の無い段は、ブログが1つでも一覧のまま', async () => {
+  it('ブログが1つなら、ジャンルの段はそのブログを指す', async () => {
     vi.mocked(fetchOnboarding).mockResolvedValue(progress(6));
     vi.mocked(fetchBlogs).mockResolvedValue(ONE_BLOG);
 
     render(<OnboardingPage />);
 
-    const genre = (await screen.findByText('ジャンルを決める')).closest('li');
+    const item = (await screen.findByText('ジャンルを決める')).closest('li');
 
-    expect(genre?.querySelector('a')).toHaveAttribute('href', '/liff/blogs');
+    await vi.waitFor(() => {
+      expect(item?.querySelector('a')).toHaveAttribute(
+        'href',
+        '/liff/blogs/blog-1/genre',
+      );
+    });
   });
 
   it('ブログが1つなら、リンク計測の段はそのブログを指す', async () => {
