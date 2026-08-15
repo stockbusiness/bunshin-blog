@@ -13,6 +13,7 @@ export {
   requireBlogForUser,
   applyPublishPaceForAdmin,
   assignGenreForAdmin,
+  listBlogsForAdmin,
   createBlogForUser,
   updateBlogForUser,
   closeBlogForUser,
