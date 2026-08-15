@@ -33,10 +33,32 @@ export {
 
 export {
   LINE_ERROR_CODES,
+  RICH_MENU_ERROR_CODES,
   lineNotConfiguredError,
   notificationTargetMissingError,
+  richMenuError,
   type LineErrorCode,
+  type RichMenuErrorCode,
 } from './errors';
+
+export {
+  EMPTY_RICH_MENU,
+  applyRichMenu,
+  createConfiguredRichMenuClient,
+  describeRichMenuState,
+  readRichMenu,
+  readRichMenuImage,
+  removeRemoteRichMenu,
+  saveRichMenu,
+  saveRichMenuImage,
+  validateRichMenu,
+  type AppliedRichMenu,
+  type ApplyRichMenuDeps,
+  type RichMenuAreaInput,
+  type RichMenuInput,
+  type RichMenuState,
+  type StoredRichMenu,
+} from './rich-menu';
 
 export {
   collectAlertsForUser,

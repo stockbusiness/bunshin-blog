@@ -323,6 +323,7 @@ model User {
   loginTokens    AdminLoginToken[]
   appSettings    AppSetting[]      @relation("AppSettingEditor")
   factIssues     FactIssue[]
+  richMenus      RichMenu[]        @relation("RichMenuEditor")
 
   @@index([status])
   @@map("users")
@@ -1180,4 +1181,61 @@ model AppSetting {
   updatedBy User? @relation("AppSettingEditor", fields: [updatedByUserId], references: [id], onDelete: SetNull)
 
   @@map("app_settings")
+}
+
+/// リッチメニューの枠の大きさ（Q-054）。**LINE が受け付けるのはこの2つだけ**
+enum RichMenuCanvas {
+  /// 2500×1686。3〜6個のボタンを置ける
+  LARGE
+  /// 2500×843。1〜3個
+  COMPACT
+}
+
+/// LINEのリッチメニューの下書きと、いま出ているものの対応（Q-054、TASKS H-6）。
+///
+/// **1行しか持たない。** リッチメニューは全モニター共通で、
+/// 個別に出し分ける必要が Phase 0 に無い。`singleton` の一意制約と
+/// CHECK でそれを保つ（アプリ側の書き方に依存させない。`app_settings` と同じ）。
+///
+/// ## 画像をこの表に置く理由
+///
+/// **LINE の上限が1MBなので、DBに収まる。** 置き場所を1つ増やすより、
+/// **下書きと画像が一緒に残る**ほうが「適用し直す」が確実になる。
+///
+/// ## `line_rich_menu_id` は「いま LINE に在るもの」
+///
+/// **保存しただけでは入らない。** 適用に成功して初めて入る。
+/// NULL は「まだ一度も出していない」。
+model RichMenu {
+  id          String         @id @default(uuid()) @db.Uuid
+  /// 常に true。1行だけを保つための鍵
+  singleton   Boolean        @unique @default(true)
+  /// 管理用の名前。利用者には見えない
+  name        String
+  /// トークルーム下部に出る文字。LINE の上限は14字
+  chatBarText String         @map("chat_bar_text")
+  canvas      RichMenuCanvas @default(LARGE)
+  /// 開いた状態で出すか
+  selected    Boolean        @default(true)
+  /// 押す場所と行き先。`[{ bounds: {x,y,width,height}, label, uri }]`
+  areas       Json           @default("[]")
+
+  /// 上げた画像そのもの。**未設定なら適用できない**（LINE が拒む）
+  imageData     Bytes?  @map("image_data")
+  imageMimeType String? @map("image_mime_type")
+  imageWidth    Int?    @map("image_width")
+  imageHeight   Int?    @map("image_height")
+
+  /// 適用済みの LINE 側 ID。**未適用なら NULL**
+  lineRichMenuId String?   @map("line_rich_menu_id")
+  appliedAt      DateTime? @map("applied_at") @db.Timestamptz(6)
+
+  /// 最後に変更した ADMIN
+  updatedByUserId String?  @map("updated_by_user_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  updatedBy User? @relation("RichMenuEditor", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@map("rich_menus")
 }
