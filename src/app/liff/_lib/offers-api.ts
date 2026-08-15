@@ -146,6 +146,29 @@ export function fetchOffers(blogId: string): Promise<{ offers: OfferJson[] }> {
   return request(base(blogId));
 }
 
+/** LPから作った下書き（Q-053）。**保存はされていない** */
+export interface OfferDraftJson {
+  name: string;
+  conversionType: ConversionType;
+  facts: string[];
+}
+
+/**
+ * 紹介先のページを読んで下書きをもらう（Q-053）。
+ *
+ * **ASPの名前とアフィリエイトリンクは返らない。** LPに無いため。
+ */
+export function draftOffer(
+  blogId: string,
+  landingPageUrl: string,
+): Promise<{ draft: OfferDraftJson }> {
+  return request(`${base(blogId)}/draft`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ landingPageUrl }),
+  });
+}
+
 export function createOffer(
   blogId: string,
   input: CreateOfferInput,

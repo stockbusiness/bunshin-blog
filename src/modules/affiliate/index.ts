@@ -50,6 +50,13 @@ export {
 } from './lp-evaluation';
 
 export {
+  draftOfferFromLandingPage,
+  htmlToText,
+  OFFER_DRAFT_PROMPT_KEY,
+  type OfferDraft,
+} from './offer-draft';
+
+export {
   buildAffiliateLink,
   buildSubId,
   buildRedirectUrl,
