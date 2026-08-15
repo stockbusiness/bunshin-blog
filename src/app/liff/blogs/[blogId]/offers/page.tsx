@@ -13,6 +13,7 @@ import {
   OfferApiError,
   createOffer,
   fetchOffers,
+  readFactItems,
   type ConversionType,
   type CreateOfferInput,
   type OfferJson,
@@ -50,6 +51,8 @@ interface FormState {
   affiliateUrl: string;
   conversionType: ConversionType;
   rewardYen: string;
+  /** 1行に1つ。送るときに配列へ均す */
+  facts: string;
   userExperience: UserExperience | '';
 }
 
@@ -60,11 +63,21 @@ const EMPTY_FORM: FormState = {
   affiliateUrl: '',
   conversionType: 'FREE_SIGNUP',
   rewardYen: '',
+  facts: '',
   userExperience: '',
 };
 
+/** 1行に1つ。空行は落とす */
+function toFactItems(text: string): string[] {
+  return text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '');
+}
+
 function toInput(form: FormState): CreateOfferInput {
   const reward = Number.parseInt(form.rewardYen, 10);
+  const items = toFactItems(form.facts);
 
   return {
     name: form.name.trim(),
@@ -73,6 +86,9 @@ function toInput(form: FormState): CreateOfferInput {
     affiliateUrl: form.affiliateUrl.trim(),
     conversionType: form.conversionType,
     ...(Number.isInteger(reward) && reward >= 0 ? { rewardYen: reward } : {}),
+    // **空なら送らない。** 送ると `facts_updated_at` が入り、
+    // 「確かめた」ことになってしまう（D-13・Q-022）
+    ...(items.length === 0 ? {} : { facts: { items } }),
     ...(form.userExperience === ''
       ? {}
       : { userExperience: form.userExperience }),
@@ -92,6 +108,7 @@ export default function OffersPage({
   const conversionId = useId();
   const rewardId = useId();
   const experienceId = useId();
+  const factsId = useId();
 
   const [offers, setOffers] = useState<OfferJson[] | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
@@ -164,6 +181,15 @@ export default function OffersPage({
                   **切れているリンクは黙って置かない**（H-3b）。
                   貼ったままだと成果にならない
                 */}
+                {/*
+                  **事実が空なら言う。** 空のまま気づかないと、
+                  記事に数字を書けないことが後で分かる（Q-050）
+                */}
+                <p className="mt-1 text-xs">
+                  {readFactItems(offer.facts).length === 0
+                    ? '事実が未記入です'
+                    : `事実 ${readFactItems(offer.facts).length} 件`}
+                </p>
                 {offer.linkBrokenAt === null ? null : (
                   <p className="mt-1 text-xs">リンクが切れています</p>
                 )}
@@ -345,6 +371,31 @@ export default function OffersPage({
             }}
           />
           <p className="text-xs leading-relaxed">分からなければ空のままで</p>
+        </div>
+
+        {/*
+          **形は決めるが、中身は決めない**（Q-050）。読む側は
+          葉の値だけを見るので、1行に1つで足りる
+        */}
+        <div className="flex flex-col gap-1">
+          <label htmlFor={factsId} className="text-sm font-bold">
+            事実（1行に1つ）
+          </label>
+          <textarea
+            id={factsId}
+            className="rounded border p-2 text-base"
+            rows={4}
+            value={form.facts}
+            placeholder={'月額1,480円\n初期費用なし\n違約金なし'}
+            onChange={(event) => {
+              setForm({ ...form, facts: event.target.value });
+            }}
+          />
+          <p className="text-xs leading-relaxed">
+            価格・条件・機能をそのまま書いてください。
+            <strong>ここに無い数字は記事に書きません。</strong>
+            空のままだと、書ける内容がとても狭くなります
+          </p>
         </div>
 
         <button

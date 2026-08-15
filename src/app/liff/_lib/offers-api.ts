@@ -17,6 +17,26 @@ export type UserExperience = 'USED' | 'NOT_USED' | 'UNKNOWN';
 export type OfferStatus =
   'DRAFT' | 'ACTIVE' | 'PAUSED' | 'ENDED' | 'NEEDS_REVIEW';
 
+/**
+ * 案件の「事実」（Q-050）。
+ *
+ * **1行に1つ。** 価格・条件・機能をそのまま書く。
+ *
+ * ## なぜこの形でよいのか
+ *
+ * **読む側は形を見ていない。** 事実照合（`flattenFactStrings`）は
+ * **葉の値だけを集めてキー名を取らず**、記事生成は入力ごと
+ * `JSON.stringify` してプロンプトへ渡す。`facts` が `unknown` の
+ * ままだったのは**決め忘れではなく設計**だった。
+ *
+ * **`updatedAt` というキーを使わない。** 照合が意図的に外している
+ * （日付の数字が「facts にある数値」として数えられ、本文の
+ * 「2026年」のような無関係な数値を通してしまう）。
+ */
+export interface OfferFactsJson {
+  items: string[];
+}
+
 export interface OfferJson {
   id: string;
   blogId: string;
@@ -27,6 +47,8 @@ export interface OfferJson {
   affiliateUrl: string;
   rewardYen: number | null;
   conversionType: ConversionType;
+  /** **書いてよい数値の範囲**（SPEC 9.6）。ここに無い価格・条件は書かない */
+  facts: unknown;
   userExperience: UserExperience;
   userRating: number | null;
   denyConditions: string[];
@@ -48,8 +70,27 @@ export interface CreateOfferInput {
   affiliateUrl: string;
   conversionType: ConversionType;
   rewardYen?: number;
+  facts?: OfferFactsJson;
   userExperience?: UserExperience;
   denyConditions?: string[];
+}
+
+/**
+ * 画面に出せる形へ均す。
+ *
+ * **形を決めていないものを読む。** 過去の行や、ADMIN が直に入れた値は
+ * `{ items: [...] }` とは限らない。**読めなければ空にする**（落とさない）。
+ */
+export function readFactItems(facts: unknown): string[] {
+  if (typeof facts !== 'object' || facts === null) {
+    return [];
+  }
+
+  const items = (facts as { items?: unknown }).items;
+
+  return Array.isArray(items)
+    ? items.filter((item): item is string => typeof item === 'string')
+    : [];
 }
 
 /** 画面に出せる失敗。原因を推測せず、サーバーの文言をそのまま使う */

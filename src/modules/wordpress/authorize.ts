@@ -169,6 +169,20 @@ export function verifyAuthorizeState(
  * **`wp-admin` の位置は決め打ちにする。** REST API の入口
  * （`deriveApiBaseUrl`）とは別で、探る手段が無い。移したサイトでは
  * 開けないが、**そのために手で貼る経路を残してある。**
+ *
+ * ## `state` は戻り先のURLに埋める
+ *
+ * **WordPress は `state` を返さない。** `authorize-application.php` が
+ * 見るのは `app_name` `app_id` `success_url` `reject_url` だけで、
+ * **知らないパラメータは捨てる。** 戻りに載るのは `site_url`・
+ * `user_login`・`password` の3つだけである。
+ *
+ * **最初は `state` を認証URLの独立したパラメータとして渡していた。**
+ * そのため戻りに `state` が無く、**承認しても「取り消された」として
+ * 扱われた**（本番で判明・2026-08-15）。
+ *
+ * `success_url` は WordPress が `add_query_arg` で組み立て直すので、
+ * **こちらが付けた問い合わせ文字列はそのまま残る。** そこへ埋める。
  */
 export function buildAuthorizeUrl(params: {
   siteUrl: string;
@@ -180,12 +194,16 @@ export function buildAuthorizeUrl(params: {
     `${normalizeSiteUrl(params.siteUrl)}/`,
   );
 
+  // **戻り先そのものに `state` を持たせる**（上記）
+  const returnUrl = new URL(params.successUrl);
+  returnUrl.searchParams.set('state', params.state);
+  const returnTo = returnUrl.toString();
+
   url.searchParams.set('app_name', AUTHORIZE_APP_NAME);
-  url.searchParams.set('success_url', params.successUrl);
+  url.searchParams.set('success_url', returnTo);
   // **拒否したときも戻す。** 戻らないと、モニターは WordPress の
   // 画面に取り残されて「何が起きたのか」が分からない
-  url.searchParams.set('reject_url', params.successUrl);
-  url.searchParams.set('state', params.state);
+  url.searchParams.set('reject_url', returnTo);
 
   return url.toString();
 }

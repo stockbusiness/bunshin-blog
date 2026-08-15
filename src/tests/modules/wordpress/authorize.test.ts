@@ -139,11 +139,29 @@ describe('承認画面のURL', () => {
     expect(url.pathname).toBe('/wp-admin/authorize-application.php');
   });
 
-  it('戻り先と state を載せる', () => {
-    expect(url.searchParams.get('success_url')).toBe(
+  /**
+   * **`state` は戻り先のURLに埋める。**
+   *
+   * WordPress は `state` を返さない。`authorize-application.php` が
+   * 見るのは `app_name` `app_id` `success_url` `reject_url` だけで、
+   * **知らないパラメータは捨てる。**
+   *
+   * **元は認証URLの独立したパラメータとして渡していた。** そのため
+   * 戻りに `state` が無く、**承認しても「取り消された」として扱われた**
+   * （本番で判明・2026-08-15）。**このテストはその形を確かめていた。**
+   */
+  it('state は戻り先のURLの中に入る', () => {
+    const success = new URL(url.searchParams.get('success_url') ?? '');
+
+    expect(success.origin + success.pathname).toBe(
       'https://bunshin.example/api/blogs/blog-1/wordpress/authorized',
     );
-    expect(url.searchParams.get('state')).toBe('STATE');
+    expect(success.searchParams.get('state')).toBe('STATE');
+  });
+
+  /** **独立したパラメータでは渡さない。** WordPress が捨てる */
+  it('認証URLの直下に state を置かない', () => {
+    expect(url.searchParams.get('state')).toBeNull();
   });
 
   /**

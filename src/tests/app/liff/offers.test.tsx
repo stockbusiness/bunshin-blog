@@ -40,6 +40,7 @@ function offer(overrides: Partial<OfferJson> = {}): OfferJson {
     affiliateUrl: 'https://asp.example/click?a=xxxx',
     rewardYen: 3000,
     conversionType: 'FREE_SIGNUP',
+    facts: {},
     userExperience: 'USED',
     userRating: null,
     denyConditions: [],
@@ -148,6 +149,53 @@ describe('登録できる', () => {
     );
   });
 
+  /**
+   * **`facts` は記事に書ける数値の出どころ**（SPEC 9.6、Q-050）。
+   * ここに無い価格・条件は書かせない。
+   */
+  it('事実を1行に1つで送る', async () => {
+    vi.mocked(createOffer).mockResolvedValue({ offer: offer() });
+
+    const user = userEvent.setup();
+    await renderPage();
+    await fillRequired(user);
+    await user.type(
+      screen.getByLabelText('事実（1行に1つ）'),
+      '月額1,480円{Enter}初期費用なし',
+    );
+    await user.click(screen.getByRole('button', { name: '登録する' }));
+
+    await waitFor(() => {
+      expect(createOffer).toHaveBeenCalledWith(
+        'blog-1',
+        expect.objectContaining({
+          facts: { items: ['月額1,480円', '初期費用なし'] },
+        }),
+      );
+    });
+  });
+
+  /**
+   * **空なら送らない。** 送ると `facts_updated_at` が入り、
+   * 「確かめた」ことになってしまう（D-13・Q-022）
+   */
+  it('事実が空なら送らない', async () => {
+    vi.mocked(createOffer).mockResolvedValue({ offer: offer() });
+
+    const user = userEvent.setup();
+    await renderPage();
+    await fillRequired(user);
+    await user.click(screen.getByRole('button', { name: '登録する' }));
+
+    await waitFor(() => {
+      expect(createOffer).toHaveBeenCalled();
+    });
+
+    expect(vi.mocked(createOffer).mock.calls[0]?.[1]).not.toHaveProperty(
+      'facts',
+    );
+  });
+
   it('報酬額を入れれば数値で送る', async () => {
     vi.mocked(createOffer).mockResolvedValue({ offer: offer() });
 
@@ -241,6 +289,28 @@ describe('登録済みの案件', () => {
 
     expect(await screen.findByText('格安SIM案件')).toBeVisible();
     expect(screen.getByText(/サンプルASP・使用中・3,000 円/)).toBeVisible();
+  });
+
+  /**
+   * **空のまま気づかないと、記事に数字を書けないことが後で分かる**
+   * （Q-050）。一覧で言う。
+   */
+  it('事実の件数を出す。空なら未記入と言う', async () => {
+    vi.mocked(fetchOffers).mockResolvedValue({
+      offers: [
+        offer(),
+        offer({
+          id: 'offer-2',
+          name: '光回線案件',
+          facts: { items: ['月額'] },
+        }),
+      ],
+    });
+
+    await renderPage();
+
+    expect(await screen.findByText('事実が未記入です')).toBeVisible();
+    expect(screen.getByText('事実 1 件')).toBeVisible();
   });
 
   /** **切れているリンクを黙って置かない**（H-3b） */

@@ -123,9 +123,56 @@ describe('承認画面へ送る', () => {
     expect(url.origin).toBe(SITE);
     expect(url.pathname).toBe('/wp-admin/authorize-application.php');
     // **戻り先は APP_BASE_URL から作る**（リクエストの Host から作らない）
-    expect(url.searchParams.get('success_url')).toBe(
+    const success = new URL(url.searchParams.get('success_url') as string);
+
+    expect(success.origin + success.pathname).toBe(
       `${APP_BASE_URL}/api/blogs/${ownerBlogId}/wordpress/authorized`,
     );
+    // **`state` は戻り先の中。** WordPress は独立した `state` を返さない
+    expect(success.searchParams.get('state')).not.toBeNull();
+  });
+
+  /**
+   * **WordPress が実際にすることだけを真似て、往復を通す。**
+   *
+   * これが無かったために、**`state` を認証URLの独立した
+   * パラメータとして渡す誤りが本番まで残った**（2026-08-15）。
+   * 戻りを自分で組み立てるテストは、**こちらの思い込みを確かめていた。**
+   *
+   * `authorize-application.php` が `success_url` へ足すのは
+   * **`site_url`・`user_login`・`password` の3つだけ**である。
+   */
+  it('WordPress が足す3つだけで、承認の往復が通る', async () => {
+    const issued = await authorize(
+      new Request(`${APP_BASE_URL}/api`, {
+        method: 'POST',
+        headers: {
+          cookie: cookieFor(owner.id),
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ siteUrl: SITE }),
+      }),
+      { params: Promise.resolve({ blogId: ownerBlogId }) },
+    );
+    const { authorizeUrl } = (await issued.json()) as { authorizeUrl: string };
+
+    // WordPress の振る舞いを真似る。**足すのはこの3つだけ**
+    const back = new URL(
+      new URL(authorizeUrl).searchParams.get('success_url') as string,
+    );
+    back.searchParams.set('site_url', SITE);
+    back.searchParams.set('user_login', 'monitor');
+    back.searchParams.set('password', 'abcd efgh ijkl mnop qrst uvwx');
+
+    const response = await authorized(
+      new Request(back, { headers: { cookie: cookieFor(owner.id) } }),
+      { params: Promise.resolve({ blogId: ownerBlogId }) },
+    );
+
+    const location = new URL(response.headers.get('location') as string);
+
+    expect(location.searchParams.get('authorize')).toBe('connected');
+    expect(await connectionCount()).toBe(1);
   });
 
   /**

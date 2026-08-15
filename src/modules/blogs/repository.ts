@@ -397,6 +397,27 @@ export async function applyPublishPaceForAdmin(params: {
 }
 
 /**
+ * ブログを横断で一覧する（Q-049。**ADMIN 専用**）。
+ *
+ * **`...ForAdmin` の形にする**（MODULE_RULES 5）。利用者をまたいで読むので、
+ * 名前で「これは横断参照である」と示す。
+ *
+ * **終了したブログは出さない。** 審査の対象にならない。
+ *
+ * **`userId` は `AppBlog` に含まれる。** 誰のブログかは呼び出し側が
+ * 突き合わせる（`users` を読むのは `blogs` の仕事ではない）。
+ */
+export async function listBlogsForAdmin(): Promise<AppBlog[]> {
+  const records = await prisma.blog.findMany({
+    where: { status: { not: 'CLOSED' } },
+    orderBy: [{ createdAt: 'asc' }],
+    include: WITH_GENRE,
+  });
+
+  return records.map(toAppBlog);
+}
+
+/**
  * ブログにジャンルを割り当てる（Q-049、E-4、SPEC 9.2.2）。
  *
  * ## なぜこの関数が今まで無かったか
