@@ -6,6 +6,7 @@ import OffersPage from '@/app/liff/blogs/[blogId]/offers/page';
 import {
   OfferApiError,
   createOffer,
+  draftOffer,
   fetchOffers,
   type OfferJson,
 } from '@/app/liff/_lib/offers-api';
@@ -26,7 +27,12 @@ vi.mock('@/app/liff/_lib/offers-api', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@/app/liff/_lib/offers-api')>();
 
-  return { ...actual, fetchOffers: vi.fn(), createOffer: vi.fn() };
+  return {
+    ...actual,
+    fetchOffers: vi.fn(),
+    createOffer: vi.fn(),
+    draftOffer: vi.fn(),
+  };
 });
 
 function offer(overrides: Partial<OfferJson> = {}): OfferJson {
@@ -239,6 +245,95 @@ describe('登録できる', () => {
     expect(
       await screen.findByText('案件の内容を確認してください'),
     ).toBeVisible();
+  });
+});
+
+/**
+ * **AIは案を出す係**（Q-053）。読み取った値は下書きで、
+ * **人が確かめてから登録される。**
+ */
+describe('ページから読み取る', () => {
+  it('読み取ると入力欄が埋まる', async () => {
+    vi.mocked(draftOffer).mockResolvedValue({
+      draft: {
+        name: '格安SIM A',
+        conversionType: 'PURCHASE',
+        facts: ['月額1,480円', '初期費用なし'],
+      },
+    });
+
+    const user = userEvent.setup();
+    await renderPage();
+
+    await user.type(
+      await screen.findByLabelText('紹介先のページ'),
+      'https://lp.example.com',
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'このページから読み取る' }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('案件の名前')).toHaveValue('格安SIM A');
+    });
+
+    expect(screen.getByLabelText('事実（1行に1つ）')).toHaveValue(
+      '月額1,480円\n初期費用なし',
+    );
+  });
+
+  /**
+   * **下書きのまま通させない**（D-13・Q-022）。登録すると
+   * `facts_updated_at` が入り「確かめた」ことになる。
+   */
+  it('読み取ったら、確かめるよう伝える', async () => {
+    vi.mocked(draftOffer).mockResolvedValue({
+      draft: { name: 'A', conversionType: 'TRIAL', facts: ['月額1,480円'] },
+    });
+
+    const user = userEvent.setup();
+    await renderPage();
+
+    await user.type(
+      await screen.findByLabelText('紹介先のページ'),
+      'https://lp.example.com',
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'このページから読み取る' }),
+    );
+
+    expect(await screen.findByText(/必ず確かめてください/)).toBeVisible();
+  });
+
+  /** **手で入力する道を塞がない** */
+  it('読み取れなくても、入力欄はそのまま使える', async () => {
+    vi.mocked(draftOffer).mockRejectedValue(
+      new OfferApiError(422, '読み取れませんでした。手で入力してください'),
+    );
+
+    const user = userEvent.setup();
+    await renderPage();
+
+    await user.type(
+      await screen.findByLabelText('紹介先のページ'),
+      'https://lp.example.com',
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'このページから読み取る' }),
+    );
+
+    expect(
+      await screen.findByText('読み取れませんでした。手で入力してください'),
+    ).toBeVisible();
+    expect(screen.getByLabelText('案件の名前')).toBeEnabled();
+  });
+
+  it('URLが空のあいだは読み取れない', async () => {
+    await renderPage();
+
+    expect(
+      await screen.findByRole('button', { name: 'このページから読み取る' }),
+    ).toBeDisabled();
   });
 });
 

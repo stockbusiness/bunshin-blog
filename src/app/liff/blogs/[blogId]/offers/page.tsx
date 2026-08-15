@@ -12,6 +12,7 @@ import {
 import {
   OfferApiError,
   createOffer,
+  draftOffer,
   fetchOffers,
   readFactItems,
   type ConversionType,
@@ -114,6 +115,8 @@ export default function OffersPage({
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [drafting, setDrafting] = useState(false);
+  const [drafted, setDrafted] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -155,7 +158,8 @@ export default function OffersPage({
     <main className="min-h-dvh p-4">
       <h1 className="text-lg font-bold">案件を登録する</h1>
       <p className="mt-1 text-xs leading-relaxed">
-        紹介する商品・サービスです。1件から始められます。あとから足せます
+        紹介する商品・サービスです。<strong>何件でも登録できます。</strong>
+        1件登録すると入力欄が空に戻るので、続けて入れられます
       </p>
 
       {error === null ? null : (
@@ -215,6 +219,7 @@ export default function OffersPage({
               // **続けて登録できるようにする。** 1件ごとに画面を
               // 開き直させない
               setForm(EMPTY_FORM);
+              setDrafted(false);
             },
             (thrown: unknown) => {
               setSubmitting(false);
@@ -275,6 +280,47 @@ export default function OffersPage({
           />
           <p className="text-xs leading-relaxed">
             読者が最後に見るページです（広告主のサイト）
+          </p>
+
+          {/*
+           **AIは案を出す係**（Q-053）。読み取った値は下書きで、
+           **人が確かめてから登録される。** ここでは保存しない
+           */}
+          <button
+            type="button"
+            disabled={drafting || form.landingPageUrl.trim() === ''}
+            className="mt-1 rounded-lg border p-3 text-sm disabled:opacity-50"
+            onClick={() => {
+              setDrafting(true);
+              setError(null);
+
+              void draftOffer(blogId, form.landingPageUrl.trim()).then(
+                ({ draft }) => {
+                  setDrafting(false);
+                  setDrafted(true);
+                  setForm((current) => ({
+                    ...current,
+                    name: draft.name,
+                    conversionType: draft.conversionType,
+                    facts: draft.facts.join('\n'),
+                  }));
+                },
+                (thrown: unknown) => {
+                  setDrafting(false);
+                  setError(
+                    thrown instanceof OfferApiError
+                      ? thrown.message
+                      : '読み取れませんでした。手で入力してください',
+                  );
+                },
+              );
+            }}
+          >
+            {drafting ? '読み取っています' : 'このページから読み取る'}
+          </button>
+          <p className="text-xs leading-relaxed">
+            案件の名前・成果の条件・事実を下書きします。
+            <strong>ASP の名前とリンクは読み取れません</strong>（LPに無いため）
           </p>
         </div>
 
@@ -396,6 +442,17 @@ export default function OffersPage({
             <strong>ここに無い数字は記事に書きません。</strong>
             空のままだと、書ける内容がとても狭くなります
           </p>
+          {/*
+            **下書きのまま通させない**（D-13・Q-022）。登録すると
+            「確かめた」ことになる。**確かめるのは人**
+          */}
+          {drafted ? (
+            <p className="text-xs leading-relaxed">
+              <strong>ページから読み取った下書きです。</strong>
+              合っているか必ず確かめてください。登録すると
+              「確かめた事実」として記録されます
+            </p>
+          ) : null}
         </div>
 
         <button
