@@ -58,6 +58,74 @@ const MAX_URI_LENGTH = 1000;
 /** 押す場所の名前の長さ（LINE の仕様） */
 const MAX_LABEL_LENGTH = 20;
 
+/**
+ * リッチメニューから開く LIFF の画面（Q-054）。
+ *
+ * **`LIFF_BASE_URL` からの相対で持つ。** `buildApprovalUrl` と同じ形で、
+ * LIFF のエンドポイントが `/liff` を指しているぶんは base 側にある。
+ *
+ * **ここに並べる意味。** 行き先を手で打たせない。打たせると、
+ * 打ち間違いが「押しても何も起きないボタン」として本番に出る。
+ */
+export const RICH_MENU_DESTINATIONS = [
+  { label: 'はじめの設定', path: '/onboarding' },
+  { label: '提案を見る', path: '/approvals' },
+  { label: '今週の結果', path: '/results' },
+  { label: 'ブログ', path: '/blogs' },
+] as const;
+
+export type RichMenuDestination = (typeof RICH_MENU_DESTINATIONS)[number];
+
+/** `LIFF_BASE_URL` と相対の道をつなぐ（`buildApprovalUrl` と同じ） */
+export function buildLiffUrl(liffBaseUrl: string, path: string): string {
+  return `${liffBaseUrl.replace(/\/+$/, '')}${path}`;
+}
+
+/**
+ * 行き先を、いまの `LIFF_BASE_URL` に合わせて入れ直す。
+ *
+ * **Q-054 で管理画面から作ることにした一番の理由がこれ。**
+ * LIFF ID が変わると、リッチメニューのボタンは**全部が黙って壊れる**
+ * （押しても何も起きない）。手作業だと4つのURLを入れ直しになる。
+ *
+ * **知っている画面だけを入れ直す。** それ以外のURL（外部のページなど）は
+ * 触らない — 勝手に書き換えるほうが危ない。
+ */
+export function retargetAreasToLiffBase(
+  areas: readonly RichMenuAreaInput[],
+  liffBaseUrl: string,
+): RichMenuAreaInput[] {
+  return areas.map((area) => {
+    const path = matchDestinationPath(area.uri);
+
+    if (path === null) {
+      return area;
+    }
+
+    return { ...area, uri: buildLiffUrl(liffBaseUrl, path) };
+  });
+}
+
+/** 知っている画面のどれかなら、その相対の道を返す */
+function matchDestinationPath(uri: string): string | null {
+  let pathname: string;
+
+  try {
+    pathname = new URL(uri).pathname;
+  } catch {
+    return null;
+  }
+
+  for (const destination of RICH_MENU_DESTINATIONS) {
+    // **末尾で見る。** 先頭は LIFF ID で、それが変わるからここに居る
+    if (pathname.endsWith(destination.path)) {
+      return destination.path;
+    }
+  }
+
+  return null;
+}
+
 export interface RichMenuAreaInput {
   x: number;
   y: number;

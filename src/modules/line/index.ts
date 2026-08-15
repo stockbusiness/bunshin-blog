@@ -43,6 +43,9 @@ export {
 
 export {
   EMPTY_RICH_MENU,
+  RICH_MENU_DESTINATIONS,
+  buildLiffUrl,
+  retargetAreasToLiffBase,
   applyRichMenu,
   createConfiguredRichMenuClient,
   describeRichMenuState,
@@ -55,6 +58,7 @@ export {
   type AppliedRichMenu,
   type ApplyRichMenuDeps,
   type RichMenuAreaInput,
+  type RichMenuDestination,
   type RichMenuInput,
   type RichMenuState,
   type StoredRichMenu,

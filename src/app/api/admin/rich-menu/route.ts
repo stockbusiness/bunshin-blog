@@ -1,7 +1,12 @@
 import { z } from 'zod';
 import { AppError, toErrorHttpResponse } from '@/lib/errors';
 import { requireAdmin } from '@/modules/auth';
-import { readRichMenu, saveRichMenu } from '@/modules/line';
+import {
+  RICH_MENU_DESTINATIONS,
+  readRichMenu,
+  saveRichMenu,
+} from '@/modules/line';
+import { getRuntimeEnv } from '@/modules/settings';
 
 /**
  * `GET|PUT /api/admin/rich-menu`（Q-054、TASKS H-6）
@@ -43,7 +48,22 @@ export async function GET(request: Request): Promise<Response> {
   try {
     await requireAdmin(request.headers.get('cookie'));
 
-    return Response.json({ richMenu: await readRichMenu() });
+    const [richMenu, env] = await Promise.all([
+      readRichMenu(),
+      getRuntimeEnv(),
+    ]);
+
+    return Response.json({
+      richMenu,
+      /**
+       * **行き先を組み立てるのに要る。**（`RICH_MENU_DESTINATIONS`）
+       *
+       * **1つだけ取り出す。** `getRuntimeEnv()` は秘密の平文を含む辞書を
+       * 返すので、そのまま渡さない（SPEC 14.2）。
+       */
+      liffBaseUrl: env['LIFF_BASE_URL']?.trim() ?? '',
+      destinations: RICH_MENU_DESTINATIONS,
+    });
   } catch (error) {
     return toErrorHttpResponse(error);
   }
