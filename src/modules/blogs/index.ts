@@ -12,13 +12,14 @@ export {
   findBlogForUser,
   requireBlogForUser,
   applyPublishPaceForAdmin,
+  assignGenreForAdmin,
   createBlogForUser,
   updateBlogForUser,
   closeBlogForUser,
   getSlotUsageForUser,
 } from './repository';
 
-export { findGenre, listSelectableGenres } from './genres';
+export { createGenre, findGenre, listSelectableGenres } from './genres';
 
 export {
   ownedBy,
