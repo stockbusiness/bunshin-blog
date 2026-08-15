@@ -79,6 +79,7 @@ function offer(overrides: Partial<OfferJson> = {}): OfferJson {
     affiliateUrl: 'https://asp.example/click',
     rewardYen: null,
     conversionType: 'FREE_SIGNUP',
+    facts: {},
     userExperience: 'USED',
     userRating: null,
     denyConditions: [],
