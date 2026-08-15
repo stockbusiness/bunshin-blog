@@ -151,7 +151,7 @@ function describeTransportFailure(error: unknown): {
 }
 
 /** `/wp-json/` の応答に `wp/v2` の名前空間があるか */
-function hasWpV2Namespace(json: unknown): boolean {
+export function hasWpV2Namespace(json: unknown): boolean {
   if (typeof json !== 'object' || json === null) {
     return false;
   }
@@ -221,6 +221,14 @@ function apiMessage(fallback: string, json: unknown): string {
 export async function runConnectionTest(params: {
   siteUrl: string;
   client: WordpressClient;
+  /**
+   * 使っている REST の形（Q-052）。`plain` は**書き換えが効いていない**
+   * サイトで使う逃げ道で、**通っても伝える。**
+   *
+   * 黙って通すと、**段10で入れる `/go/{code}` が404になったときに
+   * 原因が分からない。** 同じ理由で塞がっているので、ここで言う。
+   */
+  restStyle?: 'pretty' | 'plain';
 }): Promise<ConnectionTestResult> {
   const context: CheckContext = { client: params.client, checks: [] };
 
@@ -279,7 +287,18 @@ export async function runConnectionTest(params: {
       });
     }
 
-    record(context, 'REST_REACHABLE', 'PASSED');
+    // **逃げ道で通ったことを隠さない**（Q-052）
+    record(
+      context,
+      'REST_REACHABLE',
+      'PASSED',
+      null,
+      params.restStyle === 'plain'
+        ? '別の入口で届きました。ただし書き換え規則が効いていないため、' +
+            '記事のリンク（/go/…）は404になります。' +
+            '管理画面の「設定 → パーマリンク」を「基本」以外にして保存してください'
+        : null,
+    );
   } catch (error) {
     const { code, message } = describeTransportFailure(error);
     record(context, 'REST_REACHABLE', 'FAILED', code, message);

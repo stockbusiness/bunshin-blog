@@ -5,6 +5,7 @@ import { recordAudit } from '@/modules/audit';
 import { notFoundError, requireBlogForUser } from '@/modules/blogs';
 import { createWordpressClient, type WordpressClient } from './client';
 import {
+  hasWpV2Namespace,
   runConnectionTest,
   type ConnectionTestResult,
 } from './connection-test';
@@ -15,6 +16,11 @@ import {
   type PublishDraftResult,
 } from './draft';
 import { notConnectedError } from './errors';
+import {
+  deriveApiBaseUrl,
+  derivePlainApiBaseUrl,
+  restStyleOf,
+} from './site-url';
 import { syncPost } from './sync';
 import {
   connectWordpress,
@@ -237,6 +243,71 @@ export async function readWordpressCredentialsForUser(params: {
  *
  * @param clientFactory 差し替え用。既定は `safeFetch` を使う実クライアント
  */
+/**
+ * 届く REST の入口を選ぶ（Q-052）。
+ *
+ * ## なぜ2つ試すのか
+ *
+ * **パーマリンクが「基本」のサイトでは `/wp-json/` が404になる。**
+ * WordPress がその書き換え規則を作らないためで、**サイトも REST も
+ * 生きている。** 実際に本番のサイトがこの状態だった（2026-08-15）。
+ *
+ * **`/index.php?rest_route=` は書き換えを通らない**ので届く。
+ * WordPress 自身が `_links.self` でこの形を案内している。
+ *
+ * ## 逃げ道で通っても、そのままにしない
+ *
+ * 書き換えが効いていないと、**段10で入れる `/go/{code}` も404になる。**
+ * だから `runConnectionTest` へ形を渡し、**通っても画面で伝える。**
+ *
+ * ## 保存済みの形を先に試す
+ *
+ * 2回目からは1回で当たる。**毎回2回叩かない。**
+ */
+async function resolveReachableBase(params: {
+  siteUrl: string;
+  storedBase: string;
+  credentials: WordpressCredentials;
+  factory: (input: {
+    apiBaseUrl: string;
+    credentials: WordpressCredentials;
+  }) => WordpressClient;
+}): Promise<{ apiBaseUrl: string; client: WordpressClient }> {
+  const candidates = [
+    params.storedBase,
+    deriveApiBaseUrl(params.siteUrl),
+    derivePlainApiBaseUrl(params.siteUrl),
+  ].filter((base, index, all) => all.indexOf(base) === index);
+
+  for (const apiBaseUrl of candidates) {
+    const client = params.factory({
+      apiBaseUrl,
+      credentials: params.credentials,
+    });
+
+    try {
+      const root = await client.request({ path: '/', authenticated: false });
+
+      if (root.status < 400 && hasWpV2Namespace(root.json)) {
+        return { apiBaseUrl, client };
+      }
+    } catch {
+      // 次の候補へ。**理由はここで判断しない** —
+      // どれも駄目なら `runConnectionTest` が同じ失敗をもう一度拾い、
+      // **モニターへ出す文言はそこが決める**
+    }
+  }
+
+  // **保存済みの形で流す。** 失敗の理由は接続テストが出す
+  return {
+    apiBaseUrl: params.storedBase,
+    client: params.factory({
+      apiBaseUrl: params.storedBase,
+      credentials: params.credentials,
+    }),
+  };
+}
+
 export async function testWordpressConnectionForUser(
   params: { userId: string; blogId: string },
   clientFactory?: (input: {
@@ -252,18 +323,24 @@ export async function testWordpressConnectionForUser(
   }
 
   const credentials = await readWordpressCredentials({ blogId }, deps);
+  const factory = clientFactory ?? createWordpressClient;
 
-  const client = (clientFactory ?? createWordpressClient)({
-    apiBaseUrl: record.apiBaseUrl,
+  const resolved = await resolveReachableBase({
+    siteUrl: record.siteUrl,
+    storedBase: record.apiBaseUrl,
     credentials,
+    factory,
   });
 
   const result = await runConnectionTest({
     siteUrl: record.siteUrl,
-    client,
+    client: resolved.client,
+    restStyle: restStyleOf(resolved.apiBaseUrl),
   });
 
   await db.update(blogId, {
+    // **届いた形を覚える**（Q-052）。次からは1回で当たる
+    apiBaseUrl: resolved.apiBaseUrl,
     connectionStatus: result.ok ? 'CONNECTED' : 'FAILED',
     canCreatePosts: result.canCreatePosts,
     canEditPosts: result.canEditPosts,
