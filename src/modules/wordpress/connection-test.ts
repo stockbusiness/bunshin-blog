@@ -120,10 +120,20 @@ function describeTransportFailure(error: unknown): {
   }
 
   if (error.code === HTTP_ERROR_CODES.unexpectedContentType) {
+    // **どこで何を変えるかまで書く**（本番で実際にここで止まった・2026-08-15）。
+    //
+    // WordPress は**パーマリンクが「基本」のとき `/wp-json/` の
+    // 書き換え規則を作らない。** そのため404のHTMLが返る。
+    //
+    // **`?rest_route=` で回避しない。** 「基本」のままだと段10で入れる
+    // `/go/{code}` も同じ理由で404になる。**ここで止めないと、
+    // 失敗が後ろへずれて原因が分からなくなる。**
     return {
       code: WORDPRESS_TEST_ERROR_CODES.notWordpress,
       message:
-        'WordPress の REST API が応答しませんでした。パーマリンク設定が「基本」になっていないか確認してください',
+        'WordPress の REST API が応答しませんでした。' +
+        '管理画面の「設定 → パーマリンク」を開き、' +
+        '「基本」以外（「投稿名」を推奨）に変えて保存してから、もう一度お試しください',
     };
   }
 
