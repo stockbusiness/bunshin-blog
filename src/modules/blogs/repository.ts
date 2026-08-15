@@ -395,3 +395,61 @@ export async function applyPublishPaceForAdmin(params: {
 
   return toAppBlog(updated);
 }
+
+/**
+ * ブログにジャンルを割り当てる（Q-049、E-4、SPEC 9.2.2）。
+ *
+ * ## なぜこの関数が今まで無かったか
+ *
+ * **審査（`content-planning`）は `planning_runs` に結果を記録するが、
+ * ブログにジャンルを結び付けていなかった。** そのため
+ * `blogs.genre_id` に値を入れる経路がコードのどこにも無く、
+ * **段7（ジャンルを決める）は誰にも通せなかった**（Q-048・Q-049）。
+ *
+ * ## ADMIN 専用にする
+ *
+ * **審査を回すのは ADMIN**（Q-049 の (b)）。停止条件の判定には
+ * 検索上位の内訳が要り、それを取る仕組みが無いため、SPEC 9.2.2 の
+ * フォールバック（ADMIN の手動入力）を正面から使う。
+ *
+ * **利用者向けの `updateBlogForUser` に `genreId` を足さない。**
+ * 足すと**審査を通さずにジャンルを付けられる。** それは
+ * 「停止条件を満たすジャンルが通過しない」（E-4 の完了条件）を壊す。
+ *
+ * ## 審査そのものはここで行わない
+ *
+ * ここは書き込みだけ。判定は `judgeGenre` が持つ（MODULE_RULES 3）。
+ * **`blogs` から `content-planning` を呼ぶと依存が逆向きになる**ので、
+ * 順に呼ぶのは上位（`src/app/`）の仕事。
+ *
+ * @throws {AppError} ブログが無い場合（404）
+ * @throws {AppError} ジャンルが無い場合（422）
+ */
+export async function assignGenreForAdmin(params: {
+  blogId: string;
+  genreId: string;
+}): Promise<AppBlog> {
+  try {
+    const updated = await prisma.blog.update({
+      where: { id: params.blogId },
+      data: { genreId: params.genreId },
+      include: WITH_GENRE,
+    });
+
+    return toAppBlog(updated);
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      // 対象のブログが無い
+      if (error.code === 'P2025') {
+        throw AppError.notFound('ブログが見つかりません');
+      }
+
+      // `genre_id` の外部キー違反
+      if (error.code === 'P2003') {
+        throw AppError.validationFailed('ジャンルが見つかりません');
+      }
+    }
+
+    throw error;
+  }
+}
