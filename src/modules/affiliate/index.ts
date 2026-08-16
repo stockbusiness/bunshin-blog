@@ -50,6 +50,26 @@ export {
 } from './lp-evaluation';
 
 export {
+  CSV_FIELDS,
+  MAX_CSV_BYTES,
+  MAX_CSV_ROWS,
+  applyMapping,
+  decodeCsvBytes,
+  parseCsv,
+  readConversionType,
+  readRewardYen,
+  readStatus,
+  sanitizeMapping,
+  suggestColumnMapping,
+  toScorableShape,
+  type ColumnMapping,
+  type CsvFieldKey,
+  type CsvTable,
+  type ImportCandidate,
+  type SuggestMappingDeps,
+} from './csv-import';
+
+export {
   OFFER_CATALOG_STATUSES,
   LINK_MODES,
   createCatalogItemForAdmin,

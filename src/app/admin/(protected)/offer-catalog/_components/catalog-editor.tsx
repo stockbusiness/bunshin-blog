@@ -27,6 +27,7 @@ import {
   type ConversionType,
   type LinkMode,
 } from '../_lib/catalog-api';
+import { CsvImport } from './csv-import';
 
 /**
  * 案件カタログを作る画面（Q-055、段8）。
@@ -221,8 +222,20 @@ export function CatalogEditor() {
         </p>
       )}
 
+      {/*
+        **まとめて入れる道を先に出す。** 1件ずつ入れるのは、
+        カタログに無いものを足すときと、事実を入れるとき
+      */}
+      <CsvImport
+        onRegistered={() => {
+          void fetchCatalog().then((loaded) => {
+            setItems(loaded.items);
+          });
+        }}
+      />
+
       <Card
-        title={editingId === null ? '案件を足す' : '案件を直す'}
+        title={editingId === null ? '案件を足す（1件ずつ）' : '案件を直す'}
         description={
           <>
             <strong>ここで入れた事実が、全モニターの記事に載ります。</strong>

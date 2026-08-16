@@ -135,3 +135,60 @@ export function draftCatalogItem(
     body: JSON.stringify({ landingPageUrl }),
   });
 }
+
+/** CSVの取り込みで返る候補（Q-056）。**まだ保存されていない** */
+export interface ImportCandidateJson {
+  rowNumber: number;
+  name: string;
+  advertiserName: string | null;
+  landingPageUrl: string;
+  rewardYen: number | null;
+  conversionType: ConversionType;
+  denyConditions: string[];
+  status: string;
+  problem: string | null;
+}
+
+export interface ImportPreviewJson {
+  headers: string[];
+  /** 項目 → 列の番号。**人が直せる** */
+  mapping: Record<string, number>;
+  /** 足切りを通ったもの */
+  kept: ImportCandidateJson[];
+  /** 落ちた理由ごとの件数。**黙って捨てない** */
+  droppedByReason: Record<string, number>;
+  totalRows: number;
+  droppedRows: number;
+}
+
+/**
+ * CSVを読んで、足切りを通った候補を返す。**保存しない。**
+ *
+ * `mapping` を渡さなければ、AIが列の対応を推測する。
+ */
+export function previewImport(
+  csvBase64: string,
+  mapping?: Record<string, number>,
+): Promise<ImportPreviewJson> {
+  return request(`${BASE}/import`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      action: 'preview',
+      csv: csvBase64,
+      ...(mapping === undefined ? {} : { mapping }),
+    }),
+  });
+}
+
+/** 確かめた候補をカタログへ入れる。**下書きとして入る** */
+export function registerImported(
+  aspName: string,
+  items: Omit<ImportCandidateJson, 'rowNumber' | 'problem' | 'status'>[],
+): Promise<{ added: number; skipped: number }> {
+  return request(`${BASE}/import`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ action: 'register', aspName, items }),
+  });
+}
