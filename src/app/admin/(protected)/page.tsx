@@ -34,6 +34,9 @@ export default async function AdminHomePage() {
         <Link href="/admin/genres" className="text-sm underline">
           ジャンルの審査（段7）
         </Link>
+        <Link href="/admin/rich-menu" className="text-sm underline">
+          LINEのメニュー
+        </Link>
         <Link href="/admin/dashboard" className="text-sm underline">
           実験の集計（ジャンル別・戦略別・ブログ別）
         </Link>
