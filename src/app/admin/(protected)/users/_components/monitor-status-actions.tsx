@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { BUTTON, BUTTON_PRIMARY } from '../../_components/ui';
 
 /**
  * モニターの状態を変えるボタン（TASKS H-1、SPEC 6.2）。
@@ -102,13 +103,19 @@ export function MonitorStatusActions({
           disabled={busy}
           onClick={() => void run(action)}
           aria-label={`${displayName} の${LABELS[action]}`}
-          className="rounded border px-2 py-1 text-xs"
+          // **承認だけを強い色にする。** `INVITED` のまま待たせるのが
+          // いちばん困る（本人は何もできない）。停止と再開は戻せるので中立
+          className={`${action === 'ACTIVATE' ? BUTTON_PRIMARY : BUTTON} whitespace-nowrap px-2 py-1 text-xs`}
         >
           {LABELS[action]}
         </button>
       ))}
 
-      {error === null ? null : <p className="text-xs">{error}</p>}
+      {error === null ? null : (
+        <p role="alert" className="text-xs text-red-700">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

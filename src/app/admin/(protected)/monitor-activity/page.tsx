@@ -9,6 +9,17 @@ import {
 } from '@/modules/approvals';
 import { requireAdmin } from '@/modules/auth';
 import { listMonitorsForAdmin } from '@/modules/users';
+import {
+  Badge,
+  BackLink,
+  EmptyState,
+  Page,
+  PageHeader,
+  TD,
+  TH,
+  TableFrame,
+  type BadgeTone,
+} from '../_components/ui';
 
 /**
  * `/admin/monitor-activity` モニターが提案に反応しているか（TASKS J-5）。
@@ -33,6 +44,19 @@ const VERDICT_ORDER: Readonly<Record<ActivityVerdict, number>> = {
   LOW_RESPONSE: 1,
   NOT_ENOUGH_DATA: 2,
   ACTIVE: 3,
+};
+
+/**
+ * 色は**手を打つ順**に合わせる（`VERDICT_ORDER` と同じ並び）。
+ *
+ * **`NOTHING_SENT` を赤にする。** 声をかける相手ではなく、
+ * **こちらが止まっている** — 放っておくと何日でも進まない。
+ */
+const ACTIVITY_TONES: Readonly<Record<ActivityVerdict, BadgeTone>> = {
+  NOTHING_SENT: 'danger',
+  LOW_RESPONSE: 'warn',
+  NOT_ENOUGH_DATA: 'neutral',
+  ACTIVE: 'ok',
 };
 
 function formatRate(rate: number | null): string {
@@ -70,47 +94,54 @@ export default async function MonitorActivityPage() {
     );
 
   return (
-    <main className="mx-auto max-w-4xl p-6">
-      <h1 className="text-xl font-bold">モニターの反応</h1>
-
-      <p className="mt-2 text-sm text-gray-600">
-        直近 {ACTIVITY_WINDOW_DAYS} 日に<strong>送れた</strong>提案のうち、
-        承認・見送り・修正依頼のいずれかが行われた割合。
-        <strong>見ただけは反応に数えない</strong>
-        （開いて閉じたのは判断ではない）。 送信が {MIN_SENT_FOR_JUDGEMENT}{' '}
-        件に満たない人は判定しない。
-      </p>
+    <Page>
+      <PageHeader
+        title="モニターの反応"
+        lead={
+          <>
+            直近 {ACTIVITY_WINDOW_DAYS} 日に<strong>送れた</strong>
+            提案のうち、承認・見送り・修正依頼のいずれかが行われた割合です。
+            <strong>見ただけは反応に数えません</strong>
+            （開いて閉じたのは判断ではないため）。送信が
+            {MIN_SENT_FOR_JUDGEMENT} 件に満たない人は判定しません。
+          </>
+        }
+      />
 
       {rows.length === 0 ? (
-        <p className="mt-6 text-sm text-gray-600">
-          参加中のモニターがいません。
-        </p>
+        <EmptyState>参加中のモニターがいません。</EmptyState>
       ) : (
-        <div className="mt-6 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left">
-                <th className="py-2 pr-4">モニター</th>
-                <th className="py-2 pr-4">送った</th>
-                <th className="py-2 pr-4">反応した</th>
-                <th className="py-2 pr-4">割合</th>
-                <th className="py-2">状態</th>
+        <TableFrame minWidth="40rem">
+          <thead>
+            <tr>
+              <th className={TH}>モニター</th>
+              <th className={TH}>送った</th>
+              <th className={TH}>反応した</th>
+              <th className={TH}>割合</th>
+              <th className={TH}>状態</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id}>
+                <td className={`${TD} font-medium text-slate-900`}>
+                  {row.displayName}
+                </td>
+                <td className={TD}>{row.sent}</td>
+                <td className={TD}>{row.responded}</td>
+                <td className={`${TD} font-medium`}>{formatRate(row.rate)}</td>
+                <td className={TD}>
+                  <Badge tone={ACTIVITY_TONES[row.verdict]}>
+                    {ACTIVITY_LABELS[row.verdict]}
+                  </Badge>
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.id} className="border-b">
-                  <td className="py-2 pr-4">{row.displayName}</td>
-                  <td className="py-2 pr-4">{row.sent}</td>
-                  <td className="py-2 pr-4">{row.responded}</td>
-                  <td className="py-2 pr-4">{formatRate(row.rate)}</td>
-                  <td className="py-2">{ACTIVITY_LABELS[row.verdict]}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </TableFrame>
       )}
-    </main>
+
+      <BackLink />
+    </Page>
   );
 }

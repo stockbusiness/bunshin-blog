@@ -1,6 +1,7 @@
 'use client';
 
 import { useId, useState } from 'react';
+import { BUTTON_PRIMARY, HINT, INPUT } from '../../_components/ui';
 
 /**
  * ジャンルを足す（Q-049）。
@@ -40,20 +41,23 @@ export function GenreCreateForm() {
   const canSubmit = !busy && name.trim() !== '' && category.trim() !== '';
 
   return (
-    <section className="mt-6 rounded border p-4">
-      <h2 className="text-base font-bold">ジャンルを足す</h2>
-      <p className="mt-1 text-xs text-gray-600">
+    <section className="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <h2 className="text-base font-bold text-slate-900">ジャンルを足す</h2>
+      <p className={`mt-1 ${HINT}`}>
         分類は粗く（集計とYMYLの単位）、名前は細かく（AIに渡す言葉）。
         同じ分類の中では YMYL を揃えてください。
       </p>
 
       <div className="mt-4 flex flex-col gap-1">
-        <label htmlFor={categoryId} className="text-sm font-bold">
+        <label
+          htmlFor={categoryId}
+          className="text-sm font-medium text-slate-700"
+        >
           分類（粗い）
         </label>
         <input
           id={categoryId}
-          className="rounded border p-2 text-sm"
+          className={INPUT}
           value={category}
           maxLength={100}
           placeholder="通信"
@@ -64,12 +68,12 @@ export function GenreCreateForm() {
       </div>
 
       <div className="mt-3 flex flex-col gap-1">
-        <label htmlFor={nameId} className="text-sm font-bold">
+        <label htmlFor={nameId} className="text-sm font-medium text-slate-700">
           名前（細かい）
         </label>
         <input
           id={nameId}
-          className="rounded border p-2 text-sm"
+          className={INPUT}
           value={name}
           maxLength={100}
           placeholder="格安SIM"
@@ -80,12 +84,12 @@ export function GenreCreateForm() {
       </div>
 
       <div className="mt-3 flex flex-col gap-1">
-        <label htmlFor={riskId} className="text-sm font-bold">
+        <label htmlFor={riskId} className="text-sm font-medium text-slate-700">
           YMYL リスク
         </label>
         <select
           id={riskId}
-          className="rounded border p-2 text-sm"
+          className={INPUT}
           value={ymylRisk}
           onChange={(event) => {
             setYmylRisk(event.target.value);
@@ -100,13 +104,13 @@ export function GenreCreateForm() {
       </div>
 
       {error === null ? null : (
-        <p role="alert" className="mt-3 text-sm">
+        <p role="alert" className="mt-3 text-sm text-red-700">
           {error}
         </p>
       )}
 
       {message === null ? null : (
-        <p role="status" className="mt-3 text-sm">
+        <p role="status" className="mt-3 text-sm text-slate-700">
           {message}
         </p>
       )}
@@ -114,7 +118,7 @@ export function GenreCreateForm() {
       <button
         type="button"
         disabled={!canSubmit}
-        className="mt-4 rounded border px-4 py-2 text-sm font-bold disabled:opacity-50"
+        className={`mt-4 ${BUTTON_PRIMARY}`}
         onClick={() => {
           setBusy(true);
           setError(null);

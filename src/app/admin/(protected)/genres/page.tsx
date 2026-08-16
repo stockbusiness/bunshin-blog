@@ -3,6 +3,14 @@ import { requireAdmin } from '@/modules/auth';
 import { listBlogsForAdmin, listSelectableGenres } from '@/modules/blogs';
 import { GenreCreateForm } from './_components/genre-create-form';
 import { GenreReviewForm } from './_components/genre-review-form';
+import {
+  Badge,
+  BackLink,
+  Card,
+  EmptyState,
+  Page,
+  PageHeader,
+} from '../_components/ui';
 
 /**
  * `/admin/genres` ジャンルの審査（Q-049、E-4、SPEC 9.2.2）。
@@ -48,44 +56,55 @@ export default async function AdminGenresPage() {
   }));
 
   return (
-    <main className="mx-auto max-w-3xl">
-      <h1 className="text-lg font-bold">ジャンルの審査</h1>
-      <p className="mt-2 text-sm leading-relaxed">
-        モニターのブログにジャンルを付けます。
-        <strong>停止条件を満たすジャンルは付きません</strong>
-        （SPEC 9.2.2）。
-      </p>
+    <Page>
+      <PageHeader
+        title="ジャンルの審査"
+        lead={
+          <>
+            モニターのブログにジャンルを付けます。
+            <strong>停止条件を満たすジャンルは付きません</strong>
+            （SPEC 9.2.2）。
+          </>
+        }
+      />
 
       <GenreCreateForm />
 
-      <section className="mt-6">
-        <h2 className="text-base font-bold">ジャンル（{genres.length} 件）</h2>
-        <ul className="mt-2 flex flex-col gap-1 text-sm">
-          {genres.map((genre) => (
-            <li key={genre.id}>
-              {genre.category}／{genre.name}
-              {genre.ymylRisk === 'HIGH' ? '・YMYL' : ''}
-            </li>
-          ))}
-        </ul>
-      </section>
+      <Card title="ジャンル" description={`${String(genres.length)} 件`}>
+        {genres.length === 0 ? (
+          <p className="text-sm text-slate-500">まだありません。</p>
+        ) : (
+          <ul className="flex flex-wrap gap-2">
+            {genres.map((genre) => (
+              <li key={genre.id}>
+                <Badge tone={genre.ymylRisk === 'HIGH' ? 'danger' : 'neutral'}>
+                  {genre.category}／{genre.name}
+                  {genre.ymylRisk === 'HIGH' ? '・YMYL' : ''}
+                </Badge>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
 
       {/*
         **ブログが無いうちは審査の入力を出さない。** 出しても
         選ぶ先が無く、「壊れている」に見える
       */}
       {blogs.length === 0 ? (
-        <p className="mt-6 text-sm">
+        <EmptyState>
           審査できるブログがまだありません。モニターが段5を終えると出ます。
-        </p>
+        </EmptyState>
       ) : (
-        <section className="mt-6">
-          <h2 className="text-base font-bold">ブログ（{blogs.length} 件）</h2>
+        <section className="flex flex-col gap-3">
+          <h2 className="text-base font-bold text-slate-900">
+            ブログ（{blogs.length} 件）
+          </h2>
 
           {blogs.map((blog) => (
-            <article key={blog.id} className="mt-4">
-              <h3 className="text-sm font-bold">{blog.name}</h3>
-              <p className="mt-1 text-xs text-gray-600">
+            <Card key={blog.id}>
+              <h3 className="text-sm font-bold text-slate-900">{blog.name}</h3>
+              <p className="mt-1 text-xs text-slate-500">
                 枠 {blog.slotNumber}・
                 {blog.genre === null
                   ? 'ジャンル未設定'
@@ -93,10 +112,12 @@ export default async function AdminGenresPage() {
               </p>
 
               <GenreReviewForm blogId={blog.id} genres={options} />
-            </article>
+            </Card>
           ))}
         </section>
       )}
-    </main>
+
+      <BackLink />
+    </Page>
   );
 }

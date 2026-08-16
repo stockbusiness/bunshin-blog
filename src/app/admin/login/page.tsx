@@ -43,48 +43,57 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center p-6">
-      <h1 className="text-lg font-bold">管理画面へのログイン</h1>
+    <main className="flex min-h-dvh flex-col justify-center bg-slate-50 p-6">
+      <div className="mx-auto w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h1 className="text-xl font-bold tracking-tight text-slate-900">
+          管理画面へのログイン
+        </h1>
 
-      {done ? (
-        <p className="mt-6 text-sm leading-relaxed">{ACCEPTED_MESSAGE}</p>
-      ) : (
-        <form
-          onSubmit={(e) => void submit(e)}
-          className="mt-6 flex flex-col gap-4"
-        >
-          <label htmlFor="email" className="text-sm font-bold">
-            メールアドレス
-          </label>
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            autoComplete="email"
-            className="w-full rounded border p-3 text-base"
-          />
-
-          <button
-            type="submit"
-            disabled={sending}
-            className="rounded bg-black p-4 text-base font-bold text-white disabled:opacity-50"
+        {done ? (
+          <p className="mt-6 text-sm leading-relaxed text-slate-700">
+            {ACCEPTED_MESSAGE}
+          </p>
+        ) : (
+          <form
+            onSubmit={(e) => void submit(e)}
+            className="mt-6 flex flex-col gap-4"
           >
-            {sending ? '送信しています' : 'ログインリンクを送る'}
-          </button>
+            <label
+              htmlFor="email"
+              className="text-sm font-medium text-slate-700"
+            >
+              メールアドレス
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-base text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-slate-900"
+            />
 
-          {failed ? (
-            <p className="text-sm leading-relaxed">
-              通信に失敗しました。時間をおいてお試しください
-            </p>
-          ) : null}
-        </form>
-      )}
+            <button
+              type="submit"
+              disabled={sending}
+              className="rounded-lg bg-slate-900 p-4 text-base font-bold text-white transition hover:bg-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {sending ? '送信しています' : 'ログインリンクを送る'}
+            </button>
 
-      <p className="mt-8 text-xs leading-relaxed">
-        リンクは15分間、1回だけ使えます。
-      </p>
+            {failed ? (
+              <p role="alert" className="text-sm leading-relaxed text-red-700">
+                通信に失敗しました。時間をおいてお試しください
+              </p>
+            ) : null}
+          </form>
+        )}
+
+        <p className="mt-8 text-xs leading-relaxed text-slate-500">
+          リンクは15分間、1回だけ使えます。
+        </p>
+      </div>
     </main>
   );
 }

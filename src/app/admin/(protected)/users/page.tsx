@@ -12,6 +12,17 @@ import {
   type OnboardingStatus,
 } from '@/modules/users';
 import { MonitorStatusActions } from './_components/monitor-status-actions';
+import {
+  Badge,
+  BackLink,
+  EmptyState,
+  Page,
+  PageHeader,
+  TD,
+  TH,
+  TableFrame,
+  type BadgeTone,
+} from '../_components/ui';
 
 /**
  * `/admin/users` モニター一覧（TASKS B-7、SPEC 6.2）。
@@ -40,6 +51,19 @@ const USER_STATUS_LABELS: Record<AdminMonitorSummary['status'], string> = {
   WITHDRAWN: '退会',
 };
 
+/**
+ * 状態の色。
+ *
+ * **`INVITED` を目立たせる。** 承認しないと本人は何もできないまま
+ * 待つことになり、**画面には何も起きていないように見える。**
+ */
+const USER_STATUS_TONES: Record<AdminMonitorSummary['status'], BadgeTone> = {
+  INVITED: 'warn',
+  ACTIVE: 'ok',
+  PAUSED: 'neutral',
+  WITHDRAWN: 'neutral',
+};
+
 /** 日付は年月日まで。時刻まで出しても運用の判断に使わない */
 function formatDate(value: Date): string {
   return value.toISOString().slice(0, 10);
@@ -65,39 +89,44 @@ export default async function AdminUsersPage() {
   ]);
 
   return (
-    <div>
-      <h1 className="text-lg font-bold">モニター</h1>
-      <p className="mt-1 text-sm">{monitors.length} 名</p>
+    <Page>
+      <PageHeader
+        title="モニター"
+        meta={`${String(monitors.length)} 名`}
+        lead="参加の承認と停止を行います。退会はここに置いていません（停止のつもりで退会させる事故を防ぐため）。"
+      />
 
       {monitors.length === 0 ? (
-        <p className="mt-6 text-sm">まだモニターが登録されていません。</p>
+        <EmptyState>
+          まだモニターが登録されていません。LINEで友だち追加して同意まで進むと、ここに出ます。
+        </EmptyState>
       ) : (
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[48rem] border-collapse text-sm">
-            <thead>
-              <tr className="border-b text-left">
-                <th className="p-2">モニター</th>
-                <th className="p-2">状態</th>
-                <th className="p-2">オンボーディング</th>
-                <th className="p-2">同意</th>
-                <th className="p-2">ブログ</th>
-                <th className="p-2">登録日</th>
-                <th className="p-2">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {monitors.map((monitor) => (
-                <MonitorRow
-                  key={monitor.id}
-                  monitor={monitor}
-                  blogs={blogCounts[monitor.id] ?? EMPTY_BLOG_COUNT}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <TableFrame>
+          <thead>
+            <tr>
+              <th className={TH}>モニター</th>
+              <th className={TH}>状態</th>
+              <th className={TH}>オンボーディング</th>
+              <th className={TH}>同意</th>
+              <th className={TH}>ブログ</th>
+              <th className={TH}>登録日</th>
+              <th className={TH}>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {monitors.map((monitor) => (
+              <MonitorRow
+                key={monitor.id}
+                monitor={monitor}
+                blogs={blogCounts[monitor.id] ?? EMPTY_BLOG_COUNT}
+              />
+            ))}
+          </tbody>
+        </TableFrame>
       )}
-    </div>
+
+      <BackLink />
+    </Page>
   );
 }
 
@@ -109,27 +138,33 @@ function MonitorRow({
   blogs: AdminBlogCount;
 }) {
   return (
-    <tr className="border-b align-top">
-      <td className="p-2">
-        <p className="font-bold">{monitor.displayName}</p>
+    <tr>
+      <td className={TD}>
+        <p className="font-bold text-slate-900">{monitor.displayName}</p>
         {monitor.email === null ? null : (
-          <p className="text-xs">{monitor.email}</p>
+          <p className="text-xs text-slate-500">{monitor.email}</p>
         )}
       </td>
-      <td className="p-2">{USER_STATUS_LABELS[monitor.status]}</td>
-      <td className="p-2">
+      <td className={TD}>
+        <Badge tone={USER_STATUS_TONES[monitor.status]}>
+          {USER_STATUS_LABELS[monitor.status]}
+        </Badge>
+      </td>
+      <td className={TD}>
         {monitor.onboardingStatus === null
           ? '未開始'
           : ONBOARDING_LABELS[monitor.onboardingStatus]}
       </td>
-      <td className="p-2">
+      <td className={TD}>
         <ConsentCell monitor={monitor} />
       </td>
-      <td className="p-2">
+      <td className={TD}>
         <BlogCell blogs={blogs} />
       </td>
-      <td className="p-2">{formatDate(monitor.createdAt)}</td>
-      <td className="p-2">
+      <td className={`${TD} whitespace-nowrap text-xs`}>
+        {formatDate(monitor.createdAt)}
+      </td>
+      <td className={TD}>
         <MonitorStatusActions
           userId={monitor.id}
           status={monitor.status}
@@ -152,10 +187,10 @@ function ConsentCell({ monitor }: { monitor: AdminMonitorSummary }) {
   if (monitor.dataUseConsentAt === null) missing.push('データ利用');
 
   if (missing.length === 0) {
-    return <span>済</span>;
+    return <Badge tone="ok">済</Badge>;
   }
 
-  return <span>未：{missing.join('・')}</span>;
+  return <Badge tone="warn">未：{missing.join('・')}</Badge>;
 }
 
 /**
@@ -166,10 +201,10 @@ function ConsentCell({ monitor }: { monitor: AdminMonitorSummary }) {
  */
 function BlogCell({ blogs }: { blogs: AdminBlogCount }) {
   return (
-    <span>
+    <span className="whitespace-nowrap">
       {blogs.open} / {MAX_BLOGS_PER_USER}
       {blogs.closed === 0 ? null : (
-        <span className="text-xs">（終了 {blogs.closed}）</span>
+        <span className="text-xs text-slate-500">（終了 {blogs.closed}）</span>
       )}
     </span>
   );
