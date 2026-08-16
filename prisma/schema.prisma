@@ -319,11 +319,12 @@ model User {
   blogs          Blog[]
   approvals      Approval[]
   aiUsageLogs    AiUsageLog[]
-  auditLogs      AuditLog[]        @relation("AuditActor")
+  auditLogs      AuditLog[]         @relation("AuditActor")
   loginTokens    AdminLoginToken[]
-  appSettings    AppSetting[]      @relation("AppSettingEditor")
+  appSettings    AppSetting[]       @relation("AppSettingEditor")
   factIssues     FactIssue[]
-  richMenus      RichMenu[]        @relation("RichMenuEditor")
+  richMenus      RichMenu[]         @relation("RichMenuEditor")
+  catalogItems   OfferCatalogItem[] @relation("OfferCatalogEditor")
 
   @@index([status])
   @@map("users")
@@ -588,6 +589,11 @@ model PersonaFact {
 model AffiliateOffer {
   id                    String         @id @default(uuid()) @db.Uuid
   blogId                String         @map("blog_id") @db.Uuid
+  /// 元にした運営の案件（Q-055）。**手で入れたものは NULL。**
+  ///
+  /// 元の事実が新しくなったら、**この行にも「確かめてください」と出す**
+  /// （勝手に書き換えない。確かめるのは人）
+  catalogItemId         String?        @map("catalog_item_id") @db.Uuid
   name                  String
   aspName               String         @map("asp_name")
   advertiserName        String?        @map("advertiser_name")
@@ -656,7 +662,8 @@ model AffiliateOffer {
   createdAt             DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt             DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  blog           Blog            @relation(fields: [blogId], references: [id], onDelete: Cascade)
+  blog           Blog              @relation(fields: [blogId], references: [id], onDelete: Cascade)
+  catalogItem    OfferCatalogItem? @relation(fields: [catalogItemId], references: [id], onDelete: SetNull)
   banners        Banner[]
   contentItems   ContentItem[]
   affiliateLinks AffiliateLink[]
@@ -1238,4 +1245,82 @@ model RichMenu {
   updatedBy User? @relation("RichMenuEditor", fields: [updatedByUserId], references: [id], onDelete: SetNull)
 
   @@map("rich_menus")
+}
+
+/// 運営が用意した案件の状態（Q-055）
+enum OfferCatalogStatus {
+  /// 調べている途中。**モニターには出ない**
+  DRAFT
+  /// 選べる
+  ACTIVE
+  /// 一時的に出さない
+  PAUSED
+  /// 終了した案件
+  ENDED
+}
+
+/// 運営が用意する案件の元（Q-055、段8）。
+///
+/// ## なぜ要るか
+///
+/// **「案件を決めるのが大変」**と実地で言われた。30ブログが同じ案件を
+/// 別々に調べるより、**運営が1回調べて配る**ほうが正確で速い。
+///
+/// `link_mode`・`sub_id_param`・`blog_posting_prohibited` は
+/// **もともとADMINが決める列**（ASPの規約判断だから）。ここはその置き場所。
+///
+/// ## ブログに属さない
+///
+/// `affiliate_offers` はブログのもの（リンク・状態・採点がブログごと）。
+/// ここは**その元**で、`affiliate_offers.catalog_item_id` から指される。
+///
+/// ## 事実の出どころを1つにする
+///
+/// 同じ商品が複数ブログにあると、**片方だけ古い価格が残り、
+/// それが「確かめ済み」として記事に出る**（SPEC 9.6）。
+/// ここを元にして、**古いままのブログへ「確かめてください」と出す。**
+/// **勝手に書き換えない** — 確かめるのは人（D-13・Q-022）。
+model OfferCatalogItem {
+  id             String         @id @default(uuid()) @db.Uuid
+  name           String
+  aspName        String         @map("asp_name")
+  advertiserName String?        @map("advertiser_name")
+  landingPageUrl String         @map("landing_page_url")
+  rewardYen      Int?           @map("reward_yen")
+  conversionType ConversionType @map("conversion_type")
+
+  /// 価格・条件・機能。**運営が確かめたもの**（1行に1つ・Q-050）
+  facts          Json      @default("[]")
+  /// 事実を確かめ直した時刻。**NULL は「一度も確かめていない」**（D-13 と同じ扱い）
+  factsUpdatedAt DateTime? @map("facts_updated_at") @db.Timestamptz(6)
+
+  denyConditions        String[] @map("deny_conditions")
+  /// リンクの出し方。既定は DIRECT（安全側・Q-001）
+  linkMode              LinkMode @default(DIRECT) @map("link_mode")
+  subIdParam            String?  @map("sub_id_param")
+  blogPostingProhibited Boolean  @default(false) @map("blog_posting_prohibited")
+
+  lpFormFields  Int?     @map("lp_form_fields")
+  lpMobileReady Boolean? @map("lp_mobile_ready")
+
+  /// どんなブログに向くか、という運営の見立て。**AIの提案が読む**。
+  ///
+  /// `genres` へ繋がない。1つの案件が複数のジャンルに向くことがあり、
+  /// **繋ぐと「どのジャンルにも属さない案件」が選べなくなる。**
+  genreHints String[] @map("genre_hints")
+  notes      String?
+
+  status OfferCatalogStatus @default(DRAFT)
+
+  updatedByUserId String?  @map("updated_by_user_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  updatedBy User?            @relation("OfferCatalogEditor", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  offers    AffiliateOffer[]
+
+  /// **同じものを二度登録しない。** ASPと紹介先が同じなら同じ案件
+  @@unique([aspName, landingPageUrl])
+  @@index([status])
+  @@map("offer_catalog_items")
 }

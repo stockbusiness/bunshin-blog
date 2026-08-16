@@ -45,6 +45,11 @@ const ENTRIES: readonly Entry[] = [
     description: 'ブログにジャンルを付ける。停止条件を満たすものは付かない',
   },
   {
+    href: '/admin/offer-catalog' as Route,
+    title: '案件カタログ',
+    description: 'モニターが段8で選ぶ案件。ここの事実が全員の記事に載る',
+  },
+  {
     href: '/admin/fact-issues' as Route,
     title: '事実の指摘',
     description: '見逃した事実誤りの記録。機械が見つけた分だけでは分母が無い',

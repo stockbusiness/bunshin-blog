@@ -50,6 +50,21 @@ export {
 } from './lp-evaluation';
 
 export {
+  OFFER_CATALOG_STATUSES,
+  LINK_MODES,
+  createCatalogItemForAdmin,
+  listCatalogForAdmin,
+  listOffersNeedingFactCheckForUser,
+  listSelectableCatalog,
+  readCatalogItem,
+  updateCatalogItemForAdmin,
+  type CatalogItemInput,
+  type OfferCatalogItem,
+  type OfferCatalogStatus,
+  type OfferFactAlert,
+} from './catalog';
+
+export {
   draftOfferFromLandingPage,
   htmlToText,
   OFFER_DRAFT_PROMPT_KEY,

@@ -483,6 +483,14 @@ describe('他人のブログIDを指定する', () => {
         }),
     ],
     [
+      '元が新しくなった案件を挙げる（Q-055）',
+      (): Promise<unknown> =>
+        affiliate.listOffersNeedingFactCheckForUser({
+          userId: bob.userId,
+          blogId: alice.blogIds[0],
+        }),
+    ],
+    [
       'ジャンルを審査する（E-4）',
       (): Promise<unknown> =>
         contentPlanning.reviewGenreForUser(
@@ -1019,6 +1027,8 @@ describe('入口の網羅', () => {
       'evaluateLandingPageForUser',
       'ensureRedirectLinkForUser',
       'saveOfferScoresForUser',
+      // Q-055。元の事実が新しくなった案件を挙げる（`requireBlogForUser` で絞る）
+      'listOffersNeedingFactCheckForUser',
     ],
     banners: [
       'listBannersForUser',

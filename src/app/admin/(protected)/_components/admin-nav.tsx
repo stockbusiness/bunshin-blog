@@ -34,6 +34,7 @@ export const ADMIN_NAV: readonly NavItem[] = [
   { href: '/admin/users' as Route, label: 'モニター' },
   { href: '/admin/monitor-activity' as Route, label: '反応' },
   { href: '/admin/genres' as Route, label: 'ジャンル審査' },
+  { href: '/admin/offer-catalog' as Route, label: '案件カタログ' },
   { href: '/admin/fact-issues' as Route, label: '事実の指摘' },
   { href: '/admin/jobs' as Route, label: 'ジョブ' },
   { href: '/admin/dashboard' as Route, label: '集計' },
