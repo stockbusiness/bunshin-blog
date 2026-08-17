@@ -44,6 +44,8 @@ function offer(overrides: Partial<OfferJson> = {}): OfferJson {
     advertiserName: null,
     landingPageUrl: 'https://lp.example.com/offer',
     affiliateUrl: 'https://asp.example/click?a=xxxx',
+    // **リンクがある＝提携は承認済み**（Q-060）
+    partnershipStatus: 'APPROVED',
     rewardYen: 3000,
     conversionType: 'FREE_SIGNUP',
     facts: {},
@@ -119,6 +121,57 @@ describe('登録できる', () => {
         userExperience: 'USED',
       });
     });
+  });
+
+  /**
+   * **提携が承認されるまでリンクは発行できない**（Q-060）。
+   * 承認を待つ間に登録できないと、**覚えておくしかない**（Q-058）。
+   */
+  it('リンクが無くても送れる', async () => {
+    vi.mocked(createOffer).mockResolvedValue({ offer: offer() });
+
+    const user = userEvent.setup();
+    await renderPage();
+    await user.type(await screen.findByLabelText('案件の名前'), '格安SIM案件');
+    await user.type(screen.getByLabelText('ASP の名前'), 'サンプルASP');
+    await user.type(
+      screen.getByLabelText('紹介先のページ'),
+      'https://lp.example.com/offer',
+    );
+    await user.selectOptions(
+      screen.getByLabelText('自分で使ったことがあるか'),
+      'USED',
+    );
+    await user.click(screen.getByLabelText(/申請して、返事を待っています/));
+    await user.click(screen.getByRole('button', { name: '登録する' }));
+
+    await waitFor(() => {
+      expect(createOffer).toHaveBeenCalledWith('blog-1', {
+        name: '格安SIM案件',
+        aspName: 'サンプルASP',
+        landingPageUrl: 'https://lp.example.com/offer',
+        conversionType: 'FREE_SIGNUP',
+        applied: true,
+        userExperience: 'USED',
+      });
+    });
+  });
+
+  /** **リンクを入れたら、申請の確認は要らない**（承認済みと分かる） */
+  it('リンクを入れると申請の確認が消える', async () => {
+    const user = userEvent.setup();
+    await renderPage();
+
+    expect(
+      await screen.findByLabelText(/申請して、返事を待っています/),
+    ).toBeVisible();
+
+    await user.type(
+      screen.getByLabelText('アフィリエイトリンク'),
+      'https://asp.example/click?a=xxxx',
+    );
+
+    expect(screen.queryByLabelText(/申請して、返事を待っています/)).toBeNull();
   });
 
   /**

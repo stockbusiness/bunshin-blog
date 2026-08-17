@@ -375,6 +375,8 @@ it('招待から WordPress の下書きまで通る（SPEC 15.3）', async () =>
       aspName: 'ASP',
       landingPageUrl: 'https://example.com/lp',
       affiliateUrl: 'https://asp.example/click?a=x',
+      // **リンクがある＝提携は承認済み**（Q-060）
+      partnershipStatus: 'APPROVED',
       conversionType: 'FREE_SIGNUP',
       rewardYen: 10_000,
       facts: { features: ['機能A'] },

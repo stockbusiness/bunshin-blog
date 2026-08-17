@@ -114,6 +114,8 @@ beforeEach(async () => {
       aspName: 'ASP',
       landingPageUrl: 'https://example.com/lp',
       affiliateUrl: 'https://example.com/go',
+      // **リンクがある＝提携は承認済み**（Q-060）
+      partnershipStatus: 'APPROVED',
       conversionType: 'FREE_SIGNUP',
       rewardYen: 10_000,
       facts: {},

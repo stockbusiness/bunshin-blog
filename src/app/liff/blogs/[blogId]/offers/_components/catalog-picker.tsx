@@ -19,6 +19,13 @@ import {
  * **打つのはアフィリエイトリンクだけ**（本人のASPアカウントのもので、
  * 代われない）。
  *
+ * ## リンクは後からでよい
+ *
+ * **提携が承認されるまでリンクは発行できない**（Q-060）。承認を待つ間に
+ * 登録できないと、モニターは**「あの案件を申請した」ことを覚えておくしかない。**
+ * 提携が承認されていない案件は**記事候補に入らない**ので、
+ * 先に登録しても記事にはならない。
+ *
  * ## 使ったことがあるかは省けない
  *
  * **ここで記事の書き方が変わる**（`docs/MANUAL.md` 段8）。
@@ -61,6 +68,7 @@ export function CatalogPicker({
   const [items, setItems] = useState<CatalogItemJson[] | null>(null);
   const [chosen, setChosen] = useState<CatalogItemJson | null>(null);
   const [affiliateUrl, setAffiliateUrl] = useState('');
+  const [applied, setApplied] = useState(false);
   const [experience, setExperience] = useState<UserExperience | ''>('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -100,15 +108,16 @@ export function CatalogPicker({
     );
   }
 
-  const ready =
-    chosen !== null && affiliateUrl.trim() !== '' && experience !== '';
+  // **リンクは無くてもよい**（Q-060）。提携が承認されるまで発行できない
+  const ready = chosen !== null && experience !== '';
 
   return (
     <section className="mt-4 flex flex-col gap-3">
       <h2 className="text-sm font-bold">候補から選ぶ（{items.length} 件）</h2>
       <p className="text-xs leading-relaxed">
         <strong>入れるのはアフィリエイトリンクだけです。</strong>
-        名前や事実は登録済みのものが入ります
+        名前や事実は登録済みのものが入ります。
+        <strong>提携がまだでも、先に登録できます</strong>
       </p>
 
       {error === null ? null : (
@@ -173,9 +182,28 @@ export function CatalogPicker({
             />
             <span className="text-xs leading-relaxed">
               ASPの管理画面でこの案件のリンクを発行して貼ってください。
-              <strong>ここだけは代われません</strong>（成果があなたに付くため）
+              <strong>ここだけは代われません</strong>
+              （成果があなたに付くため）。
+              <strong>提携がまだなら空のままで構いません</strong>
             </span>
           </label>
+
+          {/*
+            **提携が承認されるまでリンクは発行できない**（Q-060）。
+            申請したかどうかは**本人にしか分からない**ので、そこだけ聞く
+          */}
+          {affiliateUrl.trim() === '' ? (
+            <label className="flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                checked={applied}
+                onChange={(event) => {
+                  setApplied(event.target.checked);
+                }}
+              />
+              ASPに申請して、返事を待っています
+            </label>
+          ) : null}
 
           {/*
             **省けない。** ここで記事の書き方が変わる（MANUAL 段8）。
@@ -222,8 +250,11 @@ export function CatalogPicker({
 
               void createOfferFromCatalog(blogId, {
                 catalogItemId: chosen.id,
-                affiliateUrl: affiliateUrl.trim(),
                 userExperience: experience,
+                // **空なら送らない**（Q-060）
+                ...(affiliateUrl.trim() === ''
+                  ? { applied }
+                  : { affiliateUrl: affiliateUrl.trim() }),
               }).then(
                 (result) => {
                   setBusy(false);
@@ -231,6 +262,7 @@ export function CatalogPicker({
                   // **続けて選べるようにする。** 1件ごとに開き直させない
                   setChosen(null);
                   setAffiliateUrl('');
+                  setApplied(false);
                   setExperience('');
                 },
                 (thrown: unknown) => {

@@ -133,6 +133,8 @@ export async function scoreOffersForUser(
       lpMobileReady: offer.lpMobileReady,
       lpEvaluatedAt: offer.lpEvaluatedAt,
       blogPostingProhibited: offer.blogPostingProhibited,
+      // **提携が承認されていない案件を記事候補に入れない**（Q-060、構想書13章）
+      partnershipStatus: offer.partnershipStatus,
       status: offer.status,
     };
 

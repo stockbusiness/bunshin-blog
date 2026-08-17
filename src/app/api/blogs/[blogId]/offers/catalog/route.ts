@@ -23,6 +23,13 @@ import { requireBlogForUser } from '@/modules/blogs';
  * 名前も報酬額も事実も、**サーバーがカタログから読む**
  * （`createOfferFromCatalogForUser`）。渡させると、
  * **カタログを選んだのに中身は別物**という行が作れてしまう。
+ *
+ * ## リンクは後からでよい
+ *
+ * **提携が承認されるまでリンクは発行できない**（Q-060）。
+ * 承認を待つ間に登録できないと、モニターは「あの案件を申請した」ことを
+ * **覚えておくしかない。** 提携が承認されていない案件は
+ * **記事候補に入らない**ので、先に登録しても記事にはならない。
  */
 
 export const runtime = 'nodejs';
@@ -31,7 +38,13 @@ const USER_EXPERIENCES = ['USED', 'NOT_USED', 'UNKNOWN'] as const;
 
 const schema = z.object({
   catalogItemId: z.string().uuid(),
-  affiliateUrl: z.string().min(1).max(2_000),
+  /**
+   * **提携が承認されるまで発行できない**ので省略できる（Q-060）。
+   * 省略したときは `applied` が提携状態を決める
+   */
+  affiliateUrl: z.string().max(2_000).optional(),
+  /** リンクがまだ無いとき、**ASPへ申請済みか**（本人にしか分からない） */
+  applied: z.boolean().optional(),
   userExperience: z.enum(USER_EXPERIENCES),
   userRating: z.number().int().min(1).max(5).optional(),
 });

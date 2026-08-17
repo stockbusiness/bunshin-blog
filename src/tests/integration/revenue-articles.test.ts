@@ -89,6 +89,8 @@ async function createOffer(targetBlogId = blogId): Promise<string> {
       aspName: 'テストASP',
       landingPageUrl: `https://example.com/lp/${offerSequence}`,
       affiliateUrl: `https://example.com/go/${offerSequence}`,
+      // **リンクがある＝提携は承認済み**（Q-060）
+      partnershipStatus: 'APPROVED',
       conversionType: 'FREE_SIGNUP',
       rewardYen: 10_000,
       facts: { features: ['機能A'] },

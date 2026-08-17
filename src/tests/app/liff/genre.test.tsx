@@ -77,6 +77,8 @@ function offer(overrides: Partial<OfferJson> = {}): OfferJson {
     advertiserName: null,
     landingPageUrl: 'https://lp.example.com',
     affiliateUrl: 'https://asp.example/click',
+    // **リンクがある＝提携は承認済み**（Q-060）
+    partnershipStatus: 'APPROVED',
     rewardYen: null,
     conversionType: 'FREE_SIGNUP',
     facts: {},

@@ -95,6 +95,8 @@ async function createOffer(overrides: OfferOverrides = {}): Promise<string> {
       aspName: 'テストASP',
       landingPageUrl: `https://example.com/lp/${offerSequence}`,
       affiliateUrl: `https://example.com/go/${offerSequence}`,
+      // **リンクがある＝提携は承認済み**（Q-060）
+      partnershipStatus: 'APPROVED',
       conversionType: overrides.conversionType ?? 'FREE_SIGNUP',
       rewardYen:
         overrides.rewardYen === undefined ? 10_000 : overrides.rewardYen,
@@ -347,6 +349,8 @@ describe('他人の案件は採点できない', () => {
         aspName: 'ASP',
         landingPageUrl: 'https://example.com/lp',
         affiliateUrl: 'https://example.com/go',
+        // **リンクがある＝提携は承認済み**（Q-060）
+        partnershipStatus: 'APPROVED',
         conversionType: 'FREE_SIGNUP',
         facts: {},
         denyConditions: [],

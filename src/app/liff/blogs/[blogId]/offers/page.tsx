@@ -21,6 +21,7 @@ import {
   type UserExperience,
 } from '../../../_lib/offers-api';
 import { CatalogPicker } from './_components/catalog-picker';
+import { PartnershipPanel } from './_components/partnership-panel';
 
 /**
  * `/liff/blogs/[blogId]/offers` 案件を登録する（段8・D-1/I-3）。
@@ -51,6 +52,8 @@ interface FormState {
   aspName: string;
   landingPageUrl: string;
   affiliateUrl: string;
+  /** リンクがまだ無いとき、**ASPへ申請済みか**（Q-060） */
+  applied: boolean;
   conversionType: ConversionType;
   rewardYen: string;
   /** 1行に1つ。送るときに配列へ均す */
@@ -63,6 +66,7 @@ const EMPTY_FORM: FormState = {
   aspName: '',
   landingPageUrl: '',
   affiliateUrl: '',
+  applied: false,
   conversionType: 'FREE_SIGNUP',
   rewardYen: '',
   facts: '',
@@ -85,8 +89,11 @@ function toInput(form: FormState): CreateOfferInput {
     name: form.name.trim(),
     aspName: form.aspName.trim(),
     landingPageUrl: form.landingPageUrl.trim(),
-    affiliateUrl: form.affiliateUrl.trim(),
     conversionType: form.conversionType,
+    // **空なら送らない**（Q-060）。提携が承認されるまでリンクは発行できない
+    ...(form.affiliateUrl.trim() === ''
+      ? { applied: form.applied }
+      : { affiliateUrl: form.affiliateUrl.trim() }),
     ...(Number.isInteger(reward) && reward >= 0 ? { rewardYen: reward } : {}),
     // **空なら送らない。** 送ると `facts_updated_at` が入り、
     // 「確かめた」ことになってしまう（D-13・Q-022）
@@ -152,7 +159,7 @@ export default function OffersPage({
     form.name.trim() !== '' &&
     form.aspName.trim() !== '' &&
     form.landingPageUrl.trim() !== '' &&
-    form.affiliateUrl.trim() !== '' &&
+    // **リンクは必須にしない**（Q-060）。提携が承認されるまで発行できない
     form.userExperience !== '';
 
   return (
@@ -198,6 +205,21 @@ export default function OffersPage({
                 {offer.linkBrokenAt === null ? null : (
                   <p className="mt-1 text-xs">リンクが切れています</p>
                 )}
+                {/*
+                  **提携できていない案件は記事にならない**（Q-060）。
+                  黙って候補から外すと「登録したのに記事が来ない」になる
+                */}
+                <PartnershipPanel
+                  blogId={blogId}
+                  offer={offer}
+                  onChanged={(updated) => {
+                    setOffers((current) =>
+                      (current ?? []).map((entry) =>
+                        entry.id === updated.id ? updated : entry,
+                      ),
+                    );
+                  }}
+                />
               </li>
             ))}
           </ul>
@@ -359,8 +381,25 @@ export default function OffersPage({
               }}
             />
             <p className="text-xs leading-relaxed">
-              ASP が発行したURLを、そのまま貼り付けてください
+              ASP が発行したURLを、そのまま貼り付けてください。
+              <strong>提携がまだなら空のままで構いません</strong>
             </p>
+            {/*
+              **提携が承認されるまでリンクは発行できない**（Q-060）。
+              申請したかどうかは**本人にしか分からない**ので、そこだけ聞く
+            */}
+            {form.affiliateUrl.trim() === '' ? (
+              <label className="flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  checked={form.applied}
+                  onChange={(event) => {
+                    setForm({ ...form, applied: event.target.checked });
+                  }}
+                />
+                ASPに申請して、返事を待っています
+              </label>
+            ) : null}
           </div>
 
           <div className="flex flex-col gap-1">

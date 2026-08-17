@@ -13,7 +13,10 @@ import {
   type ImportCandidate,
 } from '@/modules/affiliate';
 import { requireAdmin } from '@/modules/auth';
-import { findExclusion } from '@/modules/content-planning';
+import {
+  PARTNERSHIP_NOT_APPLICABLE,
+  findExclusion,
+} from '@/modules/content-planning';
 import { createConfiguredAiProvider } from '@/modules/settings';
 
 /**
@@ -137,7 +140,12 @@ async function preview(input: z.infer<typeof previewSchema>): Promise<{
       continue;
     }
 
-    const reason = findExclusion(toScorableShape(candidate));
+    const reason = findExclusion({
+      ...toScorableShape(candidate),
+      // **提携は利用者ごと。** 運営がカタログを作る段階には存在しないので、
+      // 「承認済み」とは書かない（嘘のデータになる。Q-060）
+      partnershipStatus: PARTNERSHIP_NOT_APPLICABLE,
+    });
 
     // **`lp_not_evaluated` は「CSVの範囲では通った」**
     if (reason !== null && reason !== 'lp_not_evaluated') {

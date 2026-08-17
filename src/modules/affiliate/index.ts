@@ -112,6 +112,9 @@ export {
   isConversionType,
   isUserExperience,
   isOfferStatus,
+  isPartnershipStatus,
+  normalizeOptionalOfferUrl,
+  partnershipFromLink,
   OFFER_NAME_MAX_LENGTH,
   ASP_NAME_MAX_LENGTH,
   ADVERTISER_NAME_MAX_LENGTH,
@@ -141,6 +144,7 @@ export {
   CONVERSION_TYPES,
   USER_EXPERIENCES,
   OFFER_STATUSES,
+  PARTNERSHIP_STATUSES,
   type AppAffiliateOffer,
   type CreateOfferInput,
   type CreateOfferFromCatalogInput,
@@ -148,6 +152,7 @@ export {
   type ConversionType,
   type UserExperience,
   type OfferStatus,
+  type PartnershipStatus,
   type LinkMode,
 } from './types';
 

@@ -607,7 +607,7 @@ describe('案件URLの変更', () => {
 
     await updateOfferForUser(
       { userId: owner.id, blogId: blog1, offerId: offer.id },
-      { affiliateUrl: offer.affiliateUrl },
+      { affiliateUrl: offer.affiliateUrl ?? '' },
     );
 
     expect(

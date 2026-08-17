@@ -10,7 +10,10 @@ import {
   suggestColumnMapping,
   toScorableShape,
 } from '@/modules/affiliate';
-import { findExclusion } from '@/modules/content-planning';
+import {
+  PARTNERSHIP_NOT_APPLICABLE,
+  findExclusion,
+} from '@/modules/content-planning';
 import type { AiProvider } from '@/lib/ai';
 
 /**
@@ -289,8 +292,21 @@ describe('足切りに掛けられる形になる', () => {
     return { ...first, ...overrides } as ReturnType<typeof applyMapping>[0];
   }
 
+  /**
+   * 足切りへ渡す形にする。
+   *
+   * **提携（Q-060）はカタログ段階に存在しない。** 利用者ごとのものなので、
+   * 「承認済み」とは書かず、判定しない値を置く（取り込みの入口と同じ）。
+   */
+  function scorable(candidateInput: ReturnType<typeof applyMapping>[0]) {
+    return {
+      ...toScorableShape(candidateInput),
+      partnershipStatus: PARTNERSHIP_NOT_APPLICABLE,
+    };
+  }
+
   it('CSVの範囲で通ったものは lp_not_evaluated になる', () => {
-    const shape = toScorableShape(
+    const shape = scorable(
       candidate({ conversionType: 'PURCHASE', rewardYen: 5_000 }),
     );
 
@@ -298,7 +314,7 @@ describe('足切りに掛けられる形になる', () => {
   });
 
   it('購入型で報酬が足りなければ落ちる', () => {
-    const shape = toScorableShape(
+    const shape = scorable(
       candidate({ conversionType: 'PURCHASE', rewardYen: 2_999 }),
     );
 
@@ -306,7 +322,7 @@ describe('足切りに掛けられる形になる', () => {
   });
 
   it('無料登録型で報酬が足りなければ落ちる', () => {
-    const shape = toScorableShape(
+    const shape = scorable(
       candidate({ conversionType: 'FREE_SIGNUP', rewardYen: 799 }),
     );
 
@@ -314,15 +330,13 @@ describe('足切りに掛けられる形になる', () => {
   });
 
   it('終了したものは落ちる', () => {
-    expect(findExclusion(toScorableShape(candidate({ status: 'ENDED' })))).toBe(
+    expect(findExclusion(scorable(candidate({ status: 'ENDED' })))).toBe(
       'ended',
     );
   });
 
   it('否認条件が3つ以上なら落ちる', () => {
-    const shape = toScorableShape(
-      candidate({ denyConditions: ['あ', 'い', 'う'] }),
-    );
+    const shape = scorable(candidate({ denyConditions: ['あ', 'い', 'う'] }));
 
     expect(findExclusion(shape)).toBe('many_deny_conditions');
   });

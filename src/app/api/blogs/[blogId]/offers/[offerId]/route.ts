@@ -44,12 +44,26 @@ const UPDATABLE_STATUSES = [
   'NEEDS_REVIEW',
 ] as const;
 
+/** **ここで組み立てる**（`z.enum` に型のある組を渡すため。`offers/route.ts` と同じ） */
+const PARTNERSHIP_STATUSES = [
+  'NOT_APPLIED',
+  'APPLIED',
+  'APPROVED',
+  'REJECTED',
+] as const;
+
 const updateSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   aspName: z.string().min(1).max(100).optional(),
   advertiserName: z.string().max(200).nullable().optional(),
   landingPageUrl: z.string().min(1).max(2_000).optional(),
-  affiliateUrl: z.string().min(1).max(2_000).optional(),
+  affiliateUrl: z.string().max(2_000).optional(),
+  /**
+   * 提携審査の結果（Q-060）。**ASPが決めたことを写す。**
+   *
+   * `APPROVED` にするにはリンクが要る（モジュール側が断る）
+   */
+  partnershipStatus: z.enum(PARTNERSHIP_STATUSES).optional(),
   rewardYen: z.number().int().min(0).nullable().optional(),
   conversionType: z.enum(CONVERSION_TYPES).optional(),
   facts: z.unknown().optional(),
@@ -129,6 +143,9 @@ export async function PATCH(
         ...(input.affiliateUrl === undefined
           ? {}
           : { affiliateUrl: input.affiliateUrl }),
+        ...(input.partnershipStatus === undefined
+          ? {}
+          : { partnershipStatus: input.partnershipStatus }),
         ...(input.rewardYen === undefined
           ? {}
           : { rewardYen: input.rewardYen }),

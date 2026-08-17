@@ -307,6 +307,40 @@ describe('候補から登録する', () => {
     expect(await prisma.affiliateOffer.count()).toBe(0);
   });
 
+  /**
+   * **提携が承認されるまでリンクは発行できない**（Q-060）。
+   * 承認を待つ間に登録できないと、**覚えておくしかない**（Q-058）。
+   */
+  it('リンクが無くても登録できる', async () => {
+    const itemId = await activeItem();
+
+    const response = await addFromCatalog(
+      request(userId, {
+        catalogItemId: itemId,
+        userExperience: 'USED',
+        applied: true,
+      }),
+      ctx(blogId),
+    );
+
+    expect(response.status).toBe(201);
+
+    const row = await prisma.affiliateOffer.findFirstOrThrow();
+
+    expect(row.affiliateUrl).toBeNull();
+    expect(row.partnershipStatus).toBe('APPLIED');
+  });
+
+  /** **リンクがある＝提携は承認済み**（承認されないと発行できない） */
+  it('リンクを入れれば提携済みになる', async () => {
+    const itemId = await activeItem();
+    await add(itemId);
+
+    const row = await prisma.affiliateOffer.findFirstOrThrow();
+
+    expect(row.partnershipStatus).toBe('APPROVED');
+  });
+
   /** **使ったことがあるかは省けない**（MANUAL 段8） */
   it('使用経験が無ければ断る', async () => {
     const itemId = await activeItem();

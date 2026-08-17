@@ -14,6 +14,10 @@ export type ConversionType =
 
 export type UserExperience = 'USED' | 'NOT_USED' | 'UNKNOWN';
 
+/** ASPの提携審査の状態（Q-060）。**サーバー側の型を借りない** */
+export type PartnershipStatus =
+  'NOT_APPLIED' | 'APPLIED' | 'APPROVED' | 'REJECTED';
+
 export type OfferStatus =
   'DRAFT' | 'ACTIVE' | 'PAUSED' | 'ENDED' | 'NEEDS_REVIEW';
 
@@ -44,7 +48,10 @@ export interface OfferJson {
   aspName: string;
   advertiserName: string | null;
   landingPageUrl: string;
-  affiliateUrl: string;
+  /** **提携が承認されるまで発行できない**ので `null` がありうる（Q-060） */
+  affiliateUrl: string | null;
+  /** ASPの提携審査の状態（Q-060）。**`APPROVED` 以外は記事にならない** */
+  partnershipStatus: PartnershipStatus;
   rewardYen: number | null;
   conversionType: ConversionType;
   /** **書いてよい数値の範囲**（SPEC 9.6）。ここに無い価格・条件は書かない */
@@ -60,14 +67,17 @@ export interface OfferJson {
 /**
  * 登録で送れる項目。
  *
- * **必須は5つ**（`name` `aspName` `landingPageUrl` `affiliateUrl`
- * `conversionType`）。残りは省いてよい。
+ * **必須は4つ**（`name` `aspName` `landingPageUrl` `conversionType`）。
+ * 残りは省いてよい。**リンクは提携が承認されるまで発行できない**ので、
+ * 省くと「申請中」として登録される（Q-060）。
  */
 export interface CreateOfferInput {
   name: string;
   aspName: string;
   landingPageUrl: string;
-  affiliateUrl: string;
+  affiliateUrl?: string;
+  /** リンクがまだ無いとき、**ASPへ申請済みか**（Q-060） */
+  applied?: boolean;
   conversionType: ConversionType;
   rewardYen?: number;
   facts?: OfferFactsJson;
@@ -203,17 +213,38 @@ export function fetchOfferCatalog(
  * 候補から登録する。
  *
  * **送るのは3つだけ。** 名前も報酬額も事実も、サーバーがカタログから読む。
+ *
+ * **リンクは省ける**（Q-060）。提携が承認されるまで発行できないため。
  */
 export function createOfferFromCatalog(
   blogId: string,
   input: {
     catalogItemId: string;
-    affiliateUrl: string;
+    affiliateUrl?: string;
+    applied?: boolean;
     userExperience: UserExperience;
   },
 ): Promise<{ offer: OfferJson }> {
   return request(`${base(blogId)}/catalog`, {
     method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+}
+
+/**
+ * 提携の状態を変える（Q-060）。
+ *
+ * **リンクを入れると「提携済み」になる**（承認されないと発行できないため、
+ * リンクの存在が承認の証拠になる）。断られたときだけ状態を直接送る。
+ */
+export function updateOfferPartnership(
+  blogId: string,
+  offerId: string,
+  input: { affiliateUrl?: string; partnershipStatus?: PartnershipStatus },
+): Promise<{ offer: OfferJson }> {
+  return request(`${base(blogId)}/${encodeURIComponent(offerId)}`, {
+    method: 'PATCH',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(input),
   });
