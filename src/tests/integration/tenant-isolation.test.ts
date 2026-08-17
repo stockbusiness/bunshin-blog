@@ -1130,6 +1130,8 @@ describe('入口の網羅', () => {
       'enqueueIndexStatusForUser',
       'aggregateDailyMetricsForUser',
       'enqueueDailyAggregateForUser',
+      // Q-059。成果CSVを週ごとに書く（1週ずつ `saveWeeklyResultForUser` を通す）
+      'saveWeeklyResultsForUser',
     ],
     approvals: [
       'refreshProposalsForUser',
