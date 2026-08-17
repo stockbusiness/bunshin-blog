@@ -12,6 +12,41 @@ DB・アプリ・cron のすべてが**同じ Google Cloud のプロジェクト
 
 ---
 
+## この環境の値
+
+**いま動いているもの。** 以下の手順で `<公開URL>` と書いてあるところは、
+すべてこのURLに読み替える。
+
+| | 値 |
+|---|---|
+| 公開URL | `https://bunshin-blog-113292621855.asia-northeast1.run.app` |
+| **管理画面** | `https://bunshin-blog-113292621855.asia-northeast1.run.app/admin/login` |
+| Cloud Run のサービス名 | `bunshin-blog` |
+| リージョン | `asia-northeast1`（東京） |
+
+**手順の本文は `<公開URL>` のままにしてある。** 別のプロジェクトへ
+建て直すときに、書き換える場所がここ1か所で済むようにするため。
+
+**確実なのは `APP_BASE_URL` の値。** 管理者ログインのメールのリンクは
+そこから組み立てられるので、**独自ドメインを当てたらここも直す。**
+
+```bash
+# 公開URLを引く
+gcloud run services describe bunshin-blog \
+  --region=asia-northeast1 --format='value(status.url)'
+```
+
+主な入口。
+
+| | URL |
+|---|---|
+| 管理画面 | `<公開URL>/admin/login` |
+| LIFF | `<公開URL>/liff` |
+| LINE の Webhook | `<公開URL>/api/line/webhook` |
+| cron の宛先 | `<公開URL>/api/jobs/run` |
+
+---
+
 ## 0. 先に読むこと
 
 ### 0.1 鍵を先に作り、先に保管する
