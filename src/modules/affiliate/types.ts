@@ -91,6 +91,16 @@ export interface AppAffiliateOffer {
   updatedAt: Date;
 }
 
+/** カタログから登録するときに受け取るもの（Q-058・Q-055、段8） */
+export interface CreateOfferFromCatalogInput {
+  catalogItemId: string;
+  /** **本人のASPアカウントのもの。** 代われない */
+  affiliateUrl: string;
+  /** **本人にしか答えられない**（`docs/MANUAL.md` 段8） */
+  userExperience: UserExperience;
+  userRating?: number | undefined;
+}
+
 export interface CreateOfferInput {
   name: string;
   aspName: string;

@@ -179,3 +179,42 @@ export function createOffer(
     body: JSON.stringify(input),
   });
 }
+
+/** 運営が用意した案件（Q-058・Q-055、段8）。**選ぶだけ** */
+export interface CatalogItemJson {
+  id: string;
+  name: string;
+  aspName: string;
+  advertiserName: string | null;
+  landingPageUrl: string;
+  rewardYen: number | null;
+  conversionType: ConversionType;
+  facts: string[];
+  genreHints: string[];
+}
+
+export function fetchOfferCatalog(
+  blogId: string,
+): Promise<{ items: CatalogItemJson[] }> {
+  return request(`${base(blogId)}/catalog`);
+}
+
+/**
+ * 候補から登録する。
+ *
+ * **送るのは3つだけ。** 名前も報酬額も事実も、サーバーがカタログから読む。
+ */
+export function createOfferFromCatalog(
+  blogId: string,
+  input: {
+    catalogItemId: string;
+    affiliateUrl: string;
+    userExperience: UserExperience;
+  },
+): Promise<{ offer: OfferJson }> {
+  return request(`${base(blogId)}/catalog`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+}

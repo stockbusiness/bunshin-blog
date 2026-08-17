@@ -483,6 +483,18 @@ describe('他人のブログIDを指定する', () => {
         }),
     ],
     [
+      'カタログから案件を登録する（Q-058）',
+      (): Promise<unknown> =>
+        affiliate.createOfferFromCatalogForUser(
+          { userId: bob.userId, blogId: alice.blogIds[0] as string },
+          {
+            catalogItemId: '00000000-0000-4000-8000-000000000000',
+            affiliateUrl: 'https://asp.example.com/click?a=1',
+            userExperience: 'UNKNOWN',
+          },
+        ),
+    ],
+    [
       '元が新しくなった案件を挙げる（Q-055）',
       (): Promise<unknown> =>
         affiliate.listOffersNeedingFactCheckForUser({
@@ -1029,6 +1041,8 @@ describe('入口の網羅', () => {
       'saveOfferScoresForUser',
       // Q-055。元の事実が新しくなった案件を挙げる（`requireBlogForUser` で絞る）
       'listOffersNeedingFactCheckForUser',
+      // Q-058。カタログから登録する（`requireOpenBlogId` で絞る）
+      'createOfferFromCatalogForUser',
     ],
     banners: [
       'listBannersForUser',

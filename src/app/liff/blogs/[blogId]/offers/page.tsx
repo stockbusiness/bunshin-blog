@@ -20,6 +20,7 @@ import {
   type OfferJson,
   type UserExperience,
 } from '../../../_lib/offers-api';
+import { CatalogPicker } from './_components/catalog-picker';
 
 /**
  * `/liff/blogs/[blogId]/offers` 案件を登録する（段8・D-1/I-3）。
@@ -203,266 +204,284 @@ export default function OffersPage({
         </section>
       )}
 
-      <form
-        className="mt-6 flex flex-col gap-4"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!canSubmit) return;
-
-          setSubmitting(true);
-          setError(null);
-
-          void createOffer(blogId, toInput(form)).then(
-            (result) => {
-              setSubmitting(false);
-              setOffers([...offers, result.offer]);
-              // **続けて登録できるようにする。** 1件ごとに画面を
-              // 開き直させない
-              setForm(EMPTY_FORM);
-              setDrafted(false);
-            },
-            (thrown: unknown) => {
-              setSubmitting(false);
-              setError(
-                thrown instanceof OfferApiError
-                  ? thrown.message
-                  : '保存できませんでした',
-              );
-            },
-          );
+      {/*
+       **まず候補から選ばせる**（Q-058）。打つのはリンクだけになる。
+       **手で入れる道は塞がない** — カタログに無いものを足すため
+       */}
+      <CatalogPicker
+        blogId={blogId}
+        onAdded={(offer) => {
+          setOffers((current) => [...(current ?? []), offer]);
         }}
-      >
-        <div className="flex flex-col gap-1">
-          <label htmlFor={nameId} className="text-sm font-bold">
-            案件の名前
-          </label>
-          <input
-            id={nameId}
-            className="rounded border p-2 text-base"
-            value={form.name}
-            maxLength={200}
-            onChange={(event) => {
-              setForm({ ...form, name: event.target.value });
-            }}
-          />
-        </div>
+      />
 
-        <div className="flex flex-col gap-1">
-          <label htmlFor={aspId} className="text-sm font-bold">
-            ASP の名前
-          </label>
-          <input
-            id={aspId}
-            className="rounded border p-2 text-base"
-            value={form.aspName}
-            maxLength={100}
-            onChange={(event) => {
-              setForm({ ...form, aspName: event.target.value });
-            }}
-          />
-        </div>
+      <details className="mt-6">
+        <summary className="cursor-pointer text-sm font-bold">
+          じぶんで入力する（候補に無いとき）
+        </summary>
 
-        <div className="flex flex-col gap-1">
-          <label htmlFor={lpId} className="text-sm font-bold">
-            紹介先のページ
-          </label>
-          <input
-            id={lpId}
-            className="rounded border p-2 text-base"
-            value={form.landingPageUrl}
-            maxLength={2000}
-            inputMode="url"
-            autoCapitalize="none"
-            autoCorrect="off"
-            onChange={(event) => {
-              setForm({ ...form, landingPageUrl: event.target.value });
-            }}
-          />
-          <p className="text-xs leading-relaxed">
-            読者が最後に見るページです（広告主のサイト）
-          </p>
+        <form
+          className="mt-4 flex flex-col gap-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!canSubmit) return;
+
+            setSubmitting(true);
+            setError(null);
+
+            void createOffer(blogId, toInput(form)).then(
+              (result) => {
+                setSubmitting(false);
+                setOffers([...offers, result.offer]);
+                // **続けて登録できるようにする。** 1件ごとに画面を
+                // 開き直させない
+                setForm(EMPTY_FORM);
+                setDrafted(false);
+              },
+              (thrown: unknown) => {
+                setSubmitting(false);
+                setError(
+                  thrown instanceof OfferApiError
+                    ? thrown.message
+                    : '保存できませんでした',
+                );
+              },
+            );
+          }}
+        >
+          <div className="flex flex-col gap-1">
+            <label htmlFor={nameId} className="text-sm font-bold">
+              案件の名前
+            </label>
+            <input
+              id={nameId}
+              className="rounded border p-2 text-base"
+              value={form.name}
+              maxLength={200}
+              onChange={(event) => {
+                setForm({ ...form, name: event.target.value });
+              }}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label htmlFor={aspId} className="text-sm font-bold">
+              ASP の名前
+            </label>
+            <input
+              id={aspId}
+              className="rounded border p-2 text-base"
+              value={form.aspName}
+              maxLength={100}
+              onChange={(event) => {
+                setForm({ ...form, aspName: event.target.value });
+              }}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label htmlFor={lpId} className="text-sm font-bold">
+              紹介先のページ
+            </label>
+            <input
+              id={lpId}
+              className="rounded border p-2 text-base"
+              value={form.landingPageUrl}
+              maxLength={2000}
+              inputMode="url"
+              autoCapitalize="none"
+              autoCorrect="off"
+              onChange={(event) => {
+                setForm({ ...form, landingPageUrl: event.target.value });
+              }}
+            />
+            <p className="text-xs leading-relaxed">
+              読者が最後に見るページです（広告主のサイト）
+            </p>
+
+            {/*
+             **AIは案を出す係**（Q-053）。読み取った値は下書きで、
+             **人が確かめてから登録される。** ここでは保存しない
+             */}
+            <button
+              type="button"
+              disabled={drafting || form.landingPageUrl.trim() === ''}
+              className="mt-1 rounded-lg border p-3 text-sm disabled:opacity-50"
+              onClick={() => {
+                setDrafting(true);
+                setError(null);
+
+                void draftOffer(blogId, form.landingPageUrl.trim()).then(
+                  ({ draft }) => {
+                    setDrafting(false);
+                    setDrafted(true);
+                    setForm((current) => ({
+                      ...current,
+                      name: draft.name,
+                      conversionType: draft.conversionType,
+                      facts: draft.facts.join('\n'),
+                    }));
+                  },
+                  (thrown: unknown) => {
+                    setDrafting(false);
+                    setError(
+                      thrown instanceof OfferApiError
+                        ? thrown.message
+                        : '読み取れませんでした。手で入力してください',
+                    );
+                  },
+                );
+              }}
+            >
+              {drafting ? '読み取っています' : 'このページから読み取る'}
+            </button>
+            <p className="text-xs leading-relaxed">
+              案件の名前・成果の条件・事実を下書きします。
+              <strong>ASP の名前とリンクは読み取れません</strong>
+              （LPに無いため）
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label htmlFor={linkId} className="text-sm font-bold">
+              アフィリエイトリンク
+            </label>
+            <input
+              id={linkId}
+              className="rounded border p-2 text-base"
+              value={form.affiliateUrl}
+              maxLength={2000}
+              inputMode="url"
+              autoCapitalize="none"
+              autoCorrect="off"
+              onChange={(event) => {
+                setForm({ ...form, affiliateUrl: event.target.value });
+              }}
+            />
+            <p className="text-xs leading-relaxed">
+              ASP が発行したURLを、そのまま貼り付けてください
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label htmlFor={conversionId} className="text-sm font-bold">
+              成果になる条件
+            </label>
+            <select
+              id={conversionId}
+              className="rounded border p-2 text-base"
+              value={form.conversionType}
+              onChange={(event) => {
+                setForm({
+                  ...form,
+                  conversionType: event.target.value as ConversionType,
+                });
+              }}
+            >
+              {CONVERSION_TYPE_VALUES.map((value) => (
+                <option key={value} value={value}>
+                  {CONVERSION_TYPE_LABELS[value]}
+                </option>
+              ))}
+            </select>
+          </div>
 
           {/*
-           **AIは案を出す係**（Q-053）。読み取った値は下書きで、
-           **人が確かめてから登録される。** ここでは保存しない
-           */}
-          <button
-            type="button"
-            disabled={drafting || form.landingPageUrl.trim() === ''}
-            className="mt-1 rounded-lg border p-3 text-sm disabled:opacity-50"
-            onClick={() => {
-              setDrafting(true);
-              setError(null);
-
-              void draftOffer(blogId, form.landingPageUrl.trim()).then(
-                ({ draft }) => {
-                  setDrafting(false);
-                  setDrafted(true);
-                  setForm((current) => ({
-                    ...current,
-                    name: draft.name,
-                    conversionType: draft.conversionType,
-                    facts: draft.facts.join('\n'),
-                  }));
-                },
-                (thrown: unknown) => {
-                  setDrafting(false);
-                  setError(
-                    thrown instanceof OfferApiError
-                      ? thrown.message
-                      : '読み取れませんでした。手で入力してください',
-                  );
-                },
-              );
-            }}
-          >
-            {drafting ? '読み取っています' : 'このページから読み取る'}
-          </button>
-          <p className="text-xs leading-relaxed">
-            案件の名前・成果の条件・事実を下書きします。
-            <strong>ASP の名前とリンクは読み取れません</strong>（LPに無いため）
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label htmlFor={linkId} className="text-sm font-bold">
-            アフィリエイトリンク
-          </label>
-          <input
-            id={linkId}
-            className="rounded border p-2 text-base"
-            value={form.affiliateUrl}
-            maxLength={2000}
-            inputMode="url"
-            autoCapitalize="none"
-            autoCorrect="off"
-            onChange={(event) => {
-              setForm({ ...form, affiliateUrl: event.target.value });
-            }}
-          />
-          <p className="text-xs leading-relaxed">
-            ASP が発行したURLを、そのまま貼り付けてください
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label htmlFor={conversionId} className="text-sm font-bold">
-            成果になる条件
-          </label>
-          <select
-            id={conversionId}
-            className="rounded border p-2 text-base"
-            value={form.conversionType}
-            onChange={(event) => {
-              setForm({
-                ...form,
-                conversionType: event.target.value as ConversionType,
-              });
-            }}
-          >
-            {CONVERSION_TYPE_VALUES.map((value) => (
-              <option key={value} value={value}>
-                {CONVERSION_TYPE_LABELS[value]}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/*
           **既定を `UNKNOWN` にしない。** 記事の書き方が変わる（SPEC 9.6）。
           既定で流すと、使っていない案件に「使ってみました」と書きうる
         */}
-        <div className="flex flex-col gap-1">
-          <label htmlFor={experienceId} className="text-sm font-bold">
-            自分で使ったことがあるか
-          </label>
-          <select
-            id={experienceId}
-            className="rounded border p-2 text-base"
-            value={form.userExperience}
-            onChange={(event) => {
-              setForm({
-                ...form,
-                userExperience: event.target.value as UserExperience | '',
-              });
-            }}
-          >
-            <option value="">選んでください</option>
-            {USER_EXPERIENCE_VALUES.map((value) => (
-              <option key={value} value={value}>
-                {USER_EXPERIENCE_LABELS[value]}
-              </option>
-            ))}
-          </select>
-          <p className="text-xs leading-relaxed">
-            記事の書き方が変わります。使っていないものを「使ってみました」
-            とは書きません
-          </p>
-        </div>
+          <div className="flex flex-col gap-1">
+            <label htmlFor={experienceId} className="text-sm font-bold">
+              自分で使ったことがあるか
+            </label>
+            <select
+              id={experienceId}
+              className="rounded border p-2 text-base"
+              value={form.userExperience}
+              onChange={(event) => {
+                setForm({
+                  ...form,
+                  userExperience: event.target.value as UserExperience | '',
+                });
+              }}
+            >
+              <option value="">選んでください</option>
+              {USER_EXPERIENCE_VALUES.map((value) => (
+                <option key={value} value={value}>
+                  {USER_EXPERIENCE_LABELS[value]}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs leading-relaxed">
+              記事の書き方が変わります。使っていないものを「使ってみました」
+              とは書きません
+            </p>
+          </div>
 
-        <div className="flex flex-col gap-1">
-          <label htmlFor={rewardId} className="text-sm font-bold">
-            報酬額（円）
-          </label>
-          <input
-            id={rewardId}
-            className="rounded border p-2 text-base"
-            value={form.rewardYen}
-            inputMode="numeric"
-            onChange={(event) => {
-              setForm({
-                ...form,
-                rewardYen: event.target.value.replace(/[^0-9]/g, ''),
-              });
-            }}
-          />
-          <p className="text-xs leading-relaxed">分からなければ空のままで</p>
-        </div>
+          <div className="flex flex-col gap-1">
+            <label htmlFor={rewardId} className="text-sm font-bold">
+              報酬額（円）
+            </label>
+            <input
+              id={rewardId}
+              className="rounded border p-2 text-base"
+              value={form.rewardYen}
+              inputMode="numeric"
+              onChange={(event) => {
+                setForm({
+                  ...form,
+                  rewardYen: event.target.value.replace(/[^0-9]/g, ''),
+                });
+              }}
+            />
+            <p className="text-xs leading-relaxed">分からなければ空のままで</p>
+          </div>
 
-        {/*
+          {/*
           **形は決めるが、中身は決めない**（Q-050）。読む側は
           葉の値だけを見るので、1行に1つで足りる
         */}
-        <div className="flex flex-col gap-1">
-          <label htmlFor={factsId} className="text-sm font-bold">
-            事実（1行に1つ）
-          </label>
-          <textarea
-            id={factsId}
-            className="rounded border p-2 text-base"
-            rows={4}
-            value={form.facts}
-            placeholder={'月額1,480円\n初期費用なし\n違約金なし'}
-            onChange={(event) => {
-              setForm({ ...form, facts: event.target.value });
-            }}
-          />
-          <p className="text-xs leading-relaxed">
-            価格・条件・機能をそのまま書いてください。
-            <strong>ここに無い数字は記事に書きません。</strong>
-            空のままだと、書ける内容がとても狭くなります
-          </p>
-          {/*
+          <div className="flex flex-col gap-1">
+            <label htmlFor={factsId} className="text-sm font-bold">
+              事実（1行に1つ）
+            </label>
+            <textarea
+              id={factsId}
+              className="rounded border p-2 text-base"
+              rows={4}
+              value={form.facts}
+              placeholder={'月額1,480円\n初期費用なし\n違約金なし'}
+              onChange={(event) => {
+                setForm({ ...form, facts: event.target.value });
+              }}
+            />
+            <p className="text-xs leading-relaxed">
+              価格・条件・機能をそのまま書いてください。
+              <strong>ここに無い数字は記事に書きません。</strong>
+              空のままだと、書ける内容がとても狭くなります
+            </p>
+            {/*
             **下書きのまま通させない**（D-13・Q-022）。登録すると
             「確かめた」ことになる。**確かめるのは人**
           */}
-          {drafted ? (
-            <p className="text-xs leading-relaxed">
-              <strong>ページから読み取った下書きです。</strong>
-              合っているか必ず確かめてください。登録すると
-              「確かめた事実」として記録されます
-            </p>
-          ) : null}
-        </div>
+            {drafted ? (
+              <p className="text-xs leading-relaxed">
+                <strong>ページから読み取った下書きです。</strong>
+                合っているか必ず確かめてください。登録すると
+                「確かめた事実」として記録されます
+              </p>
+            ) : null}
+          </div>
 
-        <button
-          type="submit"
-          disabled={!canSubmit}
-          className="rounded-lg border p-4 text-base font-bold disabled:opacity-50"
-        >
-          {submitting ? '保存しています' : '登録する'}
-        </button>
-      </form>
+          <button
+            type="submit"
+            disabled={!canSubmit}
+            className="rounded-lg border p-4 text-base font-bold disabled:opacity-50"
+          >
+            {submitting ? '保存しています' : '登録する'}
+          </button>
+        </form>
+      </details>
 
       <Link
         href="/liff/onboarding"
