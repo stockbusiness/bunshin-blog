@@ -262,12 +262,17 @@ jobs:
                      '[]'::jsonb,'[]'::jsonb,'PASSED','[]'::jsonb,'{}','[]'::jsonb,
                      'anthropic','m','v1',1,1,0,'x')"
 
+          # **`found_via` を必ず書く**（2026-08-17 の決定で NOT NULL・既定値なし）。
+          # 省くと、下の「拒否されるはず」の insert が
+          # **狙った制約ではなく必須の列で落ちて、素通りする**
+          # （上の `blogs` と同じ罠。実際にここで踏んだ）
           if psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c \
             "insert into fact_issues (id, article_version_id, severity, description,
-                                      caught_before_publish, found_at, updated_at)
+                                      caught_before_publish, found_at, found_via,
+                                      updated_at)
              values (gen_random_uuid(),
                      '00000000-0000-0000-0000-0000000000d1',
-                     'MAJOR','   ',false,now(),now())" \
+                     'MAJOR','   ',false,now(),'MONITOR_REPORT',now())" \
             > /dev/null 2>&1; then
             echo "::error::説明が空の事実誤認が登録できてしまった"
             exit 1
@@ -276,10 +281,11 @@ jobs:
 
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c \
             "insert into fact_issues (id, article_version_id, severity, description,
-                                      caught_before_publish, found_at, updated_at)
+                                      caught_before_publish, found_at, found_via,
+                                      updated_at)
              values (gen_random_uuid(),
                      '00000000-0000-0000-0000-0000000000d1',
-                     'MAJOR','価格が誤っていた',false,now(),now())"
+                     'MAJOR','価格が誤っていた',false,now(),'MONITOR_REPORT',now())"
           echo "中身のある記録は登録できた"
 
       - name: 統合テスト
