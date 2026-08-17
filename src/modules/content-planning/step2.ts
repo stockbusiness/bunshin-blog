@@ -54,6 +54,10 @@ export const EXCLUSION_REASONS = {
   lpNotMobileReady: 'lp_not_mobile_ready',
   /** ブログ掲載禁止（Q-019） */
   blogPostingProhibited: 'blog_posting_prohibited',
+  /** 提携がまだ（未申請・審査中）。**待てば変わる**（Q-060） */
+  notPartnered: 'not_partnered',
+  /** 提携を断られた・解除された。**待っても変わらない**（Q-060） */
+  partnershipRejected: 'partnership_rejected',
   /** LPが未評価。**落ちたのではなく、まだ測っていない** */
   lpNotEvaluated: 'lp_not_evaluated',
 } as const;
@@ -75,7 +79,30 @@ export interface ScorableOffer {
   lpEvaluatedAt: Date | null;
   blogPostingProhibited: boolean;
   status: string;
+  /**
+   * ASPの提携審査の状態（Q-060、構想書13章）。
+   *
+   * **`affiliate` の型に依存しないので文字列で受ける。**
+   * 判定は**通す値を並べる側**にしてある（`findExclusion`）——
+   * 知らない値が来たら落ちる。**書き忘れた経路が黙って通らない**ように
+   */
+  partnershipStatus: string;
 }
+
+/**
+ * **提携を判定しない段階**を表す値（Q-060）。
+ *
+ * 提携は**利用者ごと**なので、運営が案件カタログを取り込む段階
+ * （Q-056）には存在しない。そこで `'APPROVED'` を渡すと
+ * **「承認済み」という嘘のデータ**になるため、別の値を置く。
+ */
+export const PARTNERSHIP_NOT_APPLICABLE = 'NOT_APPLICABLE';
+
+/** 記事候補に入れてよい提携の状態 */
+const PARTNERSHIP_ALLOWED: readonly string[] = [
+  'APPROVED',
+  PARTNERSHIP_NOT_APPLICABLE,
+];
 
 /** `affiliate_offers.score_breakdown` に入る形（DATA_MODEL 3章） */
 export interface ScoreBreakdown {
@@ -174,6 +201,18 @@ export function findExclusion(offer: ScorableOffer): ExclusionReason | null {
 
   if (offer.blogPostingProhibited) {
     return EXCLUSION_REASONS.blogPostingProhibited;
+  }
+
+  // **断られたものを先に見る。** 「待てば変わる」と混ぜると、
+  // モニターが待ち続ける（構想書13章）
+  if (offer.partnershipStatus === 'REJECTED') {
+    return EXCLUSION_REASONS.partnershipRejected;
+  }
+
+  // **通す値を並べる側にする。** 落とす値を並べると、知らない値が
+  // 黙って通り、**未提携の案件が記事に載る**
+  if (!PARTNERSHIP_ALLOWED.includes(offer.partnershipStatus)) {
+    return EXCLUSION_REASONS.notPartnered;
   }
 
   const reward = offer.rewardYen ?? 0;

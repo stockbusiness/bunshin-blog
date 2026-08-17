@@ -21,6 +21,7 @@ import type {
   CreateOfferInput,
   LinkMode,
   OfferStatus,
+  PartnershipStatus,
   UpdateOfferInput,
   UserExperience,
 } from './types';
@@ -33,8 +34,9 @@ import { AppError } from '@/lib/errors';
 import { readCatalogItem } from './catalog';
 import {
   normalizeCreateOffer,
-  normalizeOfferUrl,
+  normalizeOptionalOfferUrl,
   normalizeUpdateOffer,
+  partnershipFromLink,
 } from './validate';
 import { assertPeriod } from './validate';
 
@@ -45,7 +47,8 @@ interface OfferRow {
   aspName: string;
   advertiserName: string | null;
   landingPageUrl: string;
-  affiliateUrl: string;
+  affiliateUrl: string | null;
+  partnershipStatus: string;
   rewardYen: number | null;
   conversionType: string;
   facts: unknown;
@@ -84,6 +87,7 @@ function toAppOffer(row: OfferRow): AppAffiliateOffer {
     advertiserName: row.advertiserName,
     landingPageUrl: row.landingPageUrl,
     affiliateUrl: row.affiliateUrl,
+    partnershipStatus: row.partnershipStatus as PartnershipStatus,
     rewardYen: row.rewardYen,
     conversionType: row.conversionType as ConversionType,
     facts: row.facts,
@@ -116,6 +120,7 @@ const SELECT = {
   advertiserName: true,
   landingPageUrl: true,
   affiliateUrl: true,
+  partnershipStatus: true,
   rewardYen: true,
   conversionType: true,
   facts: true,
@@ -254,6 +259,8 @@ export async function createOfferForUser(
       advertiserName: data.advertiserName,
       landingPageUrl: data.landingPageUrl,
       affiliateUrl: data.affiliateUrl,
+      // **リンクの有無から決める**（Q-060）。状態を別に打たせない
+      partnershipStatus: data.partnershipStatus,
       rewardYen: data.rewardYen,
       conversionType: data.conversionType,
       facts: data.facts as object,
@@ -322,6 +329,11 @@ export async function createOfferFromCatalogForUser(
     throw AppError.conflict('この案件はいま選べません');
   }
 
+  const catalogLink = normalizeOptionalOfferUrl(
+    input.affiliateUrl,
+    'アフィリエイトリンク',
+  );
+
   const row = await prisma.affiliateOffer.create({
     data: {
       blogId,
@@ -344,10 +356,9 @@ export async function createOfferFromCatalogForUser(
       lpFormFields: item.lpFormFields,
       lpMobileReady: item.lpMobileReady,
       // ここから下は**本人のもの**
-      affiliateUrl: normalizeOfferUrl(
-        input.affiliateUrl,
-        'アフィリエイトリンク',
-      ),
+      affiliateUrl: catalogLink,
+      // **リンクの有無から決める**（Q-060）。状態を別に打たせない
+      partnershipStatus: partnershipFromLink(catalogLink, input.applied),
       userExperience: input.userExperience,
       userRating: input.userRating ?? null,
       status: 'ACTIVE',
@@ -401,6 +412,24 @@ export async function updateOfferForUser(
       from: current.affiliateUrl,
       to: data['affiliateUrl'],
     };
+  }
+
+  // **「承認済み」にはリンクが要る**（Q-060）。DBの CHECK と同じ規則だが、
+  // **ここで断るほうが理由を伝えられる。** 制約違反にすると
+  // 「保存できません」しか出ない
+  const nextLink =
+    data['affiliateUrl'] === undefined
+      ? current.affiliateUrl
+      : (data['affiliateUrl'] as string | null);
+  const nextPartnership =
+    data['partnershipStatus'] === undefined
+      ? current.partnershipStatus
+      : (data['partnershipStatus'] as PartnershipStatus);
+
+  if (nextPartnership === 'APPROVED' && nextLink === null) {
+    throw invalidOfferError(
+      '提携が承認されたのなら、アフィリエイトリンクを入れてください',
+    );
   }
 
   // **`facts` を渡した経路だけが「確かめ直した」時刻を書く**（D-13・Q-022）。
@@ -498,6 +527,15 @@ export async function readLinkableOfferForUser(params: {
 
   if (row === null) {
     throw notFoundError('案件');
+  }
+
+  // **リンクの無い案件を記事に貼れない**（Q-060）。提携が承認されるまで
+  // リンクは発行できないので、ここへ来る時点で在るはずだが、
+  // **足切りの抜けをここでも止める** — 記事に空のリンクは出せない
+  if (row.affiliateUrl === null) {
+    throw invalidOfferError(
+      'この案件はまだ提携が承認されていません（リンクがありません）',
+    );
   }
 
   return {

@@ -12,10 +12,12 @@ import {
 import {
   CONVERSION_TYPES,
   OFFER_STATUSES,
+  PARTNERSHIP_STATUSES,
   USER_EXPERIENCES,
   type ConversionType,
   type CreateOfferInput,
   type OfferStatus,
+  type PartnershipStatus,
   type UpdateOfferInput,
   type UserExperience,
 } from './types';
@@ -169,13 +171,56 @@ export function isOfferStatus(value: string): value is OfferStatus {
   return (OFFER_STATUSES as readonly string[]).includes(value);
 }
 
+export function isPartnershipStatus(value: string): value is PartnershipStatus {
+  return (PARTNERSHIP_STATUSES as readonly string[]).includes(value);
+}
+
+/**
+ * リンクの有無から提携状態を決める（Q-060）。
+ *
+ * **リンクは提携が承認されないと発行できない。** 逆に言えば、
+ * **リンクを持っている＝承認されている**なので、状態を別に聞く必要はない
+ * （Q-058「打たせない」）。
+ *
+ * リンクが無いときだけ、**申請したかどうか**を本人に聞く —
+ * 申請は我々のシステムの外で起きるので、**こちらからは分からない。**
+ */
+export function partnershipFromLink(
+  affiliateUrl: string | null,
+  applied: boolean | undefined,
+): PartnershipStatus {
+  if (affiliateUrl !== null) {
+    return 'APPROVED';
+  }
+
+  return applied === true ? 'APPLIED' : 'NOT_APPLIED';
+}
+
+/**
+ * 省略できるURLを整える。
+ *
+ * **空文字を `null` として扱う。** フォームは未入力を空文字で送るので、
+ * ここで分けないと**空文字がURLとして検証され、必ず落ちる。**
+ */
+export function normalizeOptionalOfferUrl(
+  value: string | undefined,
+  label: string,
+): string | null {
+  if (value === undefined || value.trim() === '') {
+    return null;
+  }
+
+  return normalizeOfferUrl(value, label);
+}
+
 /** 保存できる形に整えた作成入力 */
 export interface NormalizedCreateOffer {
   name: string;
   aspName: string;
   advertiserName: string | null;
   landingPageUrl: string;
-  affiliateUrl: string;
+  affiliateUrl: string | null;
+  partnershipStatus: PartnershipStatus;
   rewardYen: number | null;
   conversionType: ConversionType;
   facts: unknown;
@@ -209,6 +254,11 @@ export function normalizeCreateOffer(
   assertRating(input.userRating);
   assertPeriod(input.startsAt, input.endsAt);
 
+  const affiliateUrl = normalizeOptionalOfferUrl(
+    input.affiliateUrl,
+    'アフィリエイトURL',
+  );
+
   return {
     name: assertText(input.name, '案件名', OFFER_NAME_MAX_LENGTH),
     aspName: assertText(input.aspName, 'ASP名', ASP_NAME_MAX_LENGTH),
@@ -221,7 +271,8 @@ export function normalizeCreateOffer(
             ADVERTISER_NAME_MAX_LENGTH,
           ),
     landingPageUrl: normalizeOfferUrl(input.landingPageUrl, 'LPのURL'),
-    affiliateUrl: normalizeOfferUrl(input.affiliateUrl, 'アフィリエイトURL'),
+    affiliateUrl,
+    partnershipStatus: partnershipFromLink(affiliateUrl, input.applied),
     rewardYen: input.rewardYen ?? null,
     conversionType: input.conversionType,
     facts: input.facts ?? {},
@@ -269,10 +320,27 @@ export function normalizeUpdateOffer(
   }
 
   if (input.affiliateUrl !== undefined) {
-    data['affiliateUrl'] = normalizeOfferUrl(
+    const url = normalizeOptionalOfferUrl(
       input.affiliateUrl,
       'アフィリエイトURL',
     );
+
+    data['affiliateUrl'] = url;
+
+    // **リンクを入れたら提携は承認済み**（承認されないと発行できない）。
+    // 明示された状態があればそちらを立てる — 提携が切れた案件の
+    // リンクを残したまま `REJECTED` にできなくなるため
+    if (url !== null && input.partnershipStatus === undefined) {
+      data['partnershipStatus'] = 'APPROVED';
+    }
+  }
+
+  if (input.partnershipStatus !== undefined) {
+    if (!isPartnershipStatus(input.partnershipStatus)) {
+      throw invalidOfferError('提携状態の値が不正です');
+    }
+
+    data['partnershipStatus'] = input.partnershipStatus;
   }
 
   if (input.rewardYen !== undefined) {

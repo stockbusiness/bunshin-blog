@@ -41,7 +41,10 @@ const createSchema = z.object({
   aspName: z.string().min(1).max(100),
   advertiserName: z.string().max(200).optional(),
   landingPageUrl: z.string().min(1).max(2_000),
-  affiliateUrl: z.string().min(1).max(2_000),
+  /** **提携が承認されるまで発行できない**ので省略できる（Q-060） */
+  affiliateUrl: z.string().max(2_000).optional(),
+  /** リンクがまだ無いとき、**ASPへ申請済みか**（Q-060） */
+  applied: z.boolean().optional(),
   rewardYen: z.number().int().min(0).optional(),
   conversionType: z.enum(CONVERSION_TYPES),
   // **中身の形は決めない。** 案件ごとに載る事実が違う（SPEC 9.6）
@@ -99,8 +102,11 @@ export async function POST(
         name: input.name,
         aspName: input.aspName,
         landingPageUrl: input.landingPageUrl,
-        affiliateUrl: input.affiliateUrl,
         conversionType: input.conversionType,
+        ...(input.affiliateUrl === undefined
+          ? {}
+          : { affiliateUrl: input.affiliateUrl }),
+        ...(input.applied === undefined ? {} : { applied: input.applied }),
         ...(input.advertiserName === undefined
           ? {}
           : { advertiserName: input.advertiserName }),

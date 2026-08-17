@@ -53,6 +53,7 @@ export {
   ADOPTION_MIN_SCORE,
   ADOPTION_LIMIT,
   EXCLUSION_REASONS,
+  PARTNERSHIP_NOT_APPLICABLE,
   type ScorableOffer,
   type ScoredOffer,
   type ScoreBreakdown,

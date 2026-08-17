@@ -3,6 +3,7 @@ import {
   ADOPTION_LIMIT,
   ADOPTION_MIN_SCORE,
   EXCLUSION_REASONS,
+  PARTNERSHIP_NOT_APPLICABLE,
   SCORE_MAX,
   adoptOffers,
   findExclusion,
@@ -38,6 +39,8 @@ function offer(overrides: Partial<ScorableOffer> = {}): ScorableOffer {
     lpFormFields: 4,
     lpMobileReady: true,
     lpEvaluatedAt: new Date('2026-08-01T00:00:00Z'),
+    // **提携が承認されている案件**（Q-060）。ここを外すと全件が落ちる
+    partnershipStatus: 'APPROVED',
     blogPostingProhibited: false,
     status: 'ACTIVE',
     ...overrides,
@@ -103,6 +106,65 @@ describe('足切り（SPEC 9.2.3）', () => {
     expect(findExclusion(offer({ blogPostingProhibited: true }))).toBe(
       EXCLUSION_REASONS.blogPostingProhibited,
     );
+  });
+
+  /**
+   * **提携していない案件を記事候補に入れない**（Q-060、構想書13章）。
+   *
+   * 入れると、**貼れないリンクの記事**ができる。提携が承認されるまで
+   * リンクは発行できないので、そもそも記事にならない。
+   */
+  describe('提携', () => {
+    it.each(['NOT_APPLIED', 'APPLIED'])('%s は除外', (partnershipStatus) => {
+      expect(findExclusion(offer({ partnershipStatus }))).toBe(
+        EXCLUSION_REASONS.notPartnered,
+      );
+    });
+
+    /**
+     * **「待てば変わる」と分ける。** 断られた案件を「審査中」と同じに
+     * 見せると、モニターが待ち続ける。
+     */
+    it('断られたものは別の理由で除外', () => {
+      expect(findExclusion(offer({ partnershipStatus: 'REJECTED' }))).toBe(
+        EXCLUSION_REASONS.partnershipRejected,
+      );
+    });
+
+    it('承認済みは通る', () => {
+      expect(
+        findExclusion(offer({ partnershipStatus: 'APPROVED' })),
+      ).toBeNull();
+    });
+
+    /**
+     * **運営のカタログ段階には提携が無い**（利用者ごとのものなので）。
+     * ここで落とすと、**取り込みで案件が1件も残らない**。
+     */
+    it('判定しない段階は通る', () => {
+      expect(
+        findExclusion(offer({ partnershipStatus: PARTNERSHIP_NOT_APPLICABLE })),
+      ).toBeNull();
+    });
+
+    /**
+     * **通す値を並べる側にしてある。** 落とす値を並べると、
+     * 知らない値が黙って通り、**未提携の案件が記事に載る。**
+     */
+    it('知らない値は落とす', () => {
+      expect(findExclusion(offer({ partnershipStatus: 'なにか' }))).toBe(
+        EXCLUSION_REASONS.notPartnered,
+      );
+    });
+
+    /** **提携より先に「そもそも使えない」を見る**（順序） */
+    it('終了した案件は終了として出す', () => {
+      expect(
+        findExclusion(
+          offer({ status: 'ENDED', partnershipStatus: 'NOT_APPLIED' }),
+        ),
+      ).toBe(EXCLUSION_REASONS.ended);
+    });
   });
 
   /**

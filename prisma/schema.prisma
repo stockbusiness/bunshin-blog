@@ -144,6 +144,21 @@ enum OfferStatus {
 /// **既定は DIRECT（安全側）。** 規約を確認できたASPだけ REDIRECT へ上げる。
 /// 判断がつかないものを許可側へ倒すと、成果が無効になったときに
 /// 取り返しがつかない。
+/// ASPの提携審査の状態（Q-060、構想書13章）。
+///
+/// **こちらでは決められない。** ASPが決めたことを写し取るだけで、
+/// 承認されていない案件は**記事候補に入れない**（SPEC 9.2.3 の足切り）。
+enum PartnershipStatus {
+  /// まだ申請していない。**気になっているだけ**
+  NOT_APPLIED
+  /// 申請して、返事を待っている。**リンクはまだ発行できない**
+  APPLIED
+  /// 承認された。**リンクがある**（DBの CHECK で保証する）
+  APPROVED
+  /// 断られた・提携が解除された。**記事候補から外す**
+  REJECTED
+}
+
 enum LinkMode {
   REDIRECT
   DIRECT
@@ -587,20 +602,25 @@ model PersonaFact {
 // ============================================================
 
 model AffiliateOffer {
-  id                    String         @id @default(uuid()) @db.Uuid
-  blogId                String         @map("blog_id") @db.Uuid
+  id                    String            @id @default(uuid()) @db.Uuid
+  blogId                String            @map("blog_id") @db.Uuid
   /// 元にした運営の案件（Q-055）。**手で入れたものは NULL。**
   ///
   /// 元の事実が新しくなったら、**この行にも「確かめてください」と出す**
   /// （勝手に書き換えない。確かめるのは人）
-  catalogItemId         String?        @map("catalog_item_id") @db.Uuid
+  catalogItemId         String?           @map("catalog_item_id") @db.Uuid
   name                  String
-  aspName               String         @map("asp_name")
-  advertiserName        String?        @map("advertiser_name")
-  landingPageUrl        String         @map("landing_page_url")
-  affiliateUrl          String         @map("affiliate_url")
-  rewardYen             Int?           @map("reward_yen")
-  conversionType        ConversionType @map("conversion_type")
+  aspName               String            @map("asp_name")
+  advertiserName        String?           @map("advertiser_name")
+  landingPageUrl        String            @map("landing_page_url")
+  /// 本人がASPで発行したリンク。
+  ///
+  /// **提携が承認されるまで発行できない**ので、申請中の案件では `NULL`。
+  /// `partnership_status = 'APPROVED'` なら入っていることをDBが保証する
+  /// （`affiliate_offers_approved_needs_link_check`）
+  affiliateUrl          String?           @map("affiliate_url")
+  rewardYen             Int?              @map("reward_yen")
+  conversionType        ConversionType    @map("conversion_type")
   facts                 Json
   /// 事実（報酬・条件・キャンペーン）を**確かめ直した**時刻
   /// （D-13-schema・Q-022）。CONTENT_PLANNING 8.2 の90日判定が読む。
@@ -613,15 +633,15 @@ model AffiliateOffer {
   /// 入れると、確かめていない案件が「今日確かめた」ことになり、
   /// **古い価格が「確認済み」として公開される。**
   /// 書くのは `facts` を実際に変えた経路だけ（D-13）
-  factsUpdatedAt        DateTime?      @map("facts_updated_at") @db.Timestamptz(6)
-  userExperience        UserExperience @default(UNKNOWN) @map("user_experience")
-  userRating            Int?           @map("user_rating")
-  denyConditions        String[]       @map("deny_conditions")
+  factsUpdatedAt        DateTime?         @map("facts_updated_at") @db.Timestamptz(6)
+  userExperience        UserExperience    @default(UNKNOWN) @map("user_experience")
+  userRating            Int?              @map("user_rating")
+  denyConditions        String[]          @map("deny_conditions")
   /// リンクを最後に確かめた時刻（H-3b-schema・Q-029）。**通っていても入る。**
   ///
   /// **`NULL` は「一度も確かめていない」。** 古ければ
   /// 「確認できていない」であって「問題なし」ではない
-  linkCheckedAt         DateTime?      @map("link_checked_at") @db.Timestamptz(6)
+  linkCheckedAt         DateTime?         @map("link_checked_at") @db.Timestamptz(6)
   /// **切れていると分かった最初の時刻**（H-3b-schema・Q-029）。
   ///
   /// 切れている間は**動かさない** — 動かすと「いつからか」が毎回今日になり、
@@ -629,38 +649,46 @@ model AffiliateOffer {
   ///
   /// **一時的な失敗（401/403/5xx）では入れない。** 404/410 だけを
   /// 「消えた」とする（H-3 と同じ扱い）
-  linkBrokenAt          DateTime?      @map("link_broken_at") @db.Timestamptz(6)
-  lpFormFields          Int?           @map("lp_form_fields")
-  lpMobileReady         Boolean?       @map("lp_mobile_ready")
+  linkBrokenAt          DateTime?         @map("link_broken_at") @db.Timestamptz(6)
+  lpFormFields          Int?              @map("lp_form_fields")
+  lpMobileReady         Boolean?          @map("lp_mobile_ready")
   /// LPのページ長（取得したHTMLのバイト数・D-2）。
   ///
   /// SPEC 9.2.3 が「ページ長を機械判定する」と定めているが、スコアにも
   /// 足切りにも使われない。**判定した値を残さないと、後から
   /// 「なぜこの案件が落ちたのか」を確かめられない。**
-  lpContentLength       Int?           @map("lp_content_length")
-  lpEvaluatedAt         DateTime?      @map("lp_evaluated_at") @db.Timestamptz(6)
-  selectionScore        Int?           @map("selection_score")
-  scoreBreakdown        Json?          @map("score_breakdown")
-  status                OfferStatus    @default(DRAFT)
+  lpContentLength       Int?              @map("lp_content_length")
+  lpEvaluatedAt         DateTime?         @map("lp_evaluated_at") @db.Timestamptz(6)
+  selectionScore        Int?              @map("selection_score")
+  scoreBreakdown        Json?             @map("score_breakdown")
+  status                OfferStatus       @default(DRAFT)
+  /// ASPの提携審査の状態（Q-060、構想書13章）。
+  ///
+  /// **`status` とは別の軸。** あちらはこちらの運用（使う・止める）で、
+  /// こちらは**ASPが決めること**（こちらでは変えられない）。
+  ///
+  /// **`APPROVED` 以外は記事候補から外す**（`findExclusion`）。
+  /// 既定値を置かない — 書き忘れた経路が黙って「提携済み」になるため
+  partnershipStatus     PartnershipStatus @map("partnership_status")
   /// リンクの出し方。既定は DIRECT（安全側・Q-001）
-  linkMode              LinkMode       @default(DIRECT) @map("link_mode")
+  linkMode              LinkMode          @default(DIRECT) @map("link_mode")
   /// サブIDのパラメータ名（D-10・OPEN_QUESTIONS Q-014）。
   ///
   /// ASPによって名前が違う（sub / s1 / argument など）。
   /// **NULL ならサブIDを付けない。** ASPの情報が無くても案件は登録でき、
   /// 分かったものから ADMIN が SQL で埋める。
-  subIdParam            String?        @map("sub_id_param")
+  subIdParam            String?           @map("sub_id_param")
   /// ブログへの掲載が禁じられているか（E-5-schema・OPEN_QUESTIONS Q-019）。
   ///
   /// SPEC 9.2.3 の足切りの1つ。**ASPの規約の判断**なので ADMIN が設定する
   /// （`link_mode` `sub_id_param` と同じ扱い）。既定は `false`。
   /// `deny_conditions` の文言から機械判定しない — 表記が揺れ、
   /// **黙って通す/黙って落とすのどちらも起きる。**
-  blogPostingProhibited Boolean        @default(false) @map("blog_posting_prohibited")
-  startsAt              DateTime?      @map("starts_at") @db.Date
-  endsAt                DateTime?      @map("ends_at") @db.Date
-  createdAt             DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt             DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  blogPostingProhibited Boolean           @default(false) @map("blog_posting_prohibited")
+  startsAt              DateTime?         @map("starts_at") @db.Date
+  endsAt                DateTime?         @map("ends_at") @db.Date
+  createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   blog           Blog              @relation(fields: [blogId], references: [id], onDelete: Cascade)
   catalogItem    OfferCatalogItem? @relation(fields: [catalogItemId], references: [id], onDelete: SetNull)
@@ -672,6 +700,7 @@ model AffiliateOffer {
   // `id` は単独でも一意なので、制約としては冗長。参照先の要件で置く
   @@unique([id, blogId])
   @@index([blogId, status])
+  @@index([blogId, partnershipStatus])
   @@map("affiliate_offers")
 }
 

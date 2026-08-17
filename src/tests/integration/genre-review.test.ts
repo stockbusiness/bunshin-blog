@@ -111,6 +111,8 @@ async function createOffers(count: number): Promise<void> {
         aspName: 'テストASP',
         landingPageUrl: `https://example.com/lp/${index}`,
         affiliateUrl: `https://example.com/go/${index}`,
+        // **リンクがある＝提携は承認済み**（Q-060）
+        partnershipStatus: 'APPROVED',
         conversionType: 'FREE_SIGNUP',
         facts: {},
         denyConditions: [],

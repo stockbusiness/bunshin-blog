@@ -235,6 +235,10 @@ export function toScorableShape(candidate: ImportCandidate): {
     // **CSVからは判断しない。** ASPの規約の判断（Q-019）で、人が決める
     blogPostingProhibited: false,
     status: candidate.status,
+    // **提携（Q-060）はここに無い。** 提携は利用者ごとで、運営が
+    // カタログを作る段階には存在しない。`content-planning` の値を
+    // 使うことになるので、**足切りを組む上位が入れる**
+    // （MODULE_RULES 3。`affiliate` から `content-planning` へは依存できない）
   };
 }
 
