@@ -9,6 +9,8 @@
  * ここでトークンを持ち回らない。
  */
 
+import { readApiErrorMessage } from '@/lib/api-error';
+
 export interface ApprovalJson {
   id: string;
   blogId: string;
@@ -41,13 +43,11 @@ export class ApprovalApiError extends Error {
 }
 
 async function readError(response: Response): Promise<never> {
-  const body = (await response.json().catch(() => null)) as {
-    message?: unknown;
-  } | null;
+  const body: unknown = await response.json().catch(() => null);
 
   throw new ApprovalApiError(
     response.status,
-    typeof body?.message === 'string' ? body.message : '読み込めませんでした',
+    readApiErrorMessage(body, '読み込めませんでした'),
   );
 }
 

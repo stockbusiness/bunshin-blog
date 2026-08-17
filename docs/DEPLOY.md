@@ -179,15 +179,56 @@ Cloud SQL Auth Proxy を自分の端末で動かす**（2.4）。
 
 ### 2.4 マイグレーションを流す
 
+#### 0. 手元を最新にする（**これを飛ばすと黙って失敗する**）
+
+**`migrate deploy` が流すのは、手元の `prisma/migrations/` である。**
+古いチェックアウトから流すと、**新しいマイグレーションはそもそも手元に無い。**
+
+```sh
+git checkout main && git pull
+ls prisma/migrations | grep -c '^2'    # リポジトリと同じ本数か
+```
+
+**ここを飛ばして実際に事故になった**（2026-08-17）。
+Cloud Shell の clone が3日前のままで、**5本が一度も本番へ渡っていなかった。**
+`/admin/rich-menu` が「うまくいきませんでした」しか出さず、
+**`rich_menus` テーブルが無いことに気づくまで時間がかかった。**
+
+**`migrate deploy` は成功を返す。** 流すものが無いのだから当然で、
+**手がかりがどこにも出ない。** だから先に本数を見る。
+
+#### 1. 流す
+
 **手元から Cloud SQL Auth Proxy を動かして流す。**
 
 ```sh
 # 別の端末で proxy を上げておく
 cloud-sql-proxy <プロジェクトID>:asia-northeast1:<インスタンス名>
 
-# 流す
+# 何が未適用かを先に見る
+DATABASE_URL="postgresql://...@127.0.0.1:5432/bunshin_blog" npx prisma migrate status
+
+# バックアップを取ってから流す
+gcloud sql backups create --instance=<インスタンス名>
 DATABASE_URL="postgresql://...@127.0.0.1:5432/bunshin_blog" npx prisma migrate deploy
 ```
+
+**`npm ci` は要らない。** `migrate` は `prisma/` 配下しか見ないので、
+`npx --yes prisma@<版> migrate deploy` で足りる（Cloud Shell では速い）。
+
+#### 2. 流したら、動いている像も確かめる
+
+**列を足すマイグレーションは、古い像を壊すことがある。**
+既定値の無い `NOT NULL` 列を足した場合、**その列を知らない像は
+書き込みだけ失敗する**（読み取りは通るので、気づきにくい）。
+
+**新しい入口を叩いて確かめるのが速い。**
+
+```sh
+curl -s -o /dev/null -w '%{http_code}\n' <公開URL>/api/admin/fact-reviews
+```
+
+**401 なら入口がある**（＝その版が入っている）。**404 なら古い。**
 
 **像の中で流さない**（4.1）。ビルドは何度も走るので、入れると
 **その全部が本番DBを触る。**
@@ -571,6 +612,7 @@ VALUES (
 
 | | 確かめること | どうやって |
 |---|---|---|
+| 0 | **マイグレーションが当たっている** | `prisma migrate status`（2.4）。**マージしただけでは当たらない** |
 | 1 | 起動している | `https://<公開URL>/` が開く |
 | 2 | DBに繋がっている | `/admin/login` にメールを入れてリンクが届く |
 | 3 | 設定が入っている | `/admin/settings` に「設定済み」が並ぶ |
@@ -705,7 +747,10 @@ REST API が特定のプラグインで 403 を返す、AI の応答が想定の
 
 #### 本番環境
 
-- [ ] 最新マイグレーションが本番 Cloud SQL へ適用済み
+- [ ] **手元のリポジトリが `main` の最新**（`git pull` 済み。2.4）
+- [ ] **`prisma migrate status` が `Database schema is up to date!`**
+      — **マージしただけでは当たらない。** 誰かが手で流す（2.4）
+- [ ] 動いている像が、当てたマイグレーションと同じ版以降（2.4）
 - [ ] Cloud Run の最新リビジョンが正常起動
 - [ ] Cloud Scheduler からジョブが動く
 - [ ] 管理者ログインのメールが届く
