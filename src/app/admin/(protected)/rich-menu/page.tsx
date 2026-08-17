@@ -1,6 +1,7 @@
 import { headers } from 'next/headers';
 import { requireAdmin } from '@/modules/auth';
 import { RichMenuEditor } from './_components/rich-menu-editor';
+import { BackLink, Card, Page, PageHeader } from '../_components/ui';
 
 /**
  * `/admin/rich-menu` LINEのリッチメニュー（Q-054、TASKS H-6）。
@@ -34,22 +35,24 @@ export default async function AdminRichMenuPage() {
   }
 
   return (
-    <main className="mx-auto max-w-3xl">
-      <h1 className="text-lg font-bold">LINEのメニュー</h1>
-      <p className="mt-2 text-sm leading-relaxed">
-        トークの下に出るメニューです。モニター全員に同じものが出ます。
-      </p>
+    <Page>
+      <PageHeader
+        title="LINEのメニュー"
+        lead="トークの下に出るメニューです。モニター全員に同じものが出ます。"
+      />
 
-      <p className="mt-2 text-sm leading-relaxed">
-        <strong>
-          ここで作ると、LINE公式アカウントマネージャーからは編集できなくなります。
-        </strong>
-        LINEの仕様です。両方から触ることはできません。
-      </p>
+      <Card tone="warn">
+        <p className="text-sm leading-relaxed text-slate-700">
+          <strong>
+            ここで作ると、LINE公式アカウントマネージャーからは編集できなくなります。
+          </strong>
+          LINEの仕様です。両方から触ることはできません。
+        </p>
+      </Card>
 
-      <div className="mt-6">
-        <RichMenuEditor />
-      </div>
-    </main>
+      <RichMenuEditor />
+
+      <BackLink />
+    </Page>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useId, useState } from 'react';
+import { BUTTON_PRIMARY, HINT, INPUT } from '../../_components/ui';
 
 /**
  * ジャンル審査の入力（Q-049、SPEC 9.2.2）。
@@ -71,20 +72,20 @@ export function GenreReviewForm({
   const canSubmit = !busy && selected !== '' && total >= 1 && total <= 10;
 
   return (
-    <section className="mt-6 rounded border p-4">
-      <h2 className="text-base font-bold">ジャンル審査</h2>
-      <p className="mt-1 text-xs text-gray-600">
+    <section className="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <h2 className="text-base font-bold text-slate-900">ジャンル審査</h2>
+      <p className={`mt-1 ${HINT}`}>
         検索上位10件の内訳を数えて入れてください。取得する仕組みが無いため、
         ここは手で入れます（SPEC 9.2.2 のフォールバック）。
       </p>
 
       <div className="mt-4 flex flex-col gap-1">
-        <label htmlFor={genreId} className="text-sm font-bold">
+        <label htmlFor={genreId} className="text-sm font-medium text-slate-700">
           ジャンル
         </label>
         <select
           id={genreId}
-          className="rounded border p-2 text-sm"
+          className={INPUT}
           value={selected}
           onChange={(event) => {
             setSelected(event.target.value);
@@ -102,7 +103,9 @@ export function GenreReviewForm({
       </div>
 
       <fieldset className="mt-4">
-        <legend className="text-sm font-bold">検索上位の内訳</legend>
+        <legend className="text-sm font-medium text-slate-700">
+          検索上位の内訳
+        </legend>
         <div className="mt-2 flex flex-col gap-2">
           {DOMAIN_TYPES.map((type) => (
             <label key={type.key} className="flex items-center gap-2 text-sm">
@@ -111,7 +114,7 @@ export function GenreReviewForm({
                 type="number"
                 min={0}
                 max={10}
-                className="w-20 rounded border p-1 text-sm"
+                className={`${INPUT} w-20`}
                 value={counts[type.key]}
                 onChange={(event) => {
                   const value = Number.parseInt(event.target.value, 10);
@@ -127,7 +130,7 @@ export function GenreReviewForm({
             </label>
           ))}
         </div>
-        <p className="mt-2 text-xs text-gray-600">合計 {total} 件（1〜10件）</p>
+        <p className={`mt-2 ${HINT}`}>合計 {total} 件（1〜10件）</p>
       </fieldset>
 
       <label
@@ -147,7 +150,7 @@ export function GenreReviewForm({
       </label>
 
       {error === null ? null : (
-        <p role="alert" className="mt-3 text-sm">
+        <p role="alert" className="mt-3 text-sm text-red-700">
           {error}
         </p>
       )}
@@ -155,7 +158,7 @@ export function GenreReviewForm({
       <button
         type="button"
         disabled={!canSubmit}
-        className="mt-4 rounded border px-4 py-2 text-sm font-bold disabled:opacity-50"
+        className={`mt-4 ${BUTTON_PRIMARY}`}
         onClick={() => {
           setBusy(true);
           setError(null);
@@ -203,8 +206,8 @@ export function GenreReviewForm({
       </button>
 
       {outcome === null ? null : (
-        <div className="mt-4 rounded border p-3">
-          <p className="text-sm font-bold">
+        <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <p className="text-sm font-medium text-slate-700">
             {DECISION_LABELS[outcome.decision]}
           </p>
 

@@ -11,6 +11,7 @@ import {
   SettingsPanel,
   type SettingsGroup,
 } from './_components/settings-panel';
+import { BackLink, Card, Page, PageHeader } from '../_components/ui';
 
 /**
  * `/admin/settings` 設定（TASKS H-9、OPEN_QUESTIONS Q-017）。
@@ -83,40 +84,47 @@ export default async function AdminSettingsPage() {
   }
 
   return (
-    <div>
-      <h1 className="text-lg font-bold">設定</h1>
-      <p className="mt-2 text-sm leading-relaxed">
-        ここで保存した値が環境変数より優先されます。
-        <strong className="font-bold">
-          APIキーは保存すると読み返せません。
-        </strong>
-        末尾4文字だけを表示します。差し替えるときは新しい値を入力して保存します。
-      </p>
-      <p className="mt-1 text-sm leading-relaxed">
-        保存する前に
-        <strong className="font-bold">接続テスト</strong>
-        を実行できます（入力しただけの値で試します）。
-        {Object.values(CONNECTION_TARGET_LABELS).join(' と ')}
-        を確かめられます。
-      </p>
+    <Page>
+      <PageHeader
+        title="設定"
+        lead={
+          <>
+            ここで保存した値が環境変数より優先されます。
+            <strong>APIキーは保存すると読み返せません。</strong>
+            末尾4文字だけを表示します。差し替えるときは新しい値を入力して
+            保存します。
+          </>
+        }
+      />
+
+      <Card tone="warn">
+        <p className="text-sm leading-relaxed text-slate-700">
+          保存する前に<strong>接続テスト</strong>
+          を実行できます（入力しただけの値で試します）。
+          {Object.values(CONNECTION_TARGET_LABELS).join(' と ')}
+          を確かめられます。
+        </p>
+      </Card>
 
       <SettingsPanel groups={[...groups.values()]} />
 
-      <section className="mt-12 border-t pt-4">
-        <h2 className="text-base font-bold">この画面に置けない設定</h2>
-        <p className="mt-1 text-sm leading-relaxed">
-          設定はデータベースにあり、データベースを読むには設定が要ります。
-          次の値は環境変数（Cloud Run の設定）で変更してください。
-        </p>
-        <dl className="mt-3 flex flex-col gap-2 text-sm">
+      <Card
+        title="この画面に置けない設定"
+        description="設定はデータベースにあり、データベースを読むには設定が要ります。次の値は環境変数（Cloud Run の設定）で変更してください。"
+      >
+        <dl className="flex flex-col gap-2 text-sm">
           {ENV_ONLY.map((item) => (
             <div key={item.name} className="flex flex-wrap gap-x-2">
-              <dt className="font-bold">{item.name}</dt>
-              <dd>{item.reason}</dd>
+              <dt className="font-bold text-slate-900">
+                <code className="text-xs">{item.name}</code>
+              </dt>
+              <dd className="text-slate-600">{item.reason}</dd>
             </div>
           ))}
         </dl>
-      </section>
-    </div>
+      </Card>
+
+      <BackLink />
+    </Page>
   );
 }

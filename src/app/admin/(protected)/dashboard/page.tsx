@@ -1,6 +1,19 @@
 import { headers } from 'next/headers';
 import { requireAdmin } from '@/modules/auth';
 import { aggregateForAdmin, type AggregateAxis } from './_lib/aggregate';
+import {
+  BackLink,
+  Card,
+  EmptyState,
+  Page,
+  PageHeader,
+  TD,
+  TH,
+  TableFrame,
+} from '../_components/ui';
+
+/** 数の列。**右に寄せて桁をそろえる** */
+const NUM = 'text-right tabular-nums whitespace-nowrap';
 
 /**
  * 実験の集計（TASKS G-7、SPEC 10.3）。
@@ -52,81 +65,91 @@ export default async function AdminDashboardPage() {
   );
 
   return (
-    <div>
-      <h1 className="text-lg font-bold">実験の集計</h1>
-
-      <p className="mt-2 text-sm leading-relaxed">
-        実験グループの割当はSQLで行います（SPEC 10.3）。ここは読むだけです。
-      </p>
+    <Page>
+      <PageHeader
+        title="実験の集計"
+        lead="実験グループの割当はSQLで行います（SPEC 10.3）。ここは読むだけです。"
+      />
 
       {sections.map((section) => (
-        <section key={section.axis} className="mt-8">
-          <h2 className="text-base font-bold">{section.title}</h2>
+        <section key={section.axis} className="flex flex-col gap-3">
+          <h2 className="text-base font-bold text-slate-900">
+            {section.title}
+          </h2>
 
           {section.rows.length === 0 ? (
-            <p className="mt-2 text-sm">まだブログがありません。</p>
+            <EmptyState>まだブログがありません。</EmptyState>
           ) : (
-            <div className="mt-2 overflow-x-auto">
-              <table className="min-w-full text-left text-xs">
-                <thead>
-                  <tr>
-                    <th className="p-2">{section.title.replace('別', '')}</th>
-                    <th className="p-2">ブログ</th>
-                    <th className="p-2">公開</th>
-                    <th className="p-2">検索表示</th>
-                    <th className="p-2">検索クリック</th>
-                    <th className="p-2">広告リンク</th>
-                    <th className="p-2">AI経由</th>
-                    <th className="p-2">成果</th>
-                    <th className="p-2">収益</th>
-                    <th className="p-2">AI費用</th>
+            <TableFrame minWidth="60rem">
+              <thead>
+                <tr>
+                  <th className={TH}>{section.title.replace('別', '')}</th>
+                  <th className={TH}>ブログ</th>
+                  <th className={TH}>公開</th>
+                  <th className={TH}>検索表示</th>
+                  <th className={TH}>検索クリック</th>
+                  <th className={TH}>広告リンク</th>
+                  <th className={TH}>AI経由</th>
+                  <th className={TH}>成果</th>
+                  <th className={TH}>収益</th>
+                  <th className={TH}>AI費用</th>
+                </tr>
+              </thead>
+              <tbody>
+                {section.rows.map((row) => (
+                  <tr key={row.label}>
+                    <td className={`${TD} font-medium text-slate-900`}>
+                      {row.label}
+                    </td>
+                    {/* **数は右に寄せる。** 桁が揃わないと比べられない */}
+                    <td className={`${TD} ${NUM}`}>{row.blogs}</td>
+                    <td className={`${TD} ${NUM}`}>{row.postedArticles}</td>
+                    <td className={`${TD} ${NUM}`}>
+                      {row.impressions.toLocaleString()}
+                    </td>
+                    <td className={`${TD} ${NUM}`}>
+                      {row.searchClicks.toLocaleString()}
+                    </td>
+                    <td className={`${TD} ${NUM}`}>
+                      {row.affiliateClicks.toLocaleString()}
+                    </td>
+                    <td className={`${TD} ${NUM}`}>
+                      {row.aiReferrals.toLocaleString()}
+                    </td>
+                    <td className={`${TD} ${NUM}`}>
+                      {row.conversions.toLocaleString()}
+                    </td>
+                    <td className={`${TD} ${NUM}`}>{yen(row.revenueYen)}</td>
+                    <td className={`${TD} ${NUM}`}>{usd(row.aiCostUsd)}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {section.rows.map((row) => (
-                    <tr key={row.label}>
-                      <td className="p-2">{row.label}</td>
-                      <td className="p-2">{row.blogs}</td>
-                      <td className="p-2">{row.postedArticles}</td>
-                      <td className="p-2">
-                        {row.impressions.toLocaleString()}
-                      </td>
-                      <td className="p-2">
-                        {row.searchClicks.toLocaleString()}
-                      </td>
-                      <td className="p-2">
-                        {row.affiliateClicks.toLocaleString()}
-                      </td>
-                      <td className="p-2">
-                        {row.aiReferrals.toLocaleString()}
-                      </td>
-                      <td className="p-2">
-                        {row.conversions.toLocaleString()}
-                      </td>
-                      <td className="p-2">{yen(row.revenueYen)}</td>
-                      <td className="p-2">{usd(row.aiCostUsd)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </TableFrame>
           )}
         </section>
       ))}
 
       {/* **測っていないものを0で並べない**（Q-032） */}
-      <p className="mt-8 text-xs leading-relaxed">
-        広告クリックとPVは測る経路がまだありません（Q-032）。0として並べると
-        「測ったが0だった」と読めるため、列を出していません。
-      </p>
-      <p className="mt-2 text-xs leading-relaxed">
-        AI経由の流入は「判別可能なAIサービス経由流入数」です。referrerが欠落する
-        場合があるため、完全値ではありません（SPEC 11.4）。
-      </p>
-      <p className="mt-2 text-xs leading-relaxed">
-        検索の数値はSearch Consoleの暦日、成果はJSTの週で記録しています。
-        突き合わせると最大1日ずれます（Q-005）。
-      </p>
-    </div>
+      <Card title="この表の読み方">
+        <ul className="flex list-disc flex-col gap-2 pl-5 text-xs leading-relaxed text-slate-600">
+          <li>
+            広告クリックとPVは<strong>測る経路がまだありません</strong>
+            （Q-032）。0として並べると「測ったが0だった」と読めるため、
+            列を出していません。
+          </li>
+          <li>
+            AI経由の流入は「判別可能なAIサービス経由流入数」です。referrerが
+            欠落する場合があるため、<strong>完全値ではありません</strong>
+            （SPEC 11.4）。
+          </li>
+          <li>
+            検索の数値はSearch Consoleの暦日、成果はJSTの週で記録しています。
+            <strong>突き合わせると最大1日ずれます</strong>（Q-005）。
+          </li>
+        </ul>
+      </Card>
+
+      <BackLink />
+    </Page>
   );
 }

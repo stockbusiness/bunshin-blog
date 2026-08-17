@@ -15,6 +15,15 @@ import {
   type RichMenuJson,
   type RichMenuStateJson,
 } from '../_lib/rich-menu-api';
+import {
+  BUTTON,
+  BUTTON_DANGER,
+  BUTTON_PRIMARY,
+  Card,
+  HINT,
+  INPUT,
+  LABEL,
+} from '../../_components/ui';
 
 /**
  * リッチメニューを組み立てる画面（Q-054、TASKS H-6）。
@@ -159,14 +168,17 @@ export function RichMenuEditor() {
 
   if (loadFailed) {
     return (
-      <p role="alert" className="text-sm text-red-700">
+      <p
+        role="alert"
+        className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+      >
         {error ?? '読み込めませんでした'}
       </p>
     );
   }
 
   if (menu === null) {
-    return <p className="text-sm">読み込んでいます…</p>;
+    return <p className="text-sm text-slate-500">読み込んでいます…</p>;
   }
 
   const canvas = CANVAS[menu.canvas];
@@ -208,18 +220,24 @@ export function RichMenuEditor() {
   return (
     <div className="flex flex-col gap-6">
       {error === null ? null : (
-        <p role="alert" className="text-sm text-red-700">
+        <p
+          role="alert"
+          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+        >
           {error}
         </p>
       )}
       {notice === null ? null : (
-        <p role="status" className="text-sm">
+        <p
+          role="status"
+          className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800"
+        >
           {notice}
         </p>
       )}
 
-      <section className="rounded-lg border p-3">
-        <p className="text-sm">
+      <Card>
+        <p className="text-sm text-slate-700">
           {menu.lineRichMenuId === null ? (
             <strong>まだLINEに出していません</strong>
           ) : (
@@ -231,7 +249,7 @@ export function RichMenuEditor() {
         </p>
 
         {state === null ? null : (
-          <p className="mt-1 text-sm">
+          <p className="mt-1 text-sm text-slate-700">
             {state.applied ? (
               '確かめました。保存してあるものが全員に出ています'
             ) : (
@@ -241,15 +259,15 @@ export function RichMenuEditor() {
             )}
           </p>
         )}
-      </section>
+      </Card>
 
-      <section className="flex flex-col gap-2">
-        <h2 className="text-base font-bold">1. 枠と文字</h2>
+      <section className="flex flex-col gap-3">
+        <h2 className="text-base font-bold text-slate-900">1. 枠と文字</h2>
 
-        <label className="flex flex-col gap-1 text-sm">
+        <label className={LABEL}>
           管理用の名前
           <input
-            className="rounded-lg border p-2"
+            className={INPUT}
             value={menu.name}
             onChange={(event) => {
               update({ name: event.target.value });
@@ -257,10 +275,10 @@ export function RichMenuEditor() {
           />
         </label>
 
-        <label className="flex flex-col gap-1 text-sm">
+        <label className={LABEL}>
           メニューバーの文字
           <input
-            className="rounded-lg border p-2"
+            className={INPUT}
             maxLength={14}
             value={menu.chatBarText}
             onChange={(event) => {
@@ -268,7 +286,7 @@ export function RichMenuEditor() {
             }}
           />
         </label>
-        <p className="text-xs leading-relaxed">
+        <p className={HINT}>
           トークの下に出る文字です（14字まで）。押すとメニューが開きます
         </p>
 
@@ -284,9 +302,9 @@ export function RichMenuEditor() {
         </label>
       </section>
 
-      <section className="flex flex-col gap-2">
-        <h2 className="text-base font-bold">2. 押す場所の型</h2>
-        <p className="text-xs leading-relaxed">
+      <section className="flex flex-col gap-3">
+        <h2 className="text-base font-bold text-slate-900">2. 押す場所の型</h2>
+        <p className={HINT}>
           型を選ぶと升目が入ります。
           <strong>入れてある名前と行き先は消えません</strong>
         </p>
@@ -296,7 +314,7 @@ export function RichMenuEditor() {
             <button
               key={layout.id}
               type="button"
-              className="rounded-lg border p-2 text-sm"
+              className={BUTTON}
               onClick={() => {
                 update({
                   canvas: layout.canvas,
@@ -309,21 +327,21 @@ export function RichMenuEditor() {
           ))}
         </div>
 
-        <p className="text-xs leading-relaxed">
+        <p className={HINT}>
           いまの枠は {canvas.width}×{canvas.height} です。
           <strong>画像も同じ縦横比にしてください</strong>
         </p>
       </section>
 
-      <section className="flex flex-col gap-2">
-        <h2 className="text-base font-bold">3. 画像</h2>
-        <p className="text-xs leading-relaxed">
+      <section className="flex flex-col gap-3">
+        <h2 className="text-base font-bold text-slate-900">3. 画像</h2>
+        <p className={HINT}>
           PNG か JPEG、1MB以下。横は 800〜2500px。
           <strong>枠と縦横比が違うものは受け取りません</strong>
           （升目と、指で押す場所がずれるためです）
         </p>
 
-        <label className="flex flex-col gap-1 text-sm">
+        <label className={LABEL}>
           画像を選ぶ
           <input
             ref={fileRef}
@@ -368,8 +386,8 @@ export function RichMenuEditor() {
         />
       </section>
 
-      <section className="flex flex-col gap-2">
-        <h2 className="text-base font-bold">4. 行き先</h2>
+      <section className="flex flex-col gap-3">
+        <h2 className="text-base font-bold text-slate-900">4. 行き先</h2>
 
         {liffBaseUrl === '' ? (
           <p className="text-sm text-red-700">
@@ -379,7 +397,7 @@ export function RichMenuEditor() {
         ) : (
           <button
             type="button"
-            className="self-start rounded-lg border p-2 text-sm"
+            className={`self-start ${BUTTON}`}
             onClick={() => {
               update({
                 areas: menu.areas.map((area) => {
@@ -399,7 +417,7 @@ export function RichMenuEditor() {
             行き先をいまの設定に合わせる
           </button>
         )}
-        <p className="text-xs leading-relaxed">
+        <p className={HINT}>
           <strong>LIFF のIDを変えたら押してください。</strong>
           変えたままだと、ボタンを押しても何も起きなくなります
         </p>
@@ -409,13 +427,18 @@ export function RichMenuEditor() {
         ) : (
           <ol className="flex flex-col gap-4">
             {menu.areas.map((area, index) => (
-              <li key={index} className="rounded-lg border p-3">
-                <p className="text-sm font-bold">{index + 1}つ目</p>
+              <li
+                key={index}
+                className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+              >
+                <p className="text-sm font-bold text-slate-900">
+                  {index + 1}つ目
+                </p>
 
-                <label className="mt-2 flex flex-col gap-1 text-sm">
+                <label className={`mt-3 ${LABEL}`}>
                   {`${String(index + 1)}つ目のボタンの名前`}
                   <input
-                    className="rounded-lg border p-2"
+                    className={INPUT}
                     maxLength={20}
                     value={area.label}
                     onChange={(event) => {
@@ -424,10 +447,10 @@ export function RichMenuEditor() {
                   />
                 </label>
 
-                <label className="mt-2 flex flex-col gap-1 text-sm">
+                <label className={`mt-3 ${LABEL}`}>
                   {`${String(index + 1)}つ目の行き先`}
                   <select
-                    className="rounded-lg border p-2"
+                    className={INPUT}
                     value={
                       destinations.find((destination) =>
                         area.uri.endsWith(destination.path),
@@ -467,10 +490,10 @@ export function RichMenuEditor() {
                     URLと位置を手で直す
                   </summary>
 
-                  <label className="mt-2 flex flex-col gap-1 text-xs">
+                  <label className={`mt-3 ${LABEL} text-xs`}>
                     {`${String(index + 1)}つ目のURL`}
                     <input
-                      className="rounded-lg border p-2"
+                      className={INPUT}
                       value={area.uri}
                       onChange={(event) => {
                         updateArea(index, { uri: event.target.value });
@@ -487,14 +510,11 @@ export function RichMenuEditor() {
                         { key: 'height', label: '縦' },
                       ] as const
                     ).map((field) => (
-                      <label
-                        key={field.key}
-                        className="flex flex-col gap-1 text-xs"
-                      >
+                      <label key={field.key} className={`${LABEL} text-xs`}>
                         {`${String(index + 1)}つ目の${field.label}`}
                         <input
                           type="number"
-                          className="w-24 rounded-lg border p-2"
+                          className={`${INPUT} w-24`}
                           value={area[field.key]}
                           onChange={(event) => {
                             const value = Number.parseInt(
@@ -517,9 +537,9 @@ export function RichMenuEditor() {
         )}
       </section>
 
-      <section className="flex flex-col gap-2">
-        <h2 className="text-base font-bold">5. 保存して出す</h2>
-        <p className="text-xs leading-relaxed">
+      <section className="flex flex-col gap-3">
+        <h2 className="text-base font-bold text-slate-900">5. 保存して出す</h2>
+        <p className={HINT}>
           <strong>保存してもLINEには出ません。</strong>
           「LINEへ出す」を押すまで、いまのメニューのままです
         </p>
@@ -528,7 +548,7 @@ export function RichMenuEditor() {
           <button
             type="button"
             disabled={busy}
-            className="rounded-lg border p-3 text-sm disabled:opacity-50"
+            className={BUTTON}
             onClick={() => {
               run(async () => {
                 await saveRichMenu({
@@ -549,7 +569,7 @@ export function RichMenuEditor() {
           <button
             type="button"
             disabled={busy || !ready}
-            className="rounded-lg border p-3 text-sm disabled:opacity-50"
+            className={BUTTON_PRIMARY}
             onClick={() => {
               run(async () => {
                 const { applied } = await applyRichMenu();
@@ -573,7 +593,7 @@ export function RichMenuEditor() {
           <button
             type="button"
             disabled={busy}
-            className="rounded-lg border p-3 text-sm disabled:opacity-50"
+            className={BUTTON}
             onClick={() => {
               run(async () => {
                 const loaded = await fetchRichMenuState();
@@ -587,7 +607,7 @@ export function RichMenuEditor() {
         </div>
 
         {ready ? null : (
-          <p className="text-xs leading-relaxed">
+          <p className={HINT}>
             <strong>
               画像と押す場所がそろうまで「LINEへ出す」は押せません。
             </strong>
@@ -598,7 +618,7 @@ export function RichMenuEditor() {
 
       {state === null ? null : (
         <section className="flex flex-col gap-2">
-          <h2 className="text-base font-bold">
+          <h2 className="text-base font-bold text-slate-900">
             LINEにあるメニュー（{state.remote.length} 件）
           </h2>
 
@@ -612,7 +632,7 @@ export function RichMenuEditor() {
                 return (
                   <li
                     key={entry.richMenuId}
-                    className="flex flex-wrap items-center gap-2 rounded-lg border p-2 text-sm"
+                    className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-3 text-sm"
                   >
                     <span>{entry.name === '' ? '(名前なし)' : entry.name}</span>
                     <code className="text-xs">{entry.richMenuId}</code>
@@ -622,7 +642,7 @@ export function RichMenuEditor() {
                       <button
                         type="button"
                         disabled={busy}
-                        className="rounded-lg border p-1 text-xs disabled:opacity-50"
+                        className={`${BUTTON_DANGER} px-2 py-1 text-xs`}
                         onClick={() => {
                           run(async () => {
                             await removeRemoteRichMenu(entry.richMenuId);
@@ -646,7 +666,7 @@ export function RichMenuEditor() {
             </ul>
           )}
 
-          <p className="text-xs leading-relaxed">
+          <p className={HINT}>
             <strong>出ているものは消せません。</strong>
             消すと誰にもメニューが出なくなるためです
           </p>

@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { BUTTON } from '../../_components/ui';
 
 /**
  * 失敗したジョブを積み直すボタン（TASKS H-14、SPEC 13.7）。
@@ -74,13 +75,13 @@ export function JobRetryButton({
         disabled={busy}
         onClick={() => void run()}
         aria-label={`${jobType} を積み直す`}
-        className="rounded border px-2 py-1 text-xs"
+        className={`${BUTTON} px-2 py-1 text-xs`}
       >
         積み直す
       </button>
 
       {error === null ? null : (
-        <p role="alert" className="text-xs">
+        <p role="alert" className="text-xs text-red-700">
           {error}
         </p>
       )}
