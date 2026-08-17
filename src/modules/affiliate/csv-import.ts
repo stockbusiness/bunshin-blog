@@ -25,30 +25,34 @@
  * 報酬額も成果条件も**CSVの値をそのまま**使う —
  * AIに数値を作らせると、**ありもしない報酬額**が記事に載る。
  *
- * ## 依存を足さない
+ * ## CSVの読み方はここに書かない
  *
- * CSVの解釈も文字コードの変換も自前で書く。
- * Shift_JIS は `TextDecoder('shift_jis')` で読める（Node は full-icu）。
+ * 文字コードの判定もRFC 4180の解釈も `src/lib/csv.ts` にある。
+ * **モニターが上げる成果レポート（Q-059）と同じものを使う** —
+ * 2つ持つと、必ず片方だけ直す。
  */
 
-import { z } from 'zod';
-import type { AiOperation, AiProvider } from '@/lib/ai';
-import { AppError } from '@/lib/errors';
+import type { AiOperation } from '@/lib/ai';
+import {
+  decodeCsvBytes,
+  parseCsv,
+  readCell,
+  readYenAmount,
+  sanitizeMapping as sanitizeColumnMapping,
+  suggestColumnMapping as suggestMapping,
+  MAX_CSV_BYTES,
+  MAX_CSV_ROWS,
+  type ColumnMapping as GenericColumnMapping,
+  type CsvTable,
+  type SuggestMappingDeps as GenericSuggestMappingDeps,
+} from '@/lib/csv';
 import type { ConversionType, UserExperience } from './types';
 
-/** 受け取るCSVの上限。**ASPの一覧は大きい** */
-export const MAX_CSV_BYTES = 5 * 1024 * 1024;
-
-/** 読み込む行の上限。**画面で確かめられる量に収める** */
-export const MAX_CSV_ROWS = 5_000;
-
-/** AIへ見せる見本の行数。**多く見せても対応づけの精度は上がらない** */
-const SAMPLE_ROWS = 3;
+export { decodeCsvBytes, parseCsv, MAX_CSV_BYTES, MAX_CSV_ROWS };
+export type { CsvTable };
 
 /** 対応づけは判断ではなく写し取り（SPEC 9.8） */
 const OPERATION: AiOperation = 'FACT_CLAIM_EXTRACT';
-
-const TEMPERATURE_MAPPING = 0;
 
 /**
  * こちらの項目。
@@ -70,235 +74,29 @@ export const CSV_FIELDS = [
 export type CsvFieldKey = (typeof CSV_FIELDS)[number]['key'];
 
 /** 項目 → 列の番号。**選ばなかった項目は入らない** */
-export type ColumnMapping = Partial<Record<CsvFieldKey, number>>;
+export type ColumnMapping = GenericColumnMapping<CsvFieldKey>;
 
-export interface CsvTable {
-  headers: string[];
-  rows: string[][];
-  /** 読み飛ばした行数。**黙って切らない** */
-  droppedRows: number;
-}
+export type SuggestMappingDeps = Omit<GenericSuggestMappingDeps, 'operation'>;
 
 /**
- * 文字コードを見て文字列にする。
+ * 見出しから列の対応を推測する（`src/lib/csv.ts`）。
  *
- * **日本のASPはたいてい Shift_JIS。** BOM付きUTF-8も、素のUTF-8もある。
- * `fatal` で読めなければ Shift_JIS とみなす — **推測はここだけに閉じる。**
- */
-export function decodeCsvBytes(bytes: Uint8Array): string {
-  if (bytes.byteLength > MAX_CSV_BYTES) {
-    throw AppError.validationFailed('CSVが大きすぎます。5MB以下にしてください');
-  }
-
-  // BOM付きUTF-8
-  if (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
-    return new TextDecoder('utf-8').decode(bytes.subarray(3));
-  }
-
-  try {
-    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-  } catch {
-    return new TextDecoder('shift_jis').decode(bytes);
-  }
-}
-
-/**
- * CSVを行と列へ分ける（RFC 4180 のかたち）。
- *
- * **囲みの中の改行とカンマを壊さない。** 案件名や否認条件に
- * 読点や改行が入ることがあり、単純に `split(',')` すると列がずれる。
- * **ずれたまま取り込むと、報酬額の列に案件名が入る。**
- */
-export function parseCsv(text: string): CsvTable {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let field = '';
-  let quoted = false;
-  let index = 0;
-  let droppedRows = 0;
-
-  function endField(): void {
-    row.push(field);
-    field = '';
-  }
-
-  function endRow(): void {
-    endField();
-
-    // **空行を落とす。** 末尾の改行で1行増えるのを防ぐ
-    if (row.length > 1 || row[0] !== '') {
-      if (rows.length < MAX_CSV_ROWS + 1) {
-        rows.push(row);
-      } else {
-        droppedRows += 1;
-      }
-    }
-
-    row = [];
-  }
-
-  while (index < text.length) {
-    const char = text[index];
-
-    if (quoted) {
-      if (char === '"') {
-        // `""` は囲みの中の `"`
-        if (text[index + 1] === '"') {
-          field += '"';
-          index += 2;
-          continue;
-        }
-
-        quoted = false;
-        index += 1;
-        continue;
-      }
-
-      field += char;
-      index += 1;
-      continue;
-    }
-
-    if (char === '"' && field === '') {
-      quoted = true;
-      index += 1;
-      continue;
-    }
-
-    if (char === ',') {
-      endField();
-      index += 1;
-      continue;
-    }
-
-    if (char === '\r') {
-      // CRLF も LF も同じ扱い
-      if (text[index + 1] === '\n') {
-        index += 1;
-      }
-
-      endRow();
-      index += 1;
-      continue;
-    }
-
-    if (char === '\n') {
-      endRow();
-      index += 1;
-      continue;
-    }
-
-    field += char;
-    index += 1;
-  }
-
-  if (field !== '' || row.length > 0) {
-    endRow();
-  }
-
-  const headers = rows.shift();
-
-  if (headers === undefined) {
-    throw AppError.validationFailed('CSVに中身がありません');
-  }
-
-  return { headers, rows, droppedRows };
-}
-
-export interface SuggestMappingDeps {
-  provider: AiProvider;
-}
-
-const mappingSchema = z.record(z.string(), z.number().int());
-
-/**
- * 見出しから列の対応を推測する。
- *
- * **AIが返すのは列の番号だけ。値は返させない。**
- * 報酬額や成果条件をAIに書かせると、**CSVに無い数値**が入りうる。
- *
- * **範囲の外や知らない項目は落とす。** AIの答えをそのまま信じない。
- * **間違っても画面で直せる**（そこが人の仕事）。
- *
- * @throws {AppError} AIの応答が読めなかったとき
+ * **どの用途としてAIを呼ぶかはここで決める。** 対応づけは判断ではなく
+ * 写し取りなので `FACT_CLAIM_EXTRACT` に載せる（SPEC 9.8）。
  */
 export async function suggestColumnMapping(
   table: CsvTable,
   deps: SuggestMappingDeps,
 ): Promise<ColumnMapping> {
-  const preview = [
-    table.headers.map((header, at) => `${String(at)}: ${header}`).join('\n'),
-    '',
-    '見本（先頭の行）:',
-    ...table.rows
-      .slice(0, SAMPLE_ROWS)
-      .map((row) => row.map((cell) => truncateCell(cell)).join(' | ')),
-  ].join('\n');
-
-  const result = await deps.provider.complete({
-    operation: OPERATION,
-    system: [
-      'あなたはCSVの見出しを、決められた項目へ対応づける係です。',
-      '',
-      '対応づける項目：',
-      ...CSV_FIELDS.map((field) => `- ${field.key}: ${field.label}`),
-      '',
-      '**列の番号だけを返してください。値は返さないでください。**',
-      '当てはまる列が無い項目は、含めないでください。',
-      '`{"項目名": 列番号}` の形のJSONだけを返してください。',
-      '前置き・後書き・コードフェンスを付けないでください。',
-    ].join('\n'),
-    messages: [{ role: 'user', content: preview }],
-    maxOutputTokens: 500,
-    temperature: TEMPERATURE_MAPPING,
-  });
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(stripFence(result.text));
-  } catch {
-    // **応答本文を例外へ載せない**（SPEC 14.2）
-    throw AppError.validationFailed(
-      '列の対応を読み取れませんでした。手で選んでください',
-    );
-  }
-
-  const record = mappingSchema.safeParse(parsed);
-
-  if (!record.success) {
-    throw AppError.validationFailed(
-      '列の対応を読み取れませんでした。手で選んでください',
-    );
-  }
-
-  return sanitizeMapping(record.data, table.headers.length);
+  return suggestMapping(table, CSV_FIELDS, { ...deps, operation: OPERATION });
 }
 
-/**
- * AIの答えを信じすぎない。
- *
- * **知らない項目と、範囲の外の列番号を落とす。** 残ったものだけを使う。
- */
+/** AIの答えを信じすぎない（`src/lib/csv.ts`） */
 export function sanitizeMapping(
   raw: Record<string, number>,
   columnCount: number,
 ): ColumnMapping {
-  const known = new Set<string>(CSV_FIELDS.map((field) => field.key));
-  const mapping: ColumnMapping = {};
-
-  for (const [key, at] of Object.entries(raw)) {
-    if (!known.has(key) || !Number.isInteger(at)) {
-      continue;
-    }
-
-    if (at < 0 || at >= columnCount) {
-      continue;
-    }
-
-    mapping[key as CsvFieldKey] = at;
-  }
-
-  return mapping;
+  return sanitizeColumnMapping(raw, CSV_FIELDS, columnCount);
 }
 
 /** 取り込みの候補。**まだ保存しない** */
@@ -346,28 +144,14 @@ export function readConversionType(value: string): ConversionType {
 }
 
 /**
- * 報酬額らしい文字列から数を取り出す。
+ * 報酬額らしい文字列から数を取り出す（`readYenAmount` に委ねる）。
  *
  * **「1,480円」「1480」「¥1,480」を同じに読む。**
  * **割合（10%）は読まない** — 金額でないものを金額として扱うと、
  * 足切りが意味を失う。
  */
 export function readRewardYen(value: string): number | null {
-  const text = value.trim();
-
-  if (text === '' || text.includes('%') || text.includes('％')) {
-    return null;
-  }
-
-  const digits = text.replace(/[^\d]/g, '');
-
-  if (digits === '') {
-    return null;
-  }
-
-  const parsed = Number.parseInt(digits, 10);
-
-  return Number.isNaN(parsed) ? null : parsed;
+  return readYenAmount(value);
 }
 
 /**
@@ -398,18 +182,18 @@ export function applyMapping(
   mapping: ColumnMapping,
 ): ImportCandidate[] {
   return table.rows.map((row, index) => {
-    const name = cell(row, mapping.name).trim();
-    const landingPageUrl = cell(row, mapping.landingPageUrl).trim();
+    const name = readCell(row, mapping.name).trim();
+    const landingPageUrl = readCell(row, mapping.landingPageUrl).trim();
 
     return {
       rowNumber: index + 1,
       name,
-      advertiserName: emptyToNull(cell(row, mapping.advertiserName)),
+      advertiserName: emptyToNull(readCell(row, mapping.advertiserName)),
       landingPageUrl,
-      rewardYen: readRewardYen(cell(row, mapping.rewardYen)),
-      conversionType: readConversionType(cell(row, mapping.conversionType)),
-      denyConditions: readDenyConditions(cell(row, mapping.denyConditions)),
-      status: readStatus(cell(row, mapping.status)),
+      rewardYen: readRewardYen(readCell(row, mapping.rewardYen)),
+      conversionType: readConversionType(readCell(row, mapping.conversionType)),
+      denyConditions: readDenyConditions(readCell(row, mapping.denyConditions)),
+      status: readStatus(readCell(row, mapping.status)),
       problem: findProblem(name, landingPageUrl),
     };
   });
@@ -454,10 +238,6 @@ export function toScorableShape(candidate: ImportCandidate): {
   };
 }
 
-function cell(row: readonly string[], at: number | undefined): string {
-  return at === undefined ? '' : (row[at] ?? '');
-}
-
 function emptyToNull(value: string): string | null {
   const text = value.trim();
 
@@ -491,22 +271,4 @@ function findProblem(name: string, landingPageUrl: string): string | null {
   }
 
   return null;
-}
-
-function truncateCell(value: string): string {
-  return value.length > 40 ? `${value.slice(0, 40)}…` : value;
-}
-
-/** コードフェンスが付いてきた場合に剥がす（`offer-draft` と同じ） */
-function stripFence(text: string): string {
-  const trimmed = text.trim();
-
-  if (!trimmed.startsWith('```')) {
-    return trimmed;
-  }
-
-  return trimmed
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/```$/, '')
-    .trim();
 }

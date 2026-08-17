@@ -127,3 +127,10 @@ export {
   type PersonaType,
   type PersonaStatus,
 } from './persona';
+
+export {
+  draftPersonaFromAnswers,
+  type DraftPersonaDeps,
+  type PersonaAnswers,
+  type PersonaDraft,
+} from './draft';

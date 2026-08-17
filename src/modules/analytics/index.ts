@@ -80,6 +80,29 @@ export {
 } from './weekly-result';
 
 export {
+  MAX_RESULT_WEEKS,
+  NOT_OUR_BLOG,
+  RESULT_CSV_FIELDS,
+  applyResultMapping,
+  isRejectedResult,
+  normalizeOfferName,
+  readResultDate,
+  sanitizeResultMapping,
+  saveWeeklyResultsForUser,
+  suggestResultColumnMapping,
+  summarizeResultCsv,
+  type ResultColumnMapping,
+  type ResultCsvBlog,
+  type ResultCsvBlogSummary,
+  type ResultCsvFieldKey,
+  type ResultCsvRow,
+  type ResultCsvSummary,
+  type ResultCsvUnassigned,
+  type ResultCsvWeek,
+  type SuggestResultMappingDeps,
+} from './result-csv';
+
+export {
   parseReferrerHost,
   hashUserAgent,
   REFERRER_HOST_MAX_LENGTH,

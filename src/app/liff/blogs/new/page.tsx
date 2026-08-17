@@ -68,6 +68,26 @@ function draftTargetReader(persona: PersonaJson): string {
   return `${ageRange}。${situation}`.slice(0, TARGET_READER_MAX);
 }
 
+/**
+ * 分身からブログの名前の下書きを作る（Q-058）。
+ *
+ * **打たせない。** この名前は**LINEの通知でブログを見分けるためのもの**で、
+ * 読者には見えない（読者が見るのは WordPress 側の題）。
+ *
+ * **書きたいと答えたことから作る。** 通知に出たときに、
+ * どのブログの話かがすぐ分かる。
+ *
+ * **分身1体につきブログ1つ**なので、名前が重なることはない。
+ */
+export function draftBlogName(persona: PersonaJson): string {
+  const field = persona.expertise.fields[0]?.trim();
+
+  return `${field === undefined || field === '' ? persona.name : field}のブログ`.slice(
+    0,
+    100,
+  );
+}
+
 export default function NewBlogPage() {
   const router = useRouter();
   const nameId = useId();
@@ -104,6 +124,7 @@ export default function NewBlogPage() {
           setForm((current) => ({
             ...current,
             personaId: only.id,
+            name: draftBlogName(only),
             targetReader: draftTargetReader(only),
           }));
         }
@@ -242,8 +263,9 @@ export default function NewBlogPage() {
               setForm({
                 ...form,
                 personaId: event.target.value,
-                // **読者像は選び直すたびに引き直す。** 前の分身の読者が
-                // 残ると、書く人と読む人が食い違う
+                // **名前と読者像は選び直すたびに引き直す。** 前の分身の
+                // ものが残ると、書く人と読む人が食い違う
+                name: next === undefined ? form.name : draftBlogName(next),
                 targetReader:
                   next === undefined
                     ? form.targetReader
@@ -265,61 +287,77 @@ export default function NewBlogPage() {
           )}
         </div>
 
-        <div className="flex flex-col gap-1">
-          <label htmlFor={nameId} className="text-sm font-bold">
-            ブログの名前
-          </label>
-          <input
-            id={nameId}
-            className="rounded border p-2 text-base"
-            value={form.name}
-            maxLength={100}
-            onChange={(event) => {
-              setForm({ ...form, name: event.target.value });
-            }}
-          />
-          <p className="text-xs leading-relaxed">あとから変えられます</p>
-        </div>
+        {/*
+          **打つところを出さない**（Q-058）。名前・記号・読者は
+          分身から引いてあり、**直したい人だけ開く**
+        */}
+        <details>
+          <summary className="cursor-pointer text-sm font-bold">
+            名前と読者を直す（このままで構いません）
+          </summary>
 
-        <div className="flex flex-col gap-1">
-          <label htmlFor={slugId} className="text-sm font-bold">
-            管理用の記号
-          </label>
-          <input
-            id={slugId}
-            className="rounded border p-2 text-base"
-            value={form.slug}
-            maxLength={100}
-            autoCapitalize="none"
-            autoCorrect="off"
-            onChange={(event) => {
-              setForm({ ...form, slug: event.target.value });
-            }}
-          />
-          <p className="text-xs leading-relaxed">
-            英小文字・数字・ハイフンのみ。3つのブログを見分けるための記号で、
-            読者の目には触れません。このままで構いません
-          </p>
-        </div>
+          <div className="mt-3 flex flex-col gap-4">
+            <div className="flex flex-col gap-1">
+              <label htmlFor={nameId} className="text-sm font-bold">
+                ブログの名前
+              </label>
+              <input
+                id={nameId}
+                className="rounded border p-2 text-base"
+                value={form.name}
+                maxLength={100}
+                onChange={(event) => {
+                  setForm({ ...form, name: event.target.value });
+                }}
+              />
+              <p className="text-xs leading-relaxed">
+                分身から下書きを入れてあります。
+                <strong>LINEの通知でブログを見分けるための名前</strong>で、
+                読者には見えません。あとから変えられます
+              </p>
+            </div>
 
-        <div className="flex flex-col gap-1">
-          <label htmlFor={readerId} className="text-sm font-bold">
-            誰に向けて書くか
-          </label>
-          <textarea
-            id={readerId}
-            className="rounded border p-2 text-base"
-            rows={3}
-            value={form.targetReader}
-            maxLength={TARGET_READER_MAX}
-            onChange={(event) => {
-              setForm({ ...form, targetReader: event.target.value });
-            }}
-          />
-          <p className="text-xs leading-relaxed">
-            分身の読者像から下書きを入れてあります。違っていれば直してください
-          </p>
-        </div>
+            <div className="flex flex-col gap-1">
+              <label htmlFor={slugId} className="text-sm font-bold">
+                管理用の記号
+              </label>
+              <input
+                id={slugId}
+                className="rounded border p-2 text-base"
+                value={form.slug}
+                maxLength={100}
+                autoCapitalize="none"
+                autoCorrect="off"
+                onChange={(event) => {
+                  setForm({ ...form, slug: event.target.value });
+                }}
+              />
+              <p className="text-xs leading-relaxed">
+                英小文字・数字・ハイフンのみ。3つのブログを見分けるための記号で、
+                読者の目には触れません。このままで構いません
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label htmlFor={readerId} className="text-sm font-bold">
+                誰に向けて書くか
+              </label>
+              <textarea
+                id={readerId}
+                className="rounded border p-2 text-base"
+                rows={3}
+                value={form.targetReader}
+                maxLength={TARGET_READER_MAX}
+                onChange={(event) => {
+                  setForm({ ...form, targetReader: event.target.value });
+                }}
+              />
+              <p className="text-xs leading-relaxed">
+                分身の読者像から下書きを入れてあります。違っていれば直してください
+              </p>
+            </div>
+          </div>
+        </details>
 
         {error === null ? null : (
           <p role="alert" className="text-sm leading-relaxed">

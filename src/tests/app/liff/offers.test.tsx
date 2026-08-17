@@ -64,6 +64,14 @@ async function renderPage() {
       </Suspense>,
     );
   });
+
+  // **手入力の欄は畳んである**（Q-058。まず候補から選ばせる）。
+  // ここを試す場合は開いてから
+  const manual = document.querySelector('details');
+
+  if (manual !== null) {
+    manual.open = true;
+  }
 }
 
 /** 必須の5項目を埋める */

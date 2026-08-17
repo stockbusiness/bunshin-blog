@@ -182,3 +182,26 @@ export function changePersonaStatus(
     json('POST', { action }),
   );
 }
+
+/** 段4で本人に聞く3つ（Q-058） */
+export interface PersonaAnswersJson {
+  fields: string[];
+  audience: string;
+  exitCriteria: string;
+}
+
+/**
+ * 3つの答えから残りを下書きする（Q-058・Q-047）。
+ *
+ * **保存はされない。** 画面に出して、人が直してから登録する。
+ * **答えた3つはAIに書き換えられない。**
+ */
+export function draftPersona(
+  answers: PersonaAnswersJson,
+): Promise<{ draft: PersonaInput }> {
+  return request('/api/personas/draft', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(answers),
+  });
+}

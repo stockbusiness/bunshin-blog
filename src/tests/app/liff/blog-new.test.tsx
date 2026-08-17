@@ -115,6 +115,15 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+/** **名前と読者は畳んである**（Q-058）。直す試験はここを開いてから */
+function openDetails(): void {
+  const details = document.querySelector('details');
+
+  if (details !== null) {
+    details.open = true;
+  }
+}
+
 describe('つくれる', () => {
   it('分身が1体なら選んだ状態で始まる', async () => {
     render(<NewBlogPage />);
@@ -135,7 +144,11 @@ describe('つくれる', () => {
     );
   });
 
-  it('名前を入れて送ると、できた設定画面へ進む', async () => {
+  /**
+   * **打つところを無くす**（Q-058）。名前・記号・読者は分身から引く。
+   * 分身が1体なら、**何も打たずに押せる。**
+   */
+  it('何も打たずに、そのまま押せる', async () => {
     vi.mocked(createBlog).mockResolvedValue({
       blog: { id: 'blog-9' } as never,
     });
@@ -143,13 +156,13 @@ describe('つくれる', () => {
     const user = userEvent.setup();
     render(<NewBlogPage />);
 
-    await user.type(await screen.findByLabelText('ブログの名前'), '副業メモ');
-    await user.click(screen.getByRole('button', { name: 'つくる' }));
+    await user.click(await screen.findByRole('button', { name: 'つくる' }));
 
     await waitFor(() => {
       expect(createBlog).toHaveBeenCalledWith({
         personaId: 'persona-1',
-        name: '副業メモ',
+        // **書きたいと答えたことから作る。** 通知でどのブログか分かる
+        name: '副業のブログ',
         slug: 'blog-1',
         targetReader: '30代〜40代。会社勤めをしながら副収入を作りたい',
       });
@@ -158,12 +171,49 @@ describe('つくれる', () => {
     expect(push).toHaveBeenCalledWith('/liff/blogs/blog-9/settings');
   });
 
-  it('名前が空のあいだは送れない', async () => {
+  it('名前は分身から下書きされる', async () => {
     render(<NewBlogPage />);
 
-    expect(
-      await screen.findByRole('button', { name: 'つくる' }),
-    ).toBeDisabled();
+    await screen.findByRole('button', { name: 'つくる' });
+    openDetails();
+
+    expect(screen.getByLabelText('ブログの名前')).toHaveValue('副業のブログ');
+  });
+
+  /** **直したい人は開いて直せる** */
+  it('名前を直して送れる', async () => {
+    vi.mocked(createBlog).mockResolvedValue({
+      blog: { id: 'blog-9' } as never,
+    });
+
+    const user = userEvent.setup();
+    render(<NewBlogPage />);
+
+    await screen.findByRole('button', { name: 'つくる' });
+    openDetails();
+
+    await user.clear(screen.getByLabelText('ブログの名前'));
+    await user.type(screen.getByLabelText('ブログの名前'), '副業メモ');
+    await user.click(screen.getByRole('button', { name: 'つくる' }));
+
+    await waitFor(() => {
+      expect(createBlog).toHaveBeenCalledWith(
+        expect.objectContaining({ name: '副業メモ' }),
+      );
+    });
+  });
+
+  /** **消したら送れない。** 下書きを消したまま通さない */
+  it('名前を消すと送れない', async () => {
+    const user = userEvent.setup();
+    render(<NewBlogPage />);
+
+    await screen.findByRole('button', { name: 'つくる' });
+    openDetails();
+
+    await user.clear(screen.getByLabelText('ブログの名前'));
+
+    expect(screen.getByRole('button', { name: 'つくる' })).toBeDisabled();
   });
 
   it('保存に失敗すると理由を出す', async () => {
@@ -174,8 +224,7 @@ describe('つくれる', () => {
     const user = userEvent.setup();
     render(<NewBlogPage />);
 
-    await user.type(await screen.findByLabelText('ブログの名前'), '副業メモ');
-    await user.click(screen.getByRole('button', { name: 'つくる' }));
+    await user.click(await screen.findByRole('button', { name: 'つくる' }));
 
     expect(
       await screen.findByText('ブログの内容を確認してください'),

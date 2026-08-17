@@ -49,6 +49,83 @@ export async function fetchWeeklyResults(
   return (await response.json()) as { results: WeeklyResultJson[] };
 }
 
+/** `NOT_OUR_BLOG`（サーバー側と同じ値。**型を借りない**） */
+export const NOT_OUR_BLOG = 'NONE';
+
+export interface ResultCsvWeekJson {
+  weekStart: string;
+  conversions: number;
+  revenueYen: number;
+}
+
+export interface ResultCsvBlogJson {
+  blogId: string;
+  blogName: string;
+  weeks: ResultCsvWeekJson[];
+  conversions: number;
+  revenueYen: number;
+}
+
+export interface ResultCsvUnassignedJson {
+  key: string;
+  offerName: string;
+  rows: number;
+  revenueYen: number;
+}
+
+export interface ResultCsvSummaryJson {
+  blogs: ResultCsvBlogJson[];
+  unassigned: ResultCsvUnassignedJson[];
+  weekStarts: string[];
+  rejectedRows: number;
+  unreadable: { rowNumber: number; problem: string }[];
+  totalRows: number;
+}
+
+export interface ResultCsvPreviewJson {
+  headers: string[];
+  mapping: Record<string, number>;
+  summary: ResultCsvSummaryJson;
+}
+
+async function postImport(body: unknown): Promise<unknown> {
+  const response = await fetch('/api/results/import', {
+    method: 'POST',
+    headers: { accept: 'application/json', 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    await readError(response);
+  }
+
+  return response.json();
+}
+
+/** CSVを読んで、まとめた結果を返す。**まだ書き込まない** */
+export async function previewResultCsv(input: {
+  csv: string;
+  mapping?: Record<string, number>;
+  assignments?: Record<string, string>;
+}): Promise<ResultCsvPreviewJson> {
+  return (await postImport({
+    action: 'preview',
+    ...input,
+  })) as ResultCsvPreviewJson;
+}
+
+/** 見た内容をそのまま書き込む（最終GO）。**対応づけは送り返す** */
+export async function registerResultCsv(input: {
+  csv: string;
+  mapping: Record<string, number>;
+  assignments?: Record<string, string>;
+}): Promise<{ savedWeeks: number; blogs: { blogName: string }[] }> {
+  return (await postImport({ action: 'register', ...input })) as {
+    savedWeeks: number;
+    blogs: { blogName: string }[];
+  };
+}
+
 export async function saveWeeklyResult(
   blogId: string,
   input: { conversions: number; revenueYen: number },

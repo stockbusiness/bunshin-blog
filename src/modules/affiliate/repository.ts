@@ -15,6 +15,7 @@ import { appendSubId, buildSubId } from './link';
 import { invalidOfferError } from './errors';
 import { generateRedirectCode, isRedirectCode } from './redirect-link';
 import type {
+  CreateOfferFromCatalogInput,
   AppAffiliateOffer,
   ConversionType,
   CreateOfferInput,
@@ -28,7 +29,13 @@ import {
   type EvaluateLandingPageOptions,
   type LpEvaluation,
 } from './lp-evaluation';
-import { normalizeCreateOffer, normalizeUpdateOffer } from './validate';
+import { AppError } from '@/lib/errors';
+import { readCatalogItem } from './catalog';
+import {
+  normalizeCreateOffer,
+  normalizeOfferUrl,
+  normalizeUpdateOffer,
+} from './validate';
 import { assertPeriod } from './validate';
 
 interface OfferRow {
@@ -260,6 +267,90 @@ export async function createOfferForUser(
       status: data.status,
       startsAt: data.startsAt,
       endsAt: data.endsAt,
+    },
+    select: SELECT,
+  });
+
+  return toAppOffer(row);
+}
+
+/**
+ * カタログの案件を、このブログの案件として登録する（Q-058・Q-055、段8）。
+ *
+ * ## クライアントの値を信じない
+ *
+ * 受け取るのは**カタログのIDとアフィリエイトリンクと使用経験だけ。**
+ * 名前も報酬額も事実も、**サーバーがカタログから読む。**
+ * 渡させると、**カタログを選んだのに中身は別物**という行が作れる。
+ *
+ * `link_mode` と `sub_id_param` は ASP の規約の判断（Q-001・Q-014）で、
+ * **モニターが決めてよいものではない。**
+ *
+ * ## 確かめた時刻はカタログのものを引き継ぐ
+ *
+ * `facts_updated_at` は「**誰かが確かめた時刻**」（D-13・Q-022）。
+ * 事実を確かめたのは運営なので、**カタログの時刻をそのまま持たせる。**
+ *
+ * - 今の時刻を入れると、**モニターが確かめたことになる**（嘘になる）
+ * - `null` にすると、**運営が確かめたのに「未確認」**になる
+ *
+ * 引き継げば、**元が新しくなったときだけ**「確かめてください」が出る
+ * （`listOffersNeedingFactCheckForUser`）。
+ *
+ * ## 使ったことがあるかは省けない
+ *
+ * **ここで記事の書き方が変わる**（`docs/MANUAL.md` 段8）。
+ * **カタログから引き継げない、本人にしか答えられないもの。**
+ *
+ * @throws {AppError} ブログが自分のものでない、カタログに無い、
+ *   選べる状態でない、リンクが読めないとき
+ */
+export async function createOfferFromCatalogForUser(
+  params: { userId: string; blogId: string },
+  input: CreateOfferFromCatalogInput,
+): Promise<AppAffiliateOffer> {
+  const blogId = await requireOpenBlogId(params);
+  const item = await readCatalogItem(input.catalogItemId);
+
+  if (item === null) {
+    throw AppError.notFound('案件が見つかりません');
+  }
+
+  // **選べないものを選ばせない。** 一覧に出していないものが
+  // IDだけで登録できる形にしない（`listSelectableCatalog` と同じ条件）
+  if (item.status !== 'ACTIVE' || item.blogPostingProhibited) {
+    throw AppError.conflict('この案件はいま選べません');
+  }
+
+  const row = await prisma.affiliateOffer.create({
+    data: {
+      blogId,
+      catalogItemId: item.id,
+      // ここから下は**すべてカタログの値**（クライアントから受け取らない）
+      name: item.name,
+      aspName: item.aspName,
+      advertiserName: item.advertiserName,
+      landingPageUrl: item.landingPageUrl,
+      rewardYen: item.rewardYen,
+      conversionType: item.conversionType,
+      facts: item.facts,
+      // **運営が確かめた時刻を引き継ぐ**（上記）
+      factsUpdatedAt: item.factsUpdatedAt,
+      denyConditions: item.denyConditions,
+      // **ASPの規約の判断はカタログが持つ**（Q-001・Q-014・Q-019）
+      linkMode: item.linkMode,
+      subIdParam: item.subIdParam,
+      blogPostingProhibited: item.blogPostingProhibited,
+      lpFormFields: item.lpFormFields,
+      lpMobileReady: item.lpMobileReady,
+      // ここから下は**本人のもの**
+      affiliateUrl: normalizeOfferUrl(
+        input.affiliateUrl,
+        'アフィリエイトリンク',
+      ),
+      userExperience: input.userExperience,
+      userRating: input.userRating ?? null,
+      status: 'ACTIVE',
     },
     select: SELECT,
   });
