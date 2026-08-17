@@ -90,6 +90,8 @@ function record(params: {
     caughtBeforePublish: params.caughtBeforePublish ?? false,
     foundAt: FOUND_AT,
     foundByUserId: params.foundByUserId ?? null,
+    // **どこから見つかったかは省けない**（2026-08-17 の決定）
+    foundVia: 'MONITOR_REPORT',
   });
 }
 
@@ -143,6 +145,7 @@ describe('記録する', () => {
         caughtBeforePublish: false,
         foundAt: FOUND_AT,
         foundByUserId: null,
+        foundVia: 'MONITOR_REPORT',
       }),
     ).rejects.toThrow();
   });
@@ -232,6 +235,7 @@ describe('一覧', () => {
       caughtBeforePublish: false,
       foundAt: new Date('2026-08-01T00:00:00.000Z'),
       foundByUserId: null,
+      foundVia: 'MONITOR_REPORT',
     });
     await record({ description: '新しい' });
 

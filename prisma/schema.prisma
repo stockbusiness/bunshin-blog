@@ -329,17 +329,18 @@ model User {
   createdAt        DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  monitorProfile MonitorProfile?
-  personas       Persona[]
-  blogs          Blog[]
-  approvals      Approval[]
-  aiUsageLogs    AiUsageLog[]
-  auditLogs      AuditLog[]         @relation("AuditActor")
-  loginTokens    AdminLoginToken[]
-  appSettings    AppSetting[]       @relation("AppSettingEditor")
-  factIssues     FactIssue[]
-  richMenus      RichMenu[]         @relation("RichMenuEditor")
-  catalogItems   OfferCatalogItem[] @relation("OfferCatalogEditor")
+  monitorProfile  MonitorProfile?
+  personas        Persona[]
+  blogs           Blog[]
+  approvals       Approval[]
+  aiUsageLogs     AiUsageLog[]
+  auditLogs       AuditLog[]         @relation("AuditActor")
+  loginTokens     AdminLoginToken[]
+  appSettings     AppSetting[]       @relation("AppSettingEditor")
+  factIssues      FactIssue[]
+  factReviewWeeks FactReviewWeek[]
+  richMenus       RichMenu[]         @relation("RichMenuEditor")
+  catalogItems    OfferCatalogItem[] @relation("OfferCatalogEditor")
 
   @@index([status])
   @@map("users")
@@ -1026,21 +1027,32 @@ model Job {
 /// 分けると、分母を組み立てるのに2か所を足し合わせることになり、
 /// **片方を数え忘れたときに率が良く出る。**
 model FactIssue {
-  id                  String        @id @default(uuid()) @db.Uuid
+  id                  String             @id @default(uuid()) @db.Uuid
   /// どの版の記事にあった誤りか。**記事ではなく版**（作り直せば直る）
-  articleVersionId    String        @map("article_version_id") @db.Uuid
+  articleVersionId    String             @map("article_version_id") @db.Uuid
   /// SPEC 16.2 が見るのは「**重大な**事実誤認」。軽微なものと分ける
   severity            IssueSeverity
   /// 何が誤っていたか。**あとから読んで分かる長さで書く**
   description         String
   /// **公開前に気づいたか。** これが分子と分母を分ける唯一の列
-  caughtBeforePublish Boolean       @map("caught_before_publish")
+  caughtBeforePublish Boolean            @map("caught_before_publish")
   /// いつ見つけたか。**記録した時刻ではない**（後からまとめて入れうる）
-  foundAt             DateTime      @map("found_at") @db.Timestamptz(6)
+  foundAt             DateTime           @map("found_at") @db.Timestamptz(6)
   /// 誰が見つけたか。**分からなければ `null`**（読者からの指摘など）
-  foundByUserId       String?       @map("found_by_user_id") @db.Uuid
-  createdAt           DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt           DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  foundByUserId       String?            @map("found_by_user_id") @db.Uuid
+  /// どこから見つかったか（2026-08-17 の決定）。
+  ///
+  /// **機械が見逃したのか、人が抜き取りで見つけたのか、読者に
+  /// 指摘されたのかで打つ手が違う。** 既定値を置かない —
+  /// 記録するたびに分かっているはずのもの
+  foundVia            FactIssueSource    @map("found_via")
+  /// 直したか（2026-08-17 の決定）。**記録しただけで直っていないのが
+  /// いちばん悪い。** 既定は `NOT_STARTED`（安全側）
+  fixStatus           FactIssueFixStatus @default(NOT_STARTED) @map("fix_status")
+  /// 直した時刻。`FIXED` なら入っていることをDBが保証する
+  fixedAt             DateTime?          @map("fixed_at") @db.Timestamptz(6)
+  createdAt           DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   articleVersion ArticleVersion @relation(fields: [articleVersionId], references: [id], onDelete: Cascade)
   /// **見つけた人を消しても記録は残す。** 誤りがあった事実は消えない
@@ -1048,12 +1060,62 @@ model FactIssue {
 
   @@index([articleVersionId])
   @@index([caughtBeforePublish, severity])
+  @@index([fixStatus])
+  @@index([foundVia])
   @@map("fact_issues")
+}
+
+/// 公開済み記事の抜き取り確認（2026-08-17 の決定）。
+///
+/// **`fact_issues` が空のとき、「誤りが無かった」のか「確かめていない」のかが
+/// 分からない。** これは `fact_issues` 自身が解いた問題と同じ形である。
+///
+/// **確認した週にだけ行を作る。** 行が無い週＝確認していない
+/// （`metrics_daily` の「行が無い＝未報告」と同じ考え。Q-059）。
+model FactReviewWeek {
+  id               String   @id @default(uuid()) @db.Uuid
+  /// JSTの月曜（Q-031。`date` 型には暦日をそのまま渡す）
+  weekStart        DateTime @unique @map("week_start") @db.Date
+  /// その週に確かめた記事の数。**0 では行を作れない**（DBの CHECK）
+  reviewedCount    Int      @map("reviewed_count")
+  /// そのうち誤りが見つかった数。**0 を記録できることが要点**
+  issueCount       Int      @map("issue_count")
+  note             String?
+  reviewedByUserId String?  @map("reviewed_by_user_id") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  /// **確認した人を消しても記録は残す**（確かめた事実は消えない）
+  reviewedBy User? @relation(fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+
+  @@map("fact_review_weeks")
 }
 
 enum IssueSeverity {
   MAJOR
   MINOR
+}
+
+/// 事実誤認をどこから見つけたか（2026-08-17 の決定）
+enum FactIssueSource {
+  /// モニターがLINEで知らせてきた
+  MONITOR_REPORT
+  /// 運営が抜き取り確認で見つけた
+  SAMPLING
+  /// 運営がそれ以外の場面で気づいた
+  OPERATOR
+  /// 読者からの指摘
+  READER
+  OTHER
+}
+
+/// 事実誤認を直したか（2026-08-17 の決定）
+enum FactIssueFixStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  FIXED
+  /// 直さないと決めた（案件が終了した、など）
+  WONT_FIX
 }
 
 model AuditLog {

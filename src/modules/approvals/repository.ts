@@ -417,6 +417,87 @@ export async function findApprovalForUser(params: {
  * **`EXPIRED` は送れなかったもの**（F-3b の期限切れ）なので、
  * `sent_at` が入っていない限り分母に入らない。
  */
+/**
+ * 判定期間ごとに、届いた提案と行った判断を数える（Q-043、8週間継続率）。
+ *
+ * **利用者ごとに窓の位置が違う**ので、`groupBy` で一度に出せない。
+ * 全体をまとめて引いてから、**各自の窓へ振り分ける。**
+ * Phase 0 は10人なので、この形で足りる。
+ *
+ * **判断は `responded_at` で数える。** 決定文が「判定期間に
+ * 承認・修正依頼・見送りのいずれかを**行った**」なので、
+ * 提案がいつ届いたかではなく、**押した時刻**が窓に入るかを見る。
+ */
+export async function countRetentionForAdmin(
+  windows: readonly { userId: string; start: Date; endExclusive: Date }[],
+): Promise<Map<string, { sent: number; decided: number }>> {
+  const counts = new Map<string, { sent: number; decided: number }>();
+
+  for (const window of windows) {
+    counts.set(window.userId, { sent: 0, decided: 0 });
+  }
+
+  if (windows.length === 0) {
+    return counts;
+  }
+
+  const earliest = new Date(
+    Math.min(...windows.map((window) => window.start.getTime())),
+  );
+  const latest = new Date(
+    Math.max(...windows.map((window) => window.endExclusive.getTime())),
+  );
+
+  const rows = await prisma.approval.findMany({
+    where: {
+      userId: { in: windows.map((window) => window.userId) },
+      OR: [
+        { sentAt: { gte: earliest, lt: latest } },
+        { respondedAt: { gte: earliest, lt: latest } },
+      ],
+    },
+    select: { userId: true, status: true, sentAt: true, respondedAt: true },
+  });
+
+  const byUser = new Map(windows.map((window) => [window.userId, window]));
+
+  for (const row of rows) {
+    const window = byUser.get(row.userId);
+    const current = counts.get(row.userId);
+
+    if (window === undefined || current === undefined) {
+      continue;
+    }
+
+    if (inWindow(row.sentAt, window)) {
+      current.sent += 1;
+    }
+
+    // **見ただけを判断に数えない**（`countApprovalActivityForAdmin` と同じ）
+    const decided =
+      row.status === 'APPROVED' ||
+      row.status === 'SKIPPED' ||
+      row.status === 'REVISION_REQUESTED';
+
+    if (decided && inWindow(row.respondedAt, window)) {
+      current.decided += 1;
+    }
+  }
+
+  return counts;
+}
+
+function inWindow(
+  at: Date | null,
+  window: { start: Date; endExclusive: Date },
+): boolean {
+  return (
+    at !== null &&
+    at.getTime() >= window.start.getTime() &&
+    at.getTime() < window.endExclusive.getTime()
+  );
+}
+
 export async function countApprovalActivityForAdmin(
   params: { windowDays?: number | undefined; now?: Date | undefined } = {},
 ): Promise<Map<string, { sent: number; responded: number }>> {

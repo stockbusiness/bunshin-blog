@@ -1,8 +1,14 @@
 import { headers } from 'next/headers';
 import { requireAdmin } from '@/modules/auth';
 import {
+  FACT_REVIEW_MIN_COUNT,
+  FACT_REVIEW_TARGET_COUNT,
   listFactIssuesForAdmin,
+  listFactReviewWeeksForAdmin,
   summarizeFactIssuesForAdmin,
+  summarizeFactReviewForAdmin,
+  type FactIssueFixStatus,
+  type FactIssueSource,
 } from '@/modules/content-generation';
 import {
   Badge,
@@ -33,6 +39,31 @@ import {
 
 export const dynamic = 'force-dynamic';
 
+/** **どこから見つかったかで打つ手が違う**（2026-08-17 の決定） */
+const SOURCE_LABELS: Readonly<Record<FactIssueSource, string>> = {
+  MONITOR_REPORT: 'モニターの報告',
+  SAMPLING: '抜き取り確認',
+  OPERATOR: '運営が発見',
+  READER: '読者の指摘',
+  OTHER: 'そのほか',
+};
+
+const FIX_LABELS: Readonly<Record<FactIssueFixStatus, string>> = {
+  NOT_STARTED: '未着手',
+  IN_PROGRESS: '直している',
+  FIXED: '直した',
+  WONT_FIX: '直さない',
+};
+
+const FIX_TONES: Readonly<
+  Record<FactIssueFixStatus, 'ok' | 'warn' | 'danger' | 'neutral'>
+> = {
+  NOT_STARTED: 'danger',
+  IN_PROGRESS: 'warn',
+  FIXED: 'ok',
+  WONT_FIX: 'neutral',
+};
+
 function formatRate(rate: number | null): string {
   return rate === null ? 'まだ判定できない' : `${Math.round(rate * 100)}%`;
 }
@@ -44,9 +75,11 @@ function formatDate(value: Date): string {
 export default async function FactIssuesPage() {
   await requireAdmin((await headers()).get('cookie'));
 
-  const [summary, issues] = await Promise.all([
+  const [summary, issues, review, reviewWeeks] = await Promise.all([
     summarizeFactIssuesForAdmin(),
     listFactIssuesForAdmin({ limit: 50 }),
+    summarizeFactReviewForAdmin(),
+    listFactReviewWeeksForAdmin({ limit: 8 }),
   ]);
 
   return (
@@ -76,6 +109,62 @@ export default async function FactIssuesPage() {
         </p>
       </Card>
 
+      {/*
+        **記録しただけで直っていないのがいちばん悪い**（2026-08-17 の決定）。
+        率とは別に、いま手を動かす対象として出す
+      */}
+      {summary.unfixed === 0 ? null : (
+        <Card title="まだ直していない誤り" tone="warn">
+          <p className="text-2xl font-bold text-slate-900">
+            {summary.unfixed} 件
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-slate-600">
+            <strong>
+              記録しただけで直っていないのがいちばん悪い状態です。
+            </strong>
+            下の表で「未着手」「直している」のものを確かめてください。
+          </p>
+        </Card>
+      )}
+
+      {/*
+        **`fact_issues` が空のとき、「誤りが無かった」のか
+        「確かめていない」のかが分からない。** 確認した事実を残す
+      */}
+      <Card
+        title="公開済み記事の抜き取り確認"
+        tone={review.reviewedThisWeek ? 'plain' : 'warn'}
+      >
+        <p className="text-sm leading-relaxed text-slate-600">
+          毎週 <strong>{FACT_REVIEW_TARGET_COUNT} 件</strong>
+          （負荷が高くても最低 {FACT_REVIEW_MIN_COUNT} 件）を確かめ、
+          <strong>確かめたこと自体を記録します</strong>（2026-08-17 の決定）。
+          記録しないと、<strong>上の表が空のときに読めなくなります</strong> —
+          誤りが無かったのか、確かめていないのかが分かりません。
+        </p>
+
+        <p className="mt-3 text-sm">
+          {review.reviewedThisWeek ? (
+            <>今週は確認済みです。</>
+          ) : (
+            <strong>今週はまだ確認していません。</strong>
+          )}{' '}
+          これまで {review.weeks} 週・{review.reviewedTotal} 件を確かめました。
+        </p>
+
+        {reviewWeeks.length === 0 ? null : (
+          <ul className="mt-3 flex flex-col gap-1 text-xs text-slate-600">
+            {reviewWeeks.map((week) => (
+              <li key={week.weekStart}>
+                {week.weekStart} の週：{week.reviewedCount} 件を確認、
+                {week.issueCount} 件の誤り
+                {week.note === null ? '' : `（${week.note}）`}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
       <section className="flex flex-col gap-3">
         <h2 className="text-base font-bold text-slate-900">最近の記録</h2>
 
@@ -92,6 +181,8 @@ export default async function FactIssuesPage() {
                 <th className={TH}>見つけた日</th>
                 <th className={TH}>重さ</th>
                 <th className={TH}>公開前か</th>
+                <th className={TH}>どこから</th>
+                <th className={TH}>直したか</th>
                 <th className={TH}>内容</th>
               </tr>
             </thead>
@@ -113,6 +204,15 @@ export default async function FactIssuesPage() {
                       {issue.caughtBeforePublish ? '公開前' : '公開後'}
                     </Badge>
                   </td>
+                  {/* **打つ手が違う**ので、経路を出す */}
+                  <td className={`${TD} whitespace-nowrap text-xs`}>
+                    {SOURCE_LABELS[issue.foundVia]}
+                  </td>
+                  <td className={TD}>
+                    <Badge tone={FIX_TONES[issue.fixStatus]}>
+                      {FIX_LABELS[issue.fixStatus]}
+                    </Badge>
+                  </td>
                   <td className={TD}>{issue.description}</td>
                 </tr>
               ))}
@@ -122,7 +222,9 @@ export default async function FactIssuesPage() {
       </section>
 
       <p className={HINT}>
-        記録の追加は <code>POST /api/admin/fact-issues</code>。
+        記録の追加は <code>POST /api/admin/fact-issues</code>、 直したかの記録は{' '}
+        <code>PATCH</code>、 抜き取り確認は{' '}
+        <code>POST /api/admin/fact-reviews</code>。
       </p>
 
       <BackLink />

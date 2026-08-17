@@ -12,6 +12,7 @@ import {
   type ResultCsvBlog,
   type ResultCsvSummary,
 } from '@/modules/analytics';
+import { recordAudit } from '@/modules/audit';
 import { requireConsentedUser } from '@/modules/auth';
 import { listOffersForUser } from '@/modules/affiliate';
 import { listBlogsForUser } from '@/modules/blogs';
@@ -173,6 +174,29 @@ async function register(
   }
 
   await saveWeeklyResultsForUser(userId, summary);
+
+  // **人が割り当てた回だけ残す**（Q-059、2026-08-17 の決定）。
+  // 割当記憶を実装する条件（未割当が2週連続で全体の20%以上、または
+  // 手動割当が週10件以上）を、ここから数える。
+  //
+  // **要らなかった回は残さない** — 正常系を全部残すと、
+  // `audit_logs` から異常が見えなくなる
+  const handAssigned = Object.keys(input.assignments ?? {}).length;
+
+  if (handAssigned > 0) {
+    await recordAudit({
+      actorUserId: userId,
+      action: 'RESULT_ASSIGNED_BY_HAND',
+      entityType: 'user',
+      entityId: userId,
+      // **割合を出せる形で残す。** 件数だけだと分母が分からない
+      metadata: {
+        handAssignedNames: handAssigned,
+        totalRows: summary.totalRows,
+        weeks: summary.weekStarts.length,
+      },
+    });
+  }
 
   return {
     savedWeeks: summary.weekStarts.length,
