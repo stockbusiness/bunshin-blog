@@ -1,5 +1,6 @@
 'use client';
 
+import { readApiErrorMessage } from '@/lib/api-error';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { BUTTON } from '../../_components/ui';
@@ -36,16 +37,11 @@ export function JobRetryButton({
       });
 
       const body = (await response.json().catch(() => null)) as {
-        message?: unknown;
         clearedCheckpoint?: unknown;
       } | null;
 
       if (!response.ok) {
-        setError(
-          typeof body?.message === 'string'
-            ? body.message
-            : '積み直せませんでした',
-        );
+        setError(readApiErrorMessage(body, '積み直せませんでした'));
 
         return;
       }

@@ -4,6 +4,8 @@
  * **画面から `fetch` を直に書かない**（`rich-menu-api` と同じ）。
  */
 
+import { readApiErrorMessage } from '@/lib/api-error';
+
 export type ConversionType =
   'FREE_SIGNUP' | 'REQUEST' | 'TRIAL' | 'PURCHASE' | 'OTHER';
 
@@ -80,9 +82,7 @@ async function request<T>(input: string, init: RequestInit = {}): Promise<T> {
   if (!response.ok) {
     throw new CatalogApiError(
       response.status,
-      typeof body['message'] === 'string'
-        ? body['message']
-        : 'うまくいきませんでした',
+      readApiErrorMessage(body, 'うまくいきませんでした'),
     );
   }
 

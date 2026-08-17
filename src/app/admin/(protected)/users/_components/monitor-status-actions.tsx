@@ -1,5 +1,6 @@
 'use client';
 
+import { readApiErrorMessage } from '@/lib/api-error';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { BUTTON, BUTTON_PRIMARY } from '../../_components/ui';
@@ -71,15 +72,9 @@ export function MonitorStatusActions({
       });
 
       if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as {
-          message?: unknown;
-        } | null;
+        const body: unknown = await response.json().catch(() => null);
 
-        setError(
-          typeof body?.message === 'string'
-            ? body.message
-            : '変更できませんでした',
-        );
+        setError(readApiErrorMessage(body, '変更できませんでした'));
 
         return;
       }

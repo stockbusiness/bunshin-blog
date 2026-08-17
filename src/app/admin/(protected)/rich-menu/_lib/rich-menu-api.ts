@@ -5,6 +5,8 @@
  * 試験で差し替えられる形にしておく。
  */
 
+import { readApiErrorMessage } from '@/lib/api-error';
+
 export interface AreaJson {
   x: number;
   y: number;
@@ -90,9 +92,7 @@ async function request<T>(input: string, init: RequestInit = {}): Promise<T> {
   if (!response.ok) {
     throw new RichMenuApiError(
       response.status,
-      typeof body['message'] === 'string'
-        ? body['message']
-        : 'うまくいきませんでした',
+      readApiErrorMessage(body, 'うまくいきませんでした'),
     );
   }
 

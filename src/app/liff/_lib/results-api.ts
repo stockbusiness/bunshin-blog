@@ -4,6 +4,8 @@
  * **サーバー側の型を借りない**（`blogs-api.ts` と同じ理由）。
  */
 
+import { readApiErrorMessage } from '@/lib/api-error';
+
 export interface WeeklyResultJson {
   /** `YYYY-MM-DD`（JSTの月曜） */
   weekStart: string;
@@ -24,13 +26,11 @@ export class ResultApiError extends Error {
 }
 
 async function readError(response: Response): Promise<never> {
-  const body = (await response.json().catch(() => null)) as {
-    message?: unknown;
-  } | null;
+  const body: unknown = await response.json().catch(() => null);
 
   throw new ResultApiError(
     response.status,
-    typeof body?.message === 'string' ? body.message : '読み込めませんでした',
+    readApiErrorMessage(body, '読み込めませんでした'),
   );
 }
 
