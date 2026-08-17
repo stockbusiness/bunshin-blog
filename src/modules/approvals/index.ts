@@ -66,7 +66,10 @@ export {
   type RevisionInput,
 } from './decide';
 
-export { countApprovalActivityForAdmin } from './repository';
+export {
+  countApprovalActivityForAdmin,
+  countRetentionForAdmin,
+} from './repository';
 
 export {
   judgeApprovalActivity,
@@ -78,3 +81,14 @@ export {
   type ActivityCounts,
   type ActivityJudgement,
 } from './activity';
+
+export {
+  RETENTION_START_DAY,
+  RETENTION_END_DAY,
+  isRetentionEligible,
+  retentionWindow,
+  summarizeRetention,
+  type RetentionEntry,
+  type RetentionSummary,
+  type RetentionWindow,
+} from './retention';

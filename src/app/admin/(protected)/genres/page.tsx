@@ -30,6 +30,16 @@ import {
  * 通すためのジャンルは**この画面から足す。** 実際に何を書けるかは
  * **案件と対になって決まる**（案件0件は停止条件）ので、
  * 先に候補だけ並べても選べない。
+ *
+ * ## 割当の偏りを見せる
+ *
+ * 2026-08-17 の決定で**「ジャンルの割当が偏らないよう事前に固定する」**
+ * と決まった（例：通信15ブログ／暮らしの固定費15ブログ）。
+ *
+ * **計画を持つ表は作らない。** 決めた配分は運用側の取り決めで、
+ * ここで要るのは**いまどうなっているか**である。
+ * **偏ったまま進むと、成果の差がジャンル差なのか分身差なのか
+ * 分からなくなる** — それを防ぐには、審査するその場で現在の数が見えればよい。
  */
 
 export const dynamic = 'force-dynamic';
@@ -47,6 +57,27 @@ export default async function AdminGenresPage() {
     listBlogsForAdmin(),
     listSelectableGenres(),
   ]);
+
+  // **いまの配分を数える**（決めた配分に寄せるための材料）
+  const assigned = new Map<string, number>();
+  let unassigned = 0;
+
+  for (const blog of blogs) {
+    if (blog.genre === null) {
+      unassigned += 1;
+      continue;
+    }
+
+    assigned.set(blog.genre.id, (assigned.get(blog.genre.id) ?? 0) + 1);
+  }
+
+  const distribution = genres
+    .filter((genre) => assigned.has(genre.id))
+    .map((genre) => ({
+      name: `${genre.category}／${genre.name}`,
+      count: assigned.get(genre.id) ?? 0,
+    }))
+    .sort((a, b) => b.count - a.count);
 
   const options = genres.map((genre) => ({
     id: genre.id,
@@ -80,10 +111,41 @@ export default async function AdminGenresPage() {
                 <Badge tone={genre.ymylRisk === 'HIGH' ? 'danger' : 'neutral'}>
                   {genre.category}／{genre.name}
                   {genre.ymylRisk === 'HIGH' ? '・YMYL' : ''}
+                  {assigned.get(genre.id) === undefined
+                    ? ''
+                    : `・${String(assigned.get(genre.id))} ブログ`}
                 </Badge>
               </li>
             ))}
           </ul>
+        )}
+      </Card>
+
+      {/*
+        **審査するその場で現在の配分を見せる**（2026-08-17 の決定）。
+        偏ったまま進むと、成果の差がジャンル差なのか分身差なのか
+        分からなくなる
+      */}
+      <Card
+        title="いまの割当"
+        description={`${String(blogs.length)} ブログ中 ${String(blogs.length - unassigned)} 件に設定済み`}
+      >
+        {distribution.length === 0 ? (
+          <p className="text-sm text-slate-500">まだ1件も付いていません。</p>
+        ) : (
+          <ul className="flex flex-col gap-1 text-sm">
+            {distribution.map((entry) => (
+              <li key={entry.name}>
+                {entry.name}：<strong>{entry.count} ブログ</strong>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {unassigned === 0 ? null : (
+          <p className="mt-2 text-xs text-slate-600">
+            ジャンル未設定が {unassigned} 件あります。
+          </p>
         )}
       </Card>
 

@@ -38,6 +38,7 @@ import {
 } from '@/modules/personas';
 import { getRuntimeEnv } from '@/modules/settings';
 import { findNotificationTargetForUser } from '@/modules/users';
+import { recordAudit } from '@/modules/audit';
 import { classifyLineReply, type ReplyKind } from './reply-classification';
 import { lineNotConfiguredError } from './errors';
 
@@ -231,6 +232,17 @@ export async function recordLineReplyForUser(
       eventId: params.eventId,
       outcome: 'PERSONA_AMBIGUOUS',
       deps,
+    });
+
+    // **保存できなかったことを残す**（2026-08-17 の決定）。
+    // 数えないと「LINE上で分身を選ばせる」へ移る判断ができない。
+    // **本文は残さない** — 記憶にしないと決めたものを別の場所へ写さない
+    await recordAudit({
+      actorUserId: params.userId,
+      action: 'REPLY_NOT_SAVED',
+      entityType: 'user',
+      entityId: params.userId,
+      metadata: { kind, personaCount: personas.length, guided },
     });
 
     return { kind, outcome: 'PERSONA_AMBIGUOUS', guided };

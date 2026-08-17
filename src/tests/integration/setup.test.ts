@@ -44,14 +44,15 @@ describe('統合テスト基盤', () => {
    * J-7 で `fact_issues` を足して 29。
    * Q-054 で `rich_menus` を足して 30。
    * Q-055 で `offer_catalog_items` を足して 31。
+   * 2026-08-17 の決定で `fact_review_weeks` を足して 32。
    */
-  it('マイグレーションで31テーブルが作られている', async () => {
+  it('マイグレーションで32テーブルが作られている', async () => {
     const rows = await prisma.$queryRawUnsafe<{ count: bigint }[]>(
       `select count(*)::bigint as count from information_schema.tables
        where table_schema = 'public' and table_name <> '_prisma_migrations'`,
     );
 
-    expect(Number(rows[0]?.count ?? 0)).toBe(31);
+    expect(Number(rows[0]?.count ?? 0)).toBe(32);
   });
 
   it('ユーザーとブログを作れる', async () => {

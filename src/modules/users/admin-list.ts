@@ -23,6 +23,13 @@ export interface AdminMonitorSummary {
   onboardingStatus: OnboardingStatus | null;
   termsAcceptedAt: Date | null;
   dataUseConsentAt: Date | null;
+  /**
+   * ADMINが参加を認めた時刻（Q-034）。**8週間継続率の起点**（Q-043）。
+   *
+   * **`created_at` で代用できない。** あちらは招待した時刻で、
+   * 承認までの待ち時間のぶん**継続率の窓がずれる。**
+   */
+  activatedAt: Date | null;
   createdAt: Date;
 }
 
@@ -45,6 +52,7 @@ export async function listMonitorsForAdmin(): Promise<AdminMonitorSummary[]> {
       status: true,
       termsAcceptedAt: true,
       dataUseConsentAt: true,
+      activatedAt: true,
       createdAt: true,
       monitorProfile: { select: { onboardingStatus: true } },
     },
@@ -64,6 +72,7 @@ export async function listMonitorsForAdmin(): Promise<AdminMonitorSummary[]> {
         : (record.monitorProfile.onboardingStatus as OnboardingStatus),
     termsAcceptedAt: record.termsAcceptedAt,
     dataUseConsentAt: record.dataUseConsentAt,
+    activatedAt: record.activatedAt,
     createdAt: record.createdAt,
   }));
 }
